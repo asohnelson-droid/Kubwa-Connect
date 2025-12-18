@@ -1,0 +1,9 @@
+{
+  "name": "Kubwa Connect",
+  "description": "A community super app for Kubwa residents to shop, hire services, and book deliveries.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
