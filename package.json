@@ -1,3 +1,4 @@
+
 {
   "name": "kubwa-connect",
   "private": true,
@@ -10,10 +11,10 @@
     "type-check": "tsc"
   },
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "dependencies": {
-    "@google/genai": "^0.1.1",
+    "@google/genai": "^0.21.0",
     "@supabase/supabase-js": "^2.39.0",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",

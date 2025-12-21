@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, AppSection, ActivityItem, Address } from '../types';
 import { api, FIXIT_SERVICES, KUBWA_AREAS } from '../services/data';
@@ -27,7 +28,16 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
   const [editForm, setEditForm] = useState({
     name: '',
     bio: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    storeName: '',
+    address: ''
+  });
+
+  // Vendor Form State for Upgrade/Signup Completion
+  const [vendorForm, setVendorForm] = useState({
+    storeName: '',
+    description: '',
+    businessAddress: ''
   });
 
   // Data State
@@ -65,7 +75,9 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
       setEditForm({
         name: user.name || '',
         bio: user.bio || '',
-        phoneNumber: user.phoneNumber || ''
+        phoneNumber: user.phoneNumber || '',
+        storeName: user.storeName || '',
+        address: user.address || ''
       });
 
       // Pre-fill fixit form
@@ -75,9 +87,19 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
           phoneNumber: user.phoneNumber || ''
       }));
 
-      // CHECK FOR UPGRADE INTENT (Fix for "Become Vendor" flow)
-      if (authIntent?.role === 'VENDOR' && user.role !== 'VENDOR' && user.role !== 'ADMIN') {
+      // CHECK FOR UPGRADE INTENT OR INCOMPLETE VENDOR SIGNUP
+      const isVendorUpgradeNeeded = authIntent?.role === 'VENDOR' && user.role !== 'VENDOR';
+      const isVendorSignupIncomplete = user.role === 'VENDOR' && !user.storeName;
+      
+      if (isVendorUpgradeNeeded || isVendorSignupIncomplete) {
           setShowUpgradeModal(true);
+          // Pre-fill vendor form if possible
+          setVendorForm(prev => ({
+            ...prev,
+            storeName: user.storeName || '',
+            description: user.bio || '',
+            businessAddress: user.address || ''
+          }));
       }
     }
   }, [user, activeTab, authIntent]);
@@ -151,7 +173,9 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
     const updatedUser = await api.users.updateProfile(user.id, {
       name: editForm.name,
       bio: editForm.bio,
-      phoneNumber: editForm.phoneNumber
+      phoneNumber: editForm.phoneNumber,
+      storeName: editForm.storeName,
+      address: editForm.address
     });
 
     if (updatedUser) {
@@ -167,18 +191,31 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
 
   const handleUpgradeToVendor = async () => {
       if (!user) return;
+      if (!vendorForm.storeName || !vendorForm.businessAddress) {
+          setError("Store Name and Business Address are required.");
+          return;
+      }
+      
       setLoading(true);
-      const success = await api.users.updateRole(user.id, 'VENDOR');
-      if (success) {
-          await refreshUser(); // Fetch new role
+      setError('');
+      
+      const roleSuccess = await api.users.updateRole(user.id, 'VENDOR');
+      const profileSuccess = await api.users.updateProfile(user.id, {
+          storeName: vendorForm.storeName,
+          bio: vendorForm.description,
+          address: vendorForm.businessAddress
+      });
+
+      if (roleSuccess && profileSuccess) {
+          await refreshUser(); // Fetch new role and profile data
           setShowUpgradeModal(false);
-          setSuccessMsg("Congratulations! You are now a Vendor.");
+          setSuccessMsg("Congratulations! Your vendor profile is set up.");
           // Redirect to Mart after short delay
           setTimeout(() => {
               if (setSection) setSection(AppSection.MART);
           }, 1500);
       } else {
-          setError("Upgrade failed. Please contact support.");
+          setError("Action failed. Please contact support.");
       }
       setLoading(false);
   };
@@ -244,7 +281,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
     }
   };
 
-  // --- GUEST VIEW (Login/Signup/Forgot) ---
+  // --- GUEST VIEW ---
   if (!user) {
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 animate-fade-in">
@@ -389,25 +426,72 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
   return (
     <div className="pb-24 pt-4 px-4 max-w-2xl mx-auto relative">
       
-      {/* UPGRADE MODAL */}
+      {/* VENDOR UPGRADE / SETUP MODAL */}
       {showUpgradeModal && (
           <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <Card className="w-full max-w-sm text-center p-6 animate-zoom-in">
-                  <div className="w-16 h-16 bg-green-100 text-kubwa-green rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Store size={32} />
+              <Card className="w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh] animate-zoom-in">
+                  <div className="bg-kubwa-green text-white p-4 text-center">
+                      <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <Store size={24} />
+                      </div>
+                      <h3 className="text-xl font-bold">Vendor Onboarding</h3>
+                      <p className="text-white/80 text-xs">Set up your store to start selling in Kubwa.</p>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Become a Vendor</h3>
-                  <p className="text-gray-600 mb-6 text-sm">
-                      Upgrade your account to start selling products on Kubwa Mart. 
-                      You'll get access to a vendor dashboard and analytics.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                      <Button onClick={handleUpgradeToVendor} disabled={loading} className="w-full py-3 flex items-center justify-center gap-2">
-                          {loading ? <Loader2 className="animate-spin" /> : 'Confirm Upgrade'}
+                  
+                  <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                      {error && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs flex items-center gap-2">
+                          <AlertCircle size={16} /> {error}
+                        </div>
+                      )}
+
+                      <div>
+                          <label className="text-xs font-bold text-gray-700 mb-1 block">Store Name</label>
+                          <Input 
+                            value={vendorForm.storeName} 
+                            onChange={e => setVendorForm({...vendorForm, storeName: e.target.value})}
+                            placeholder="e.g. Mama Nkechi Groceries" 
+                            required
+                          />
+                      </div>
+
+                      <div>
+                          <label className="text-xs font-bold text-gray-700 mb-1 block">Business Address</label>
+                          <Input 
+                            value={vendorForm.businessAddress} 
+                            onChange={e => setVendorForm({...vendorForm, businessAddress: e.target.value})}
+                            placeholder="e.g. Shop 12, Phase 4 Market, Kubwa" 
+                            required
+                          />
+                      </div>
+
+                      <div>
+                          <label className="text-xs font-bold text-gray-700 mb-1 block">Store Description</label>
+                          <textarea 
+                            className="w-full p-3 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-kubwa-green outline-none"
+                            rows={4}
+                            placeholder="Tell customers what you sell and why they should buy from you..."
+                            value={vendorForm.description}
+                            onChange={e => setVendorForm({...vendorForm, description: e.target.value})}
+                          />
+                      </div>
+
+                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2">
+                         <Shield size={20} className="text-blue-500 shrink-0" />
+                         <p className="text-[10px] text-blue-700">
+                           As a vendor, your store details will be visible to all Kubwa Connect users. 
+                           Ensure your information is accurate for better trust and sales.
+                         </p>
+                      </div>
+                  </div>
+
+                  <div className="p-4 border-t bg-gray-50 flex gap-3">
+                      {user.role !== 'VENDOR' && (
+                        <Button variant="outline" className="flex-1" onClick={() => setShowUpgradeModal(false)}>Cancel</Button>
+                      )}
+                      <Button onClick={handleUpgradeToVendor} disabled={loading} className="flex-[2] bg-kubwa-green hover:opacity-90">
+                          {loading ? <Loader2 className="animate-spin" /> : 'Complete Setup'}
                       </Button>
-                      <button onClick={() => setShowUpgradeModal(false)} className="text-sm text-gray-500 hover:text-gray-800 py-2">
-                          Cancel
-                      </button>
                   </div>
               </Card>
           </div>
@@ -459,7 +543,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                                   <button
                                     key={service}
                                     onClick={() => toggleFixitService(service)}
-                                    className={`text-[10px] py-2 px-1 rounded border transition-all ${fixitForm.services.includes(service) ? 'bg-orange-100 border-orange-500 text-orange-800 font-bold' : 'bg-gray-50 border-gray-200 text-gray-600'}`}
+                                    className={`text-[10px] py-2 px-1 rounded border transition-all ${fixitForm.services.includes(service) ? 'bg-orange-100 border-orange-500 text-orange-800 font-bold' : 'bg-white border-gray-200 text-gray-600'}`}
                                   >
                                       {service}
                                   </button>
@@ -490,7 +574,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
       )}
 
       {/* Header Profile Card */}
-      <Card className="mb-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white border-none">
+      <Card className="mb-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white border-none shadow-xl">
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-2xl font-bold border-2 border-white/30">
@@ -663,20 +747,51 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                  )}
               </div>
 
-              {/* Bio Field */}
+              {/* Vendor Specific Fields */}
+              {user.role === 'VENDOR' && (
+                <div className="pt-4 mt-4 border-t border-gray-100 space-y-4">
+                  <h4 className="text-xs font-bold text-kubwa-green uppercase">Store Details</h4>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Store Name</label>
+                    {isEditing ? (
+                      <Input 
+                        value={editForm.storeName} 
+                        onChange={(e) => setEditForm({...editForm, storeName: e.target.value})}
+                        className="bg-gray-50"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-900">{user.storeName || 'Not set'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Business Address</label>
+                    {isEditing ? (
+                      <Input 
+                        value={editForm.address} 
+                        onChange={(e) => setEditForm({...editForm, address: e.target.value})}
+                        className="bg-gray-50"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-900">{user.address || 'Not set'}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Bio / Description Field */}
               <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Bio</label>
+                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{user.role === 'VENDOR' ? 'Store Description' : 'Bio'}</label>
                  {isEditing ? (
                    <textarea
                      value={editForm.bio}
                      onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
                      className="w-full p-3 bg-gray-50 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kubwa-green"
                      rows={3}
-                     placeholder="Tell us a bit about yourself..."
+                     placeholder={user.role === 'VENDOR' ? "Describe your store..." : "Tell us about yourself..."}
                    />
                  ) : (
                    <p className="text-sm text-gray-600 leading-relaxed italic">
-                     {user.bio || "No bio provided yet."}
+                     {user.bio || "No description provided yet."}
                    </p>
                  )}
               </div>
