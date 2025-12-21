@@ -23,6 +23,11 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   
+  // Vendor specific signup fields
+  const [storeName, setStoreName] = useState('');
+  const [storeDescription, setStoreDescription] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+
   // Profile Edit State
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -141,11 +146,29 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
           }
         }
       } else {
-        // SIGNUP - Uses the detected role (User or Rider)
+        // SIGNUP
+        // Validate vendor specific fields if that's the role
+        if (signupRole === 'VENDOR') {
+          if (!storeName || !businessAddress) {
+            setError("Store Name and Business Address are required for vendors.");
+            setLoading(false);
+            return;
+          }
+        }
+
         const { user: newUser, error } = await api.auth.signUp(email, password, name, signupRole);
         if (error) {
           setError(error);
         } else if (newUser) {
+          // If vendor, update their profile with the extra info immediately
+          if (signupRole === 'VENDOR') {
+            await api.users.updateProfile(newUser.id, {
+              storeName: storeName,
+              bio: storeDescription,
+              address: businessAddress
+            });
+          }
+          
           setUser(newUser);
           if (authIntent && setSection) {
             setSection(authIntent.section);
@@ -292,12 +315,18 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                   <Bike size={24} />
                </div>
             )}
+            {signupRole === 'VENDOR' && authView === 'SIGNUP' && (
+               <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Store size={24} />
+               </div>
+            )}
             <h2 className="text-2xl font-bold text-gray-900">
                 {authView === 'LOGIN' ? 'Welcome Back' : authView === 'SIGNUP' ? 'Create Account' : 'Reset Password'}
             </h2>
             <p className="text-gray-500 text-sm mt-1">
               {authView === 'LOGIN' ? 'Sign in to access your orders and profile.' : 
                authView === 'SIGNUP' && signupRole === 'RIDER' ? 'Join as a Rider and start earning.' :
+               authView === 'SIGNUP' && signupRole === 'VENDOR' ? 'Open your store on Kubwa Connect.' :
                authView === 'SIGNUP' ? 'Join the Kubwa Connect community today.' :
                'Enter your email to receive a reset link.'}
             </p>
@@ -349,14 +378,50 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                     required 
                   />
                 </div>
-                {authView === 'LOGIN' && (
-                    <div className="flex justify-end mt-1">
-                        <button type="button" onClick={() => { setAuthView('FORGOT'); setError(''); setSuccessMsg(''); }} className="text-xs text-kubwa-green hover:underline">
-                            Forgot Password?
-                        </button>
-                    </div>
-                )}
               </div>
+            )}
+
+            {/* Vendor Specific Onboarding Fields during Signup */}
+            {authView === 'SIGNUP' && signupRole === 'VENDOR' && (
+              <div className="space-y-4 pt-2 border-t mt-4">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Store Information</p>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 mb-1 block">Store Name</label>
+                  <Input 
+                    placeholder="e.g. Phase 4 Provisions" 
+                    value={storeName} 
+                    onChange={e => setStoreName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 mb-1 block">Business Address</label>
+                  <Input 
+                    placeholder="e.g. Shop 45, Market Square" 
+                    value={businessAddress} 
+                    onChange={e => setBusinessAddress(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 mb-1 block">Store Description (Optional)</label>
+                  <textarea 
+                    className="w-full p-3 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-kubwa-green outline-none"
+                    rows={3}
+                    placeholder="What do you sell?"
+                    value={storeDescription}
+                    onChange={e => setStoreDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {authView === 'LOGIN' && (
+                <div className="flex justify-end mt-1">
+                    <button type="button" onClick={() => { setAuthView('FORGOT'); setError(''); setSuccessMsg(''); }} className="text-xs text-kubwa-green hover:underline">
+                        Forgot Password?
+                    </button>
+                </div>
             )}
 
             {error && (
@@ -373,7 +438,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
 
             <Button className="w-full py-3 flex items-center justify-center gap-2" disabled={loading}>
               {loading && <Loader2 className="animate-spin" size={18} />}
-              {authView === 'LOGIN' ? 'Sign In' : authView === 'SIGNUP' ? (signupRole === 'RIDER' ? 'Register Rider' : 'Sign Up') : 'Send Link'}
+              {authView === 'LOGIN' ? 'Sign In' : authView === 'SIGNUP' ? (signupRole === 'RIDER' ? 'Register Rider' : signupRole === 'VENDOR' ? 'Create Store' : 'Sign Up') : 'Send Link'}
             </Button>
           </form>
 
@@ -401,25 +466,6 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
         </Card>
       </div>
     );
-  }
-
-  // --- WAITING FOR APPROVAL VIEW (FOR RIDERS) ---
-  if (user.role === 'RIDER' && user.status === 'PENDING') {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 animate-fade-in text-center">
-           <div className="w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
-              <Shield size={48} className="text-yellow-600" />
-           </div>
-           <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Pending Approval</h2>
-           <p className="text-gray-600 max-w-xs mx-auto mb-8 leading-relaxed">
-              Thanks for registering as a rider! Our team is reviewing your application. 
-              You will be notified once your account is active.
-           </p>
-           <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
-              <LogOut size={18} /> Sign Out
-           </Button>
-        </div>
-      );
   }
 
   // --- LOGGED IN VIEW ---
@@ -470,18 +516,10 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                           <textarea 
                             className="w-full p-3 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-kubwa-green outline-none"
                             rows={4}
-                            placeholder="Tell customers what you sell and why they should buy from you..."
+                            placeholder="Tell customers what you sell..."
                             value={vendorForm.description}
                             onChange={e => setVendorForm({...vendorForm, description: e.target.value})}
                           />
-                      </div>
-
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2">
-                         <Shield size={20} className="text-blue-500 shrink-0" />
-                         <p className="text-[10px] text-blue-700">
-                           As a vendor, your store details will be visible to all Kubwa Connect users. 
-                           Ensure your information is accurate for better trust and sales.
-                         </p>
                       </div>
                   </div>
 
@@ -491,82 +529,6 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                       )}
                       <Button onClick={handleUpgradeToVendor} disabled={loading} className="flex-[2] bg-kubwa-green hover:opacity-90">
                           {loading ? <Loader2 className="animate-spin" /> : 'Complete Setup'}
-                      </Button>
-                  </div>
-              </Card>
-          </div>
-      )}
-
-      {/* FIXIT ONBOARDING MODAL */}
-      {showFixitModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <Card className="w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh] animate-zoom-in">
-                  <div className="bg-kubwa-orange text-white p-4">
-                      <h3 className="text-lg font-bold flex items-center gap-2"><Wrench size={20}/> Become a Fixit Pro</h3>
-                      <p className="text-xs text-white/80">Fill in your details to start earning.</p>
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto flex-1 space-y-4">
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Business/Display Name</label>
-                          <Input 
-                            value={fixitForm.businessName} 
-                            onChange={e => setFixitForm({...fixitForm, businessName: e.target.value})}
-                            placeholder="e.g. Musa Electric" 
-                          />
-                      </div>
-                      
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Phone Number (Required)</label>
-                          <Input 
-                            type="tel"
-                            value={fixitForm.phoneNumber} 
-                            onChange={e => setFixitForm({...fixitForm, phoneNumber: e.target.value})}
-                            placeholder="080..." 
-                          />
-                      </div>
-
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Location</label>
-                          <Select 
-                            value={fixitForm.location}
-                            onChange={e => setFixitForm({...fixitForm, location: e.target.value})}
-                          >
-                              {KUBWA_AREAS.map(area => <option key={area} value={area}>{area}</option>)}
-                          </Select>
-                      </div>
-
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Services Offered (Select all that apply)</label>
-                          <div className="grid grid-cols-2 gap-2">
-                              {FIXIT_SERVICES.map(service => (
-                                  <button
-                                    key={service}
-                                    onClick={() => toggleFixitService(service)}
-                                    className={`text-[10px] py-2 px-1 rounded border transition-all ${fixitForm.services.includes(service) ? 'bg-orange-100 border-orange-500 text-orange-800 font-bold' : 'bg-white border-gray-200 text-gray-600'}`}
-                                  >
-                                      {service}
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Short Bio / Experience</label>
-                          <textarea 
-                            className="w-full p-2 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none"
-                            rows={3}
-                            placeholder="I have 5 years experience repairing ACs..."
-                            value={fixitForm.bio}
-                            onChange={e => setFixitForm({...fixitForm, bio: e.target.value})}
-                          />
-                      </div>
-                  </div>
-
-                  <div className="p-4 border-t bg-gray-50 flex gap-3">
-                      <Button variant="outline" className="flex-1" onClick={() => setShowFixitModal(false)}>Cancel</Button>
-                      <Button onClick={handleBecomeFixit} disabled={loading} className="flex-[2] bg-kubwa-orange hover:bg-orange-600">
-                          {loading ? <Loader2 className="animate-spin" /> : 'Submit Application'}
                       </Button>
                   </div>
               </Card>
@@ -809,17 +771,6 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                </div>
             )}
           </Card>
-          
-          <Card>
-            <h3 className="font-bold text-gray-800 mb-4">Verification Status</h3>
-            <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
-               <Shield size={24} className="text-blue-600" />
-               <div>
-                  <p className="font-bold text-blue-900 text-sm">Level 1 Verified</p>
-                  <p className="text-xs text-blue-700">Email verified. Add NIN for full verification.</p>
-               </div>
-            </div>
-          </Card>
         </div>
       )}
 
@@ -851,12 +802,6 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent
                         </span>
                      </div>
                      <p className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</p>
-                     {item.type === 'MART' && 'total' in item && (
-                        <p className="text-xs font-bold text-gray-900 mt-1">₦{item.total.toLocaleString()}</p>
-                     )}
-                     {item.type === 'SERVICE' && 'amount' in item && (
-                        <p className="text-xs font-bold text-gray-900 mt-1">₦{item.amount.toLocaleString()}</p>
-                     )}
                   </div>
                </Card>
              ))
