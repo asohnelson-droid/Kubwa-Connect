@@ -449,7 +449,15 @@ export const api = {
             });
             return true;
         },
-        updateStatus: async (id, status, reason) => true,
+        updateStatus: async (id, status, reason) => {
+            const product = MOCK_PRODUCTS.find(p => p.id === id);
+            if (product) {
+                product.status = status;
+                product.rejectionReason = reason;
+                return true;
+            }
+            return false;
+        },
         createOrder: async (userId: string, items: CartItem[], total: number, deliveryFee: number, method: string, address: string, phone: string) => {
             MOCK_ORDERS.push({
                 id: `ord_${Date.now()}`,

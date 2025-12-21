@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Wrench, Truck, ChevronRight, User, Store, Bike, Search, MapPin, Bell, X, Star, ShieldCheck, Crown, Flame, Clock } from 'lucide-react';
+import { ShoppingBag, Wrench, Truck, ChevronRight, User, Store, Bike, Search, MapPin, Bell, X, Star, ShieldCheck, Crown, Flame, Clock, Briefcase } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
 import { Button, Card, Select } from '../components/ui';
 import { KUBWA_AREAS, api } from '../services/data';
@@ -103,6 +103,15 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
       setSection(AppSection.RIDE);
     } else {
       setAuthIntent({ section: AppSection.RIDE, role: 'RIDER' });
+      setSection(AppSection.ACCOUNT);
+    }
+  };
+
+  const handleProviderAction = () => {
+    if (user?.role === 'PROVIDER') {
+      setSection(AppSection.FIXIT);
+    } else {
+      setAuthIntent({ section: AppSection.FIXIT, role: 'PROVIDER' });
       setSection(AppSection.ACCOUNT);
     }
   };
@@ -236,7 +245,54 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
          </div>
       </div>
 
-      {/* Fresh from Mart Section (NEW) */}
+      {/* Role-Based CTA Cards (Updated for 3 columns) */}
+      <div className="px-4 mt-8">
+         <div className="grid grid-cols-3 gap-2">
+            <div 
+              onClick={handleVendorAction}
+              className="bg-gradient-to-br from-gray-900 to-gray-800 p-2.5 rounded-xl text-white relative overflow-hidden cursor-pointer shadow-sm active:scale-95 transition-transform"
+            >
+               <div className="relative z-10">
+                  <Store size={18} className="mb-1.5 text-kubwa-green" />
+                  <h4 className="font-bold text-[10px] leading-tight">Become a Vendor</h4>
+                  <p className="text-[8px] text-gray-400 mt-0.5 line-clamp-1">Sell to Kubwa</p>
+               </div>
+               <div className="absolute right-[-10px] bottom-[-10px] opacity-10">
+                  <Store size={50} />
+               </div>
+            </div>
+
+            <div 
+              onClick={handleProviderAction}
+              className="bg-gradient-to-br from-orange-600 to-amber-500 p-2.5 rounded-xl text-white relative overflow-hidden cursor-pointer shadow-sm active:scale-95 transition-transform"
+            >
+               <div className="relative z-10">
+                  <Briefcase size={18} className="mb-1.5 text-white" />
+                  <h4 className="font-bold text-[10px] leading-tight">Provide Services</h4>
+                  <p className="text-[8px] text-orange-100 mt-0.5 line-clamp-1">Find clients fast</p>
+               </div>
+               <div className="absolute right-[-10px] bottom-[-10px] opacity-20">
+                  <Briefcase size={50} />
+               </div>
+            </div>
+            
+            <div 
+              onClick={handleRiderAction}
+              className="bg-gradient-to-br from-blue-600 to-blue-500 p-2.5 rounded-xl text-white relative overflow-hidden cursor-pointer shadow-sm active:scale-95 transition-transform"
+            >
+               <div className="relative z-10">
+                  <Bike size={18} className="mb-1.5 text-white" />
+                  <h4 className="font-bold text-[10px] leading-tight">Earn as Rider</h4>
+                  <p className="text-[8px] text-blue-100 mt-0.5 line-clamp-1">Daily earnings</p>
+               </div>
+               <div className="absolute right-[-10px] bottom-[-10px] opacity-10">
+                  <Bike size={50} />
+               </div>
+            </div>
+         </div>
+      </div>
+
+      {/* Fresh from Mart Section */}
       <div className="px-4 mt-8">
          <div className="flex justify-between items-center mb-4">
             <div>
@@ -340,39 +396,6 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
                   </div>
                </div>
             ))}
-         </div>
-      </div>
-
-      {/* Role-Based CTA Cards */}
-      <div className="px-4 mb-8">
-         <div className="grid grid-cols-2 gap-3">
-            <div 
-              onClick={handleVendorAction}
-              className="bg-gradient-to-br from-gray-900 to-gray-800 p-4 rounded-xl text-white relative overflow-hidden cursor-pointer"
-            >
-               <div className="relative z-10">
-                  <Store className="mb-2 text-kubwa-green" />
-                  <h4 className="font-bold text-sm">Become a Vendor</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">Sell to thousands in Kubwa</p>
-               </div>
-               <div className="absolute right-0 bottom-0 opacity-10">
-                  <Store size={80} />
-               </div>
-            </div>
-            
-            <div 
-              onClick={handleRiderAction}
-              className="bg-blue-600 p-4 rounded-xl text-white relative overflow-hidden cursor-pointer"
-            >
-               <div className="relative z-10">
-                  <Bike className="mb-2 text-white" />
-                  <h4 className="font-bold text-sm">Earn as Rider</h4>
-                  <p className="text-[10px] text-blue-200 mt-1">Deliver and get paid daily</p>
-               </div>
-               <div className="absolute right-0 bottom-0 opacity-10">
-                  <Bike size={80} />
-               </div>
-            </div>
          </div>
       </div>
     </div>

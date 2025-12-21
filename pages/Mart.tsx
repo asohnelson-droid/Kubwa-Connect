@@ -358,6 +358,10 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (newProduct.images.length >= 3) {
+      alert("Maximum 3 images allowed.");
+      return;
+    }
     if (e.target.files && e.target.files[0]) {
        const reader = new FileReader();
        reader.onloadend = () => {
@@ -374,7 +378,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
      // Simulated crop result
      const croppedDataUrl = cropImage; 
      if (croppedDataUrl) {
-       setNewProduct(prev => ({ ...prev, images: [...prev.images, croppedDataUrl] }));
+       setNewProduct(prev => ({ ...prev, images: [...prev.images, croppedDataUrl].slice(0, 3) }));
        setCropImage(null);
      }
   };
@@ -390,7 +394,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       price: product.price.toString(),
       category: product.category,
       stock: product.stock.toString(),
-      images: [product.image, ...(product.images || [])].filter(Boolean),
+      images: [product.image, ...(product.images || [])].filter(Boolean).slice(0, 3),
       phoneNumber: product.phoneNumber || '',
       location: product.location || '',
       description: product.description || ''
@@ -999,7 +1003,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                    </div>
                 </div>
                 <div className="flex justify-between items-center mt-1">
-                  <span className="font-bold text-kubwa-green">₦{product.price.toLocaleString()}</p>
+                  <span className="font-bold text-kubwa-green">₦{product.price.toLocaleString()}</span>
                   <button 
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 active:scale-95 ${
                       quantityInCart > 0 
@@ -1280,21 +1284,29 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  {/* Image Upload & Cropper Trigger */}
                  <div>
                     <label className="text-xs font-bold text-gray-700 mb-1 block">Product Images (Max 3)</label>
-                    <div className="flex gap-2 mb-2 overflow-x-auto">
+                    <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar">
                         {newProduct.images.map((img, idx) => (
                             <div key={idx} className="relative w-20 h-20 shrink-0 border rounded-lg bg-gray-100">
                                 <img src={img} alt={`Product ${idx+1}`} className="w-full h-full object-cover rounded-lg" />
                                 <button type="button" onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow"><X size={12}/></button>
                             </div>
                         ))}
-                        {newProduct.images.length < 3 && (
+                        {newProduct.images.length < 3 ? (
                             <div className="w-20 h-20 shrink-0 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50 relative cursor-pointer hover:bg-gray-100 transition-colors">
                                 <ImageIcon className="text-gray-400 mb-1" size={20} />
                                 <span className="text-[10px] text-gray-500 text-center">Add Photo</span>
                                 <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
                             </div>
+                        ) : (
+                            <div className="w-20 h-20 shrink-0 border border-kubwa-orange/30 rounded-lg flex flex-col items-center justify-center bg-orange-50/50 p-2 text-center animate-fade-in">
+                                <AlertTriangle className="text-kubwa-orange mb-1" size={16} />
+                                <span className="text-[8px] font-bold text-kubwa-orange uppercase tracking-tighter leading-none">Max Limit Reached</span>
+                            </div>
                         )}
                     </div>
+                    {newProduct.images.length === 3 && (
+                        <p className="text-[10px] text-kubwa-orange font-bold mt-1">You've reached the maximum image limit for this item.</p>
+                    )}
                  </div>
 
                  <div className="grid grid-cols-2 gap-3">
