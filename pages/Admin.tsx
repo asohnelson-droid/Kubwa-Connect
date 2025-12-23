@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Card, Badge, Button, Input } from '../components/ui';
-import { Users, LayoutDashboard, Loader2, Search, ShoppingBag, CheckCircle, XCircle, DollarSign, Package, Trash2, ExternalLink, Ban, RefreshCw, BellRing, ShieldCheck, Briefcase, Database, Megaphone, UserPlus, Activity, UserX, TrendingUp, Send, Flag, MoreVertical, MessageSquare, Star, List, Settings, Save, AlertTriangle, ToggleLeft, ToggleRight, Lock, ShieldAlert, CheckSquare, Ghost, EyeOff, Eye, Truck, Bike, FileText, X, MapPin, Folder, Crown, Wrench } from 'lucide-react';
+import { Card, Badge, Button, Input, Select } from '../components/ui';
+import { Users, LayoutDashboard, Loader2, Search, ShoppingBag, CheckCircle, XCircle, DollarSign, Package, Trash2, ExternalLink, Ban, RefreshCw, BellRing, ShieldCheck, Briefcase, Database, Megaphone, UserPlus, Activity, UserX, TrendingUp, Send, Flag, MoreVertical, MessageSquare, Star, List, Settings, Save, AlertTriangle, ToggleLeft, ToggleRight, Lock, ShieldAlert, CheckSquare, Ghost, EyeOff, Eye, Truck, Bike, FileText, X, MapPin, Folder, Crown, Wrench, Shield } from 'lucide-react';
 import { api, FEATURED_PLANS, MOCK_RIDERS, PRODUCT_CATEGORIES, CategoryDefinition } from '../services/data';
 import { User, UserRole, Product, ServiceProvider, DeliveryRequest, ServiceOrder, Announcement, Review, AnalyticsData, SystemSettings, FeaturedRequest, MartOrder, AdminLog } from '../types';
 
@@ -21,28 +22,20 @@ const EmptyState = ({ icon: Icon, title, description, action }: { icon: any, tit
 );
 
 const Admin: React.FC<AdminProps> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'finance' | 'orders' | 'content' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'providers' | 'orders' | 'content' | 'settings'>('overview');
   const [stats, setStats] = useState<AnalyticsData | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [userFilter, setUserFilter] = useState<'ALL' | UserRole>('ALL');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [recentReviews, setRecentReviews] = useState<Review[]>([]);
   const [contentType, setContentType] = useState<'PRODUCTS' | 'ANNOUNCEMENTS' | 'REVIEWS'>('PRODUCTS');
   const [productView, setProductView] = useState<'PENDING' | 'LIVE'>('PENDING');
-  const [productSearch, setProductSearch] = useState('');
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
-  const [logs, setLogs] = useState<AdminLog[]>([]);
   const [logisticsView, setLogisticsView] = useState<'ORDERS' | 'DELIVERIES' | 'LOGS'>('ORDERS');
-  const [assignRiderModal, setAssignRiderModal] = useState<string | null>(null);
-  const [disputeModal, setDisputeModal] = useState<string | null>(null);
-  const [disputeReason, setDisputeReason] = useState('');
-  const [featureRequests, setFeatureRequests] = useState<FeaturedRequest[]>([]);
   const [settings, setSettings] = useState<SystemSettings>({
      allowSignups: true,
      maintenanceMode: false,
@@ -51,17 +44,10 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
      supportPhone: '',
      minVersion: ''
   });
-  const [categoryList, setCategoryList] = useState<CategoryDefinition[]>([]);
-  const [savingSettings, setSavingSettings] = useState(false);
-  const [broadcastTitle, setBroadcastTitle] = useState('');
-  const [broadcastBody, setBroadcastBody] = useState('');
-  const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<{type: 'success'|'error', text: string} | null>(null);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [activeTab, contentType, logisticsView]);
+  useEffect(() => { loadDashboardData(); }, [activeTab, contentType, logisticsView]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -71,6 +57,7 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
     if (activeTab === 'users') {
         const data = await api.users.getAll();
         setUsers(data);
+    } else if (activeTab === 'providers') {
         const provs = await api.admin.getAllProviders();
         setProviders(provs);
     } else if (activeTab === 'content') {
@@ -82,18 +69,10 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
         } else if (contentType === 'ANNOUNCEMENTS') {
             const data = await api.admin.getAnnouncements();
             setAnnouncements(data);
-        } else if (contentType === 'REVIEWS') {
-            const reviews = await api.reviews.getRecent();
-            setRecentReviews(reviews);
         }
-    } else if (activeTab === 'finance') {
-        const reqs = await api.features.getRequests();
-        setFeatureRequests(reqs);
     } else if (activeTab === 'settings') {
         const sysSettings = await api.admin.getSystemSettings();
         setSettings(sysSettings);
-        const cats = await api.admin.getCategories();
-        setCategoryList(cats);
     } else if (activeTab === 'orders') {
         if (logisticsView === 'ORDERS') {
             const allOrders = await api.admin.getAllOrders();
@@ -101,9 +80,6 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
         } else if (logisticsView === 'DELIVERIES') {
             const allDeliveries = await api.admin.getAllDeliveries();
             setDeliveries(allDeliveries);
-        } else if (logisticsView === 'LOGS') {
-            const allLogs = await api.admin.getLogs();
-            setLogs(allLogs);
         }
     }
     setLoading(false);
@@ -114,10 +90,29 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const handleProviderAction = async (userId: string, status: 'APPROVED' | 'REJECTED') => {
+      setUpdatingId(userId);
+      let success = false;
+      if (status === 'APPROVED') {
+          success = await api.admin.approveProvider(userId);
+      } else {
+          const reason = prompt("Enter rejection reason:") || "Incomplete profile info.";
+          success = await api.admin.rejectProvider(userId, reason);
+      }
+      
+      if (success) {
+          showNotification('success', `Provider application ${status.toLowerCase()}`);
+          loadDashboardData();
+      } else {
+          showNotification('error', "Action failed.");
+      }
+      setUpdatingId(null);
+  };
+
   const handleProductAction = async (id: string, status: 'APPROVED' | 'REJECTED') => {
      let reason = '';
      if (status === 'REJECTED') {
-         const input = prompt("Please provide a reason for rejecting this product (this will be shown to the vendor):");
+         const input = prompt("Please provide a reason for rejecting this product:");
          if (input === null) return; 
          reason = input || "Does not meet community guidelines.";
      }
@@ -125,49 +120,10 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
      const success = await api.products.updateStatus(id, status, reason);
      if (success) {
         showNotification('success', `Product ${status.toLowerCase()}`);
-        setPendingProducts(prev => prev.filter(p => p.id !== id));
-        setAllProducts(prev => prev.map(p => p.id === id ? { ...p, status, rejectionReason: reason || undefined } : p));
+        loadDashboardData();
      } else {
         showNotification('error', 'Action failed');
      }
-  };
-
-  const handleToggleProductFeature = async (productId: string) => {
-      const result = await api.admin.toggleCategoryFeature(productId);
-      if (result.success) {
-          showNotification('success', result.message);
-          setAllProducts(prev => prev.map(p => {
-              if (p.id !== productId) return p;
-              return { ...p, isCategoryFeatured: !p.isCategoryFeatured };
-          }));
-      } else {
-          showNotification('error', result.message);
-      }
-  };
-
-  const handleUserAction = async (userId: string, action: 'suspend' | 'activate' | 'role' | 'flag' | 'feature', value?: string) => {
-    setUpdatingId(userId);
-    let success = false;
-    let confirmMsg = '';
-
-    if (action === 'suspend') confirmMsg = "Suspend this user?";
-    if (action === 'activate') confirmMsg = "Re-activate user?";
-    if (action === 'role') confirmMsg = `Change role to ${value}?`;
-
-    if (confirmMsg && !confirm(confirmMsg)) {
-        setUpdatingId(null);
-        return;
-    }
-    
-    if (action === 'role' && value) success = await api.users.updateRole(userId, value as UserRole);
-    else if (action === 'suspend') success = await api.users.updateStatus(userId, 'SUSPENDED');
-    else if (action === 'activate') success = await api.users.updateStatus(userId, 'ACTIVE');
-
-    if (success) {
-      showNotification('success', 'User updated');
-      loadDashboardData();
-    }
-    setUpdatingId(null);
   };
 
   if (!currentUser || currentUser.role !== 'ADMIN') return null;
@@ -188,19 +144,19 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      <div className="bg-white p-1.5 rounded-xl shadow-sm border border-gray-100 mb-6 overflow-x-auto flex gap-2">
+      <div className="bg-white p-1.5 rounded-xl shadow-sm border border-gray-100 mb-6 overflow-x-auto flex gap-2 no-scrollbar">
            {[
              { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
              { id: 'orders', icon: Truck, label: 'Logistics' },
+             { id: 'providers', icon: Wrench, label: 'Providers' },
              { id: 'users', icon: Users, label: 'Users' },
              { id: 'content', icon: Megaphone, label: 'Content' },
-             { id: 'finance', icon: DollarSign, label: 'Finance' },
              { id: 'settings', icon: Settings, label: 'Settings' },
            ].map((tab) => (
              <button
                key={tab.id}
                onClick={() => setActiveTab(tab.id as any)}
-               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
                  activeTab === tab.id ? 'bg-kubwa-green text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
                }`}
              >
@@ -210,57 +166,95 @@ const Admin: React.FC<AdminProps> = ({ currentUser }) => {
            ))}
       </div>
 
-      {activeTab === 'content' && contentType === 'PRODUCTS' && (
-          <div className="space-y-4">
-              <div className="flex bg-gray-100 p-1 rounded-lg w-full max-w-xs">
-                  <button onClick={() => setProductView('PENDING')} className={`flex-1 py-1.5 text-xs font-bold rounded ${productView === 'PENDING' ? 'bg-white shadow text-kubwa-green' : 'text-gray-500'}`}>Pending</button>
-                  <button onClick={() => setProductView('LIVE')} className={`flex-1 py-1.5 text-xs font-bold rounded ${productView === 'LIVE' ? 'bg-white shadow text-kubwa-green' : 'text-gray-500'}`}>Live</button>
+      {activeTab === 'overview' && stats && (
+          <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="p-4 border-l-4 border-l-blue-500">
+                      <p className="text-xs text-gray-500 font-bold uppercase">DAU</p>
+                      <p className="text-2xl font-bold">{stats.dau}</p>
+                  </Card>
+                  <Card className="p-4 border-l-4 border-l-green-500">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Revenue</p>
+                      <p className="text-2xl font-bold">₦{stats.revenue.toLocaleString()}</p>
+                  </Card>
+                  <Card className="p-4 border-l-4 border-l-orange-500">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Pending Prod.</p>
+                      <p className="text-2xl font-bold">{pendingProducts.length}</p>
+                  </Card>
+                  <Card className="p-4 border-l-4 border-l-purple-500">
+                      <p className="text-xs text-gray-500 font-bold uppercase">New Users</p>
+                      <p className="text-2xl font-bold">{stats.userStats?.newThisWeek || 12}</p>
+                  </Card>
               </div>
-
-              {productView === 'PENDING' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {pendingProducts.length === 0 ? <EmptyState icon={CheckSquare} title="Clean Queue" description="No products pending review." /> : 
-                       pendingProducts.map(p => (
-                          <Card key={p.id} className="flex gap-4">
-                              <img src={p.image} className="w-20 h-20 rounded object-cover" />
-                              <div className="flex-1">
-                                  <h4 className="font-bold text-sm">{p.name}</h4>
-                                  <p className="text-xs text-gray-500 mb-2">₦{p.price.toLocaleString()}</p>
-                                  <div className="flex gap-2">
-                                      <Button className="flex-1 py-1 text-xs" onClick={() => handleProductAction(p.id, 'APPROVED')}>Approve</Button>
-                                      <Button variant="outline" className="flex-1 py-1 text-xs border-red-500 text-red-500" onClick={() => handleProductAction(p.id, 'REJECTED')}>Reject</Button>
-                                  </div>
-                              </div>
-                          </Card>
-                      ))}
-                  </div>
-              ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {allProducts.map(p => (
-                          <Card key={p.id} className="flex justify-between items-center">
-                              <div className="flex items-center gap-3">
-                                  <img src={p.image} className="w-10 h-10 rounded object-cover" />
-                                  <div>
-                                      <p className="text-sm font-bold">{p.name}</p>
-                                      <Badge color={p.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>{p.status}</Badge>
-                                  </div>
-                              </div>
-                              <div className="flex gap-1">
-                                  <button onClick={() => handleToggleProductFeature(p.id)} className={`p-1.5 rounded border ${p.isCategoryFeatured ? 'text-yellow-500 bg-yellow-50' : 'text-gray-400'}`}><Crown size={16} /></button>
-                                  <button onClick={() => handleProductAction(p.id, p.status === 'APPROVED' ? 'REJECTED' : 'APPROVED')} className="p-1.5 border rounded text-gray-400">{p.status === 'APPROVED' ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
-                              </div>
-                          </Card>
-                      ))}
-                  </div>
-              )}
           </div>
       )}
-      
-      {/* Other tabs omitted for brevity, keeping existing structure */}
-      <div className="text-center py-20 text-gray-400">
-          <Database size={40} className="mx-auto mb-2 opacity-20" />
-          <p className="text-sm">Select a tab above to manage platform data.</p>
-      </div>
+
+      {activeTab === 'providers' && (
+          <div className="space-y-4 animate-fade-in">
+              <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-gray-800">Fixit Provider Applications</h3>
+                  <button onClick={loadDashboardData} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {providers.length === 0 ? <EmptyState icon={Wrench} title="No Applications" description="All Fixit providers are up to date." /> : 
+                   providers.map(p => (
+                      <Card key={p.id} className="p-4 space-y-4 relative overflow-hidden">
+                          {p.isVerified && <div className="absolute top-0 right-0 bg-green-500 text-white p-1 rounded-bl-lg shadow"><Shield size={14}/></div>}
+                          <div className="flex gap-4">
+                              <img src={p.image} className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-sm" alt={p.name} />
+                              <div className="flex-1">
+                                  <h4 className="font-bold text-lg text-gray-900">{p.name}</h4>
+                                  <Badge color="bg-orange-100 text-orange-700 font-bold">{p.category}</Badge>
+                                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-1"><MapPin size={12}/> {p.location || 'Not Specified'}</p>
+                              </div>
+                          </div>
+                          
+                          <div className="bg-gray-50 p-3 rounded-lg border text-sm">
+                              <p className="font-bold text-gray-700 text-xs uppercase mb-1">Skills Offered</p>
+                              <div className="flex flex-wrap gap-1">
+                                  {p.skills?.map(s => <span key={s} className="bg-white px-2 py-0.5 rounded border text-[10px] text-gray-600">{s}</span>)}
+                              </div>
+                          </div>
+
+                          <div className="bg-gray-50 p-3 rounded-lg border text-sm italic text-gray-600">
+                              <p className="font-bold text-gray-700 text-xs uppercase mb-1 not-italic">Bio / Intro</p>
+                              "{p.bio || 'No bio provided.'}"
+                          </div>
+
+                          <div className="flex gap-2">
+                              <Button 
+                                onClick={() => handleProviderAction(p.userId!, 'APPROVED')}
+                                className="flex-1 py-2 text-xs bg-green-600 hover:bg-green-700 shadow-sm"
+                                disabled={updatingId === p.userId}
+                              >
+                                {updatingId === p.userId ? <Loader2 size={14} className="animate-spin" /> : 'Approve Application'}
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                onClick={() => handleProviderAction(p.userId!, 'REJECTED')}
+                                className="flex-1 py-2 text-xs border-red-500 text-red-500 hover:bg-red-50"
+                                disabled={updatingId === p.userId}
+                              >
+                                Reject
+                              </Button>
+                          </div>
+                      </Card>
+                  ))}
+              </div>
+          </div>
+      )}
+
+      {loading && (
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-green" size={40} /></div>
+      )}
+
+      {!loading && activeTab !== 'overview' && activeTab !== 'providers' && (
+        <div className="text-center py-20 text-gray-400">
+            <Database size={40} className="mx-auto mb-2 opacity-20" />
+            <p className="text-sm">Manage {activeTab} data here.</p>
+        </div>
+      )}
     </div>
   );
 };
