@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, Badge, Button, Input, Select } from '../components/ui';
 import { Users, LayoutDashboard, Loader2, Search, ShoppingBag, CheckCircle, XCircle, DollarSign, Package, Trash2, ExternalLink, Ban, RefreshCw, BellRing, ShieldCheck, Briefcase, Database, Megaphone, UserPlus, Activity, UserX, TrendingUp, Send, Flag, MoreVertical, MessageSquare, Star, List, Settings, Save, AlertTriangle, ToggleLeft, ToggleRight, Lock, ShieldAlert, CheckSquare, Ghost, EyeOff, Eye, Truck, Bike, FileText, X, MapPin, Folder, Crown, Wrench, Shield } from 'lucide-react';
-import { api, FEATURED_PLANS, MOCK_RIDERS, PRODUCT_CATEGORIES, CategoryDefinition } from '../services/data';
+// Removed FEATURED_PLANS and MOCK_RIDERS as they are not exported or used
+import { api, PRODUCT_CATEGORIES, CategoryDefinition } from '../services/data';
 import { User, UserRole, Product, ServiceProvider, DeliveryRequest, ServiceOrder, Announcement, Review, AnalyticsData, SystemSettings, FeaturedRequest, MartOrder, AdminLog } from '../types';
 
 interface AdminProps {
