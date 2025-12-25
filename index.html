@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -14,11 +13,11 @@
           extend: {
             colors: {
               kubwa: {
-                green: '#FF5733', // Vibrant Red-Orange (Primary)
-                orange: '#F97316', // Vibrant Orange: Energy + Action
-                amber: '#FBBF24', // Warm Amber: Highlights
-                dark: '#111827', // Deep Grey: Professional text
-                light: '#F3F4F6' // Clean Background
+                green: '#FF5733',
+                orange: '#F97316',
+                amber: '#FBBF24',
+                dark: '#111827',
+                light: '#F3F4F6'
               }
             },
             keyframes: {
@@ -50,7 +49,6 @@
       }
     </script>
     <style>
-      /* Hide scrollbar for clean UI */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -62,14 +60,14 @@
   <script type="importmap">
 {
   "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "recharts": "https://esm.sh/recharts@^3.6.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.89.0",
-    "vite": "https://esm.sh/vite@^7.3.0",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
