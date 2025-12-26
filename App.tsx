@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Shield, Bell, Loader2 } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType, PushNotification } from './types';
