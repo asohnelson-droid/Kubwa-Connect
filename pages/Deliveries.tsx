@@ -13,7 +13,7 @@ interface DeliveriesProps {
 }
 
 const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection, refreshUser }) => {
-  const [activeTab, setActiveTab] = useState<'request' | 'track' | 'jobs'>('request');
+  const [activeTab, setActiveTab] = useState<'request' | 'track' | 'jobs' | 'orders'>('request');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [itemType, setItemType] = useState('Small Package (Document, Phone)');
@@ -35,11 +35,13 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   // Map Simulation State
   const [transitProgress, setTransitProgress] = useState(0);
 
+  // Fix: Safe access to subscription tier
   const isElite = user?.subscription?.tier === 'ELITE';
   const isRider = user?.role === 'RIDER';
 
   // SECURITY: Ensure only approved riders can access jobs
-  const isApprovedRider = isRider && user?.status === 'ACTIVE';
+  // Fix: Comparison between status and 'APPROVED' (since types match)
+  const isApprovedRider = isRider && user?.status === 'APPROVED';
 
   useEffect(() => {
     // Determine default tab based on role

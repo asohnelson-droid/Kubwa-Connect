@@ -1,209 +1,239 @@
 
 import { supabase } from './supabase';
-import { 
-    User, UserRole, Product, ServiceProvider, DeliveryRequest, MartOrder, 
-    Announcement, Review, AnalyticsData, SystemSettings, FeaturedRequest, 
-    FeaturedPlan, SubscriptionPlan, ActivityItem, Address, VendorAnalytics,
-    CartItem, WorkDay, AdminLog
-} from '../types';
+import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review } from '../types';
 
 export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
+export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
-export const FIXIT_SERVICES = [
-    'Electrical Repairs', 
-    'Plumbing', 
-    'Generator Repairs', 
-    'Phone & Laptop Repairs',
-    'Cleaning Services', 
-    'Painting', 
-    'AC Repairs', 
-    'Carpentry', 
-    'Installations',
-    'Home Tutoring',
-    'Beauty & Makeup'
-];
+/**
+ * Helper to map Supabase User metadata to our App User type consistently.
+ */
+const mapUserMetadata = (sessionUser: any): User => {
+    if (!sessionUser) return null as any;
+    const meta = sessionUser.user_metadata || {};
+    
+    // Logic: Vendors start with 4 products unless they upgrade.
+    // Elite/Verified/Featured users get unlimited (999).
+    const isPremiumTier = meta.tier === 'VERIFIED' || meta.tier === 'FEATURED' || meta.subscription?.tier === 'ELITE';
+    const calculatedLimit = meta.productLimit ?? (isPremiumTier ? 999 : (meta.role === 'VENDOR' ? 4 : 999));
 
-export interface CategoryDefinition {
-    id: string;
-    label: string;
-    subcategories: { id: string; label: string; examples: string; active: boolean }[];
-}
-
-export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
-    {
-        id: 'food',
-        label: 'Food & Consumables',
-        subcategories: [
-            { id: 'food_grains', label: 'Grains, Rice & Pasta', examples: 'Rice, Spaghetti, Beans, Garri', active: true },
-            { id: 'food_fresh', label: 'Fresh Vegetables & Fruits', examples: 'Tomatoes, Pepper, Yam, Plantain', active: true },
-            { id: 'food_meat', label: 'Meat, Fish & Poultry', examples: 'Frozen Chicken, Fresh Fish, Beef', active: true },
-            { id: 'food_drinks', label: 'Drinks & Beverages', examples: 'Water, Juice, Wine, Soda', active: true },
-            { id: 'food_pantry', label: 'Pantry & Provisions', examples: 'Oil, Spices, Canned Food, Sugar', active: true },
-        ]
-    },
-    {
-        id: 'fashion',
-        label: 'Fashion & Personal',
-        subcategories: [
-            { id: 'fashion_men', label: 'Men\'s Wear', examples: 'Shirts, Trousers, Kaftans, Suits', active: true },
-            { id: 'fashion_women', label: 'Women\'s Wear', examples: 'Dresses, Skirts, Blouses, Abaya', active: true },
-            { id: 'fashion_shoes', label: 'Shoes & Footwear', examples: 'Sneakers, Heels, Sandals', active: true },
-            { id: 'fashion_acc', label: 'Accessories', examples: 'Bags, Jewelry, Watches, Perfumes', active: true },
-        ]
-    },
-    {
-        id: 'elec',
-        label: 'Electronics & Appliances',
-        subcategories: [
-            { id: 'elec_phones', label: 'Phones & Tablets', examples: 'iPhones, Androids, Chargers', active: true },
-            { id: 'elec_home', label: 'Home Appliances', examples: 'Blenders, Irons, Generators, Fans', active: true },
-            { id: 'elec_comp', label: 'Computers & Gadgets', examples: 'Laptops, Printers, Headphones', active: true },
-        ]
-    }
-];
-
-export const getCategoryLabel = (id: string): string => {
-    for (const group of PRODUCT_CATEGORIES) {
-        const sub = group.subcategories.find(s => s.id === id);
-        if (sub) return sub.label;
-    }
-    return 'Unknown Category';
+    return {
+        id: sessionUser.id || '',
+        email: sessionUser.email || '',
+        name: meta.name || 'Kubwa Resident',
+        role: meta.role || 'USER',
+        joinedAt: sessionUser.created_at,
+        tier: meta.tier || 'FREE',
+        isFeatured: !!meta.isFeatured,
+        productLimit: calculatedLimit,
+        verificationStatus: meta.verificationStatus || 'NONE',
+        paymentStatus: meta.paymentStatus || 'UNPAID',
+        isSetupComplete: !!meta.isSetupComplete,
+        status: meta.status || 'APPROVED',
+        avatar: meta.avatar,
+        bio: meta.bio,
+        phoneNumber: meta.phoneNumber,
+        storeName: meta.storeName,
+        address: meta.address
+    };
 };
-
-export const getParentCategory = (childId: string): string => {
-    for (const group of PRODUCT_CATEGORIES) {
-        if (group.subcategories?.some(s => s.id === childId)) return group.id;
-    }
-    return 'other';
-};
-
-export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
-    {
-        id: 'STARTER',
-        name: 'Free Tier',
-        price: 0,
-        annualPrice: 0,
-        interval: 'MONTHLY',
-        features: ['List up to 4 products', 'Basic Profile'],
-        limits: { listings: 4, photosPerListing: 3, messagesPerDay: 5, boostsPerMonth: 0 },
-        color: 'bg-gray-100'
-    },
-    {
-        id: 'PREMIUM',
-        name: 'Pro Vendor',
-        price: 5000,
-        annualPrice: 50000,
-        interval: 'MONTHLY',
-        features: ['Unlimited products', 'Verified Badge'],
-        limits: { listings: 100, photosPerListing: 5, messagesPerDay: 100, boostsPerMonth: 3 },
-        color: 'bg-yellow-100',
-        recommended: true
-    }
-];
-
-const MOCK_PRODUCTS: Product[] = [
-  { id: '1', vendorId: 'v1', name: 'Fresh Tomatoes (Basket)', price: 15000, category: 'food_fresh', image: 'https://images.unsplash.com/photo-1590779033100-9f60705a2f3b?auto=format&fit=crop&q=80&w=400', stock: 10, rating: 4.5, status: 'APPROVED', location: 'Phase 4', isCategoryFeatured: true, createdAt: '2023-10-01T10:00:00Z', salesCount: 150, description: 'Direct from the farm. Very fresh and high quality big tomatoes basket.' },
-  { id: '2', vendorId: 'v2', name: 'Local Rice (50kg)', price: 65000, category: 'food_grains', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=400', stock: 5, rating: 4.8, status: 'APPROVED', location: 'Gwarinpa', isCategoryFeatured: false, createdAt: '2023-10-05T14:30:00Z', salesCount: 80, description: 'Stone-free, well-parboiled local rice.' },
-  { id: '3', vendorId: 'v1', name: 'King\'s Vegetable Oil (5L)', price: 12500, category: 'food_pantry', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=400', stock: 20, rating: 4.9, status: 'APPROVED', location: 'Phase 4', description: 'Premium quality cooking oil.' },
-];
 
 export const api = {
     auth: {
         getSession: async () => {
-            const { data } = await supabase.auth.getSession();
-            if (data.session?.user) {
-                return {
-                     id: data.session.user.id,
-                     email: data.session.user.email!,
-                     name: data.session.user.user_metadata.name || 'User',
-                     role: 'USER',
-                     status: 'ACTIVE',
-                     joinedAt: new Date().toISOString(),
-                     isSetupComplete: true
-                } as User;
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !session) return null;
+
+                const { data: { user: sessionUser }, error: fetchError } = await supabase.auth.getUser();
+                if (fetchError || !sessionUser) return null;
+                
+                return mapUserMetadata(sessionUser);
+            } catch (e: any) {
+                console.error("Auth Session Fetch Failed:", e.message);
+                return null;
             }
-            return null;
+        },
+        signUp: async (email, password, name, role) => {
+            try {
+                const redirectUrl = window.location.origin.replace(/\/$/, ""); 
+                const initialStatus = role === 'USER' ? 'APPROVED' : 'PENDING';
+                
+                if (!email || !password || password.length < 6) {
+                    return { error: "Validation failed: Check email and password length." };
+                }
+
+                const { data, error } = await supabase.auth.signUp({ 
+                    email, 
+                    password, 
+                    options: { 
+                        emailRedirectTo: redirectUrl,
+                        data: { 
+                            name, 
+                            role, 
+                            isSetupComplete: false, 
+                            status: initialStatus,
+                            tier: 'FREE',
+                            productLimit: role === 'VENDOR' ? 4 : 999,
+                            paymentStatus: 'UNPAID'
+                        } 
+                    } 
+                });
+
+                if (error) {
+                    const msg = error.message.toLowerCase();
+                    if (msg.includes('already registered') || msg.includes('user_already_exists')) {
+                        return { error: "This email is already registered. Try logging in instead." };
+                    }
+                    return { error: error.message || "An error occurred during signup." };
+                }
+
+                const newUser = data?.user;
+                if (!newUser) {
+                    return { error: "Signup successful, but session could not be established. Please log in." };
+                }
+
+                return { 
+                    user: mapUserMetadata(newUser), 
+                    requiresVerification: !!newUser && !data?.session 
+                };
+            } catch (e: any) {
+                console.error("Signup Catch Block:", e);
+                return { error: "Signup failed due to a network interruption." };
+            }
         },
         signIn: async (email, password) => {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) return { error: error.message };
-            return { user: { id: data.user.id, email, name: data.user.user_metadata.name, role: 'USER', status: 'ACTIVE' } as User };
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) {
+                    const msg = error.message.toLowerCase();
+                    if (msg.includes('invalid login credentials')) return { error: "Incorrect email or password." };
+                    if (msg.includes('email not confirmed')) return { error: "Please verify your email first." };
+                    return { error: error.message || "Login failed." };
+                }
+                
+                return { 
+                    user: data?.user ? mapUserMetadata(data.user) : null
+                };
+            } catch (e: any) {
+                return { error: "Login failed. Check your internet connection." };
+            }
         },
-        // Updated to include requiresVerification to fix AuthModal error
-        signUp: async (email, password, name, role) => {
-            const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } });
-            if (error) return { error: error.message, requiresVerification: false };
-            return { 
-                user: { id: data.user?.id || 'new-user', email, name, role, status: 'ACTIVE' } as User,
-                requiresVerification: false
-            };
+        signOut: async () => { 
+            try {
+                await supabase.auth.signOut();
+                localStorage.removeItem('kubwa_cart');
+                const keys = Object.keys(localStorage);
+                keys.forEach(k => {
+                    if (k.includes('-auth-token')) localStorage.removeItem(k);
+                });
+            } catch (e) {
+                console.error("Signout error", e);
+            }
         },
-        signOut: async () => { await supabase.auth.signOut(); },
-        resetPassword: async (email) => { const { error } = await supabase.auth.resetPasswordForEmail(email); return { error: error?.message }; }
+        resetPassword: async (email: string) => {
+            try {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/#reset-password`,
+                });
+                return { error: error?.message };
+            } catch (e) {
+                return { error: "Unable to send reset link." };
+            }
+        },
+        resendVerification: async (email: string) => {
+            try {
+                const { error } = await supabase.auth.resend({ type: 'signup', email });
+                return { success: !error, error: error?.message };
+            } catch (e) {
+                return { success: false, error: "Network error." };
+            }
+        }
     },
+
     users: {
-        getFeaturedVendors: async () => [
-            { id: 'v1', name: 'Musa Ibrahim', role: 'VENDOR', status: 'ACTIVE', storeName: 'Musa Provisions', avatar: 'https://i.pravatar.cc/150?u=v1', rating: 4.9, bio: 'Quality goods in Phase 4' },
-            { id: 'v2', name: 'Sarah Okon', role: 'VENDOR', status: 'ACTIVE', storeName: 'Sarah’s Fashion', avatar: 'https://i.pravatar.cc/150?u=v2', rating: 4.7, bio: 'Boutique clothing' }
-        ] as User[],
-        // Added to fix Admin.tsx error
-        getAll: async () => [
-            { id: 'v1', name: 'Musa Ibrahim', email: 'musa@example.com', role: 'VENDOR', status: 'ACTIVE', storeName: 'Musa Provisions' },
-            { id: 'v2', name: 'Sarah Okon', email: 'sarah@example.com', role: 'VENDOR', status: 'ACTIVE', storeName: 'Sarah’s Fashion' },
-            { id: 'u1', name: 'Admin User', email: 'admin@kubwa.com', role: 'ADMIN', status: 'ACTIVE' }
-        ] as User[],
-        getById: async (id: string) => {
-            const vendors = {
-                'v1': { name: 'Musa Ibrahim', storeName: 'Musa Provisions', rating: 4.9, reviews: 128, avatar: 'https://i.pravatar.cc/150?u=v1', verification: { status: 'VERIFIED' }, phoneNumber: '08012345678' },
-                'v2': { name: 'Sarah Okon', storeName: 'Sarah’s Fashion', rating: 4.7, reviews: 45, avatar: 'https://i.pravatar.cc/150?u=v2', verification: { status: 'VERIFIED' }, phoneNumber: '08098765432' },
-                'v3': { name: 'Amina Jalo', storeName: 'Fresh Mart', rating: 4.5, reviews: 32, avatar: 'https://i.pravatar.cc/150?u=v3', verification: { status: 'PENDING' }, phoneNumber: '07011223344' }
-            };
-            const vendor = vendors[id] || { name: 'Kubwa Vendor', storeName: 'Local Store', rating: 4.0, reviews: 10 };
-            return { id, role: 'VENDOR', status: 'ACTIVE', ...vendor } as User;
+        completeSetup: async (userId: string, data: any) => {
+            try {
+                const { error } = await supabase.auth.updateUser({ 
+                    data: { 
+                        ...data, 
+                        isSetupComplete: true 
+                    } 
+                });
+                if (error) throw error;
+                
+                await supabase.auth.refreshSession();
+                return true;
+            } catch (e) {
+                console.error("Setup Completion Failed:", e);
+                return false;
+            }
         },
-        updateProfile: async (id, updates) => ({ id, ...updates } as User),
-        getActivity: async (id) => [],
-        getAddresses: async (id) => [],
-        saveAddress: async (userId, title, details) => ({ id: Math.random().toString(), userId, title, details } as Address),
-        deleteAddress: async (id) => true,
-        toggleWishlist: async (userId, productId) => true,
-        completeSetup: async (userId, data) => true,
-        becomeProvider: async (userId, data) => true,
-        updateRole: async (id, role) => true,
-        updateStatus: async (id, status) => true
+        getFeaturedVendors: async () => [],
+        getAddresses: async (userId: string) => [] as Address[]
     },
-    products: {
-        getPending: async () => [],
-        getByVendor: async (id) => MOCK_PRODUCTS.filter(p => p.vendorId === id),
-        getVendorOrders: async (id) => [],
-        getVendorAnalytics: async (id) => ({ totalRevenue: 150000, totalOrders: 25, itemsSold: 60, lowStockCount: 2, salesData: [] }),
-        addProduct: async (userId, product) => true,
-        updateStatus: async (id, status, reason) => true,
-        createOrder: async (userId, items, total, deliveryFee, method, address, phone) => true,
-        updateVendorOrderStatus: async (orderId, status) => true,
-        requestRider: async (order, addr) => true,
-        getAllVendors: async () => [{ id: 'v1', name: 'Musa Provisions' }, { id: 'v2', name: 'Sarah’s Fashion' }]
+
+    getProducts: async () => {
+        return [
+            { id: '1', name: 'Fresh Tomatoes (Big Basket)', price: 4500, status: 'APPROVED', category: 'food', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400', vendorId: 'v1', rating: 4.8, stock: 5, isPromoted: true, description: 'Directly from the farm. Very fresh and red.' },
+            { id: '2', name: 'Parboiled Rice 50kg', price: 78000, status: 'APPROVED', category: 'food', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400', vendorId: 'v2', rating: 4.5, stock: 12, isPromoted: false, description: 'Stone-free and easy to cook.' },
+        ] as Product[];
     },
-    admin: {
-        getAnnouncements: async () => [],
-        getAnalytics: async () => ({ dau: 120, revenue: 450000, retention: 85, conversion: 12, revenueSplit: { subscriptions: 0, commissions: 0, deliveryFees: 0 } }),
-        getAllProducts: async () => MOCK_PRODUCTS,
-        getAllProviders: async () => [],
-        approveProvider: async (id) => true,
-        rejectProvider: async (id, reason) => true,
-        getSystemSettings: async () => ({ allowSignups: true, maintenanceMode: false, allowAdminPromotions: true, supportEmail: 'hi@kubwa.com', supportPhone: '0800', minVersion: '1.0.0' }),
-        getAllOrders: async () => [],
-        getAllDeliveries: async () => []
+    
+    getProviders: async () => {
+        return [
+            { id: 'p1', userId: 'u1', name: 'Musa Fixes', category: 'Plumbing', rate: 5000, rating: 4.9, reviews: 32, image: 'https://images.unsplash.com/photo-1581578731522-745d05cb9703?w=200', available: true, isVerified: true, location: 'Arab Road' },
+            { id: 'p2', userId: 'u2', name: 'Janet Stitches', category: 'Tailoring', rate: 8000, rating: 4.7, reviews: 15, image: 'https://images.unsplash.com/photo-1520004481444-dcd3cca0913a?w=200', available: true, isVerified: false, location: 'Phase 3' }
+        ] as ServiceProvider[];
     },
-    reviews: { getByTarget: async (id) => [] },
-    providers: { getMyProfile: async (id) => null, requestService: async (uid, pid, amt, type, date) => true, updateStatus: async (id, s) => true, updateProviderProfile: async (id, u) => true },
-    deliveries: { getAvailableJobs: async () => [], acceptDelivery: async (jid, rid) => true, updateStatus: async (jid, s) => true },
-    features: { requestFeature: async (uid, n, p) => true },
-    notifications: { simulatePush: async () => ({ id: '1', title: 'Hi', body: 'Test', timestamp: new Date().toISOString() }) },
-    getMockContext: async () => ({ products: MOCK_PRODUCTS, providers: [] }),
-    getProducts: async () => MOCK_PRODUCTS,
-    getProviders: async () => [],
+
+    providers: {
+        getMyProfile: async (userId: string) => {
+            const providers = await api.getProviders();
+            return providers.find(p => p.userId === userId) || null;
+        },
+        updateStatus: async (providerId: string, available: boolean) => true
+    },
+
+    deliveries: {
+        getAvailableJobs: async () => [
+            { id: 'd1', userId: 'u1', pickup: 'Phase 2', dropoff: 'Arab Road', itemType: 'Small Package', status: 'PENDING', price: 1200, date: new Date().toISOString() }
+        ],
+        acceptDelivery: async (id, rid) => true,
+        updateStatus: async (id, st) => true
+    },
+    
     getDeliveries: async (uid) => [],
     requestDelivery: async (d) => true,
-    processPayment: async (amt, g, u) => true
+    getMockContext: async () => ({ products: await api.getProducts(), providers: await api.getProviders() }),
+    payments: { 
+        fulfillIntent: async (userId: string, intent: PaymentIntent, reference: string) => {
+            // Calculate new properties based on intent
+            const isFeatured = intent === 'VENDOR_FEATURED';
+            const tier: MonetisationTier = isFeatured ? 'FEATURED' : 'VERIFIED';
+            const productLimit = 999; // Both Verified and Featured get unlimited
+            
+            const { error } = await supabase.auth.updateUser({
+                data: {
+                    tier,
+                    productLimit,
+                    paymentStatus: 'PAID',
+                    verificationStatus: 'VERIFIED',
+                    isFeatured
+                }
+            });
+            
+            if (!error) {
+                await supabase.auth.refreshSession();
+                return true;
+            }
+            return false;
+        }, 
+        getHistory: async () => [] 
+    },
+    admin: { getAnnouncements: async () => [] },
+    reviews: { getByTarget: async (targetId: string) => [] as Review[] }
 };
+
+export const getParentCategory = (id) => 'food';
+export const PRODUCT_CATEGORIES = [{id: 'food', label: 'Food & Groceries'}, {id: 'fashion', label: 'Fashion & Textiles'}, {id: 'electronics', label: 'Electronics'}];

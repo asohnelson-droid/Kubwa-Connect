@@ -2,9 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { api } from './data';
 
-// Following guidelines: Initializing with process.env.API_KEY directly and ensuring named parameter format.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 // Define the response schema for the AI assistant
 const assistantSchema = {
   type: Type.OBJECT,
@@ -22,7 +19,20 @@ const assistantSchema = {
 
 export const askKubwaAssistant = async (userQuery: string) => {
   try {
-    // Await the asynchronous data fetch from Supabase
+    // Check if API_KEY is available in environment
+    if (!process.env.API_KEY || process.env.API_KEY === "undefined" || process.env.API_KEY === "") {
+      console.warn("AI Assistant: API_KEY is missing. AI features will be unavailable.");
+      return {
+        message: "I'm sorry, the AI assistant is currently offline. Please check your environment variables.",
+        suggestedAction: "NONE",
+        searchQuery: ""
+      };
+    }
+
+    // Fix: Initialize GoogleGenAI with named parameter apiKey from process.env.API_KEY directly
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    // Await the asynchronous data fetch from context
     const { products, providers } = await api.getMockContext();
 
     const context = `
@@ -42,7 +52,6 @@ export const askKubwaAssistant = async (userQuery: string) => {
       Otherwise, just chat friendly.
     `;
 
-    // Updated model to 'gemini-3-flash-preview' for basic text tasks as per guidelines.
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: context,
@@ -52,7 +61,7 @@ export const askKubwaAssistant = async (userQuery: string) => {
       }
     });
 
-    // Accessing response.text directly (property access) instead of calling it as a method.
+    // Fix: access response.text property directly
     const text = response.text;
     if (!text) throw new Error("No response from AI");
     
@@ -60,7 +69,7 @@ export const askKubwaAssistant = async (userQuery: string) => {
   } catch (error) {
     console.error("AI Error:", error);
     return {
-      message: "I'm having trouble connecting to the network. Please try again.",
+      message: "I'm having trouble connecting to the network. Please try again later.",
       suggestedAction: "NONE",
       searchQuery: ""
     };

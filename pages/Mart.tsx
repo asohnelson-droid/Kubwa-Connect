@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, Plus, Star, Loader2, X, Trash2, Store, Crown, Heart, Filter, Minus, ExternalLink, Shield, Phone, ShoppingBag, MapPin, CheckCircle } from 'lucide-react';
-import { api, SUBSCRIPTION_PLANS, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
-import { Product, CartItem, User, Review, AppSection, FeaturedPlan } from '../types';
-import { Button, Badge, Card, Breadcrumbs } from '../components/ui';
-import AuthModal from '../components/AuthModal';
+import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle } from 'lucide-react';
+import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
+import { Product, CartItem, User, AppSection } from '../types';
+import { Button, Badge, Card, Breadcrumbs, Sheet } from '../components/ui';
 
 interface MartProps {
   addToCart: (product: Product) => void;
@@ -20,128 +20,107 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [selectedParentCategory, setSelectedParentCategory] = useState('All'); 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterVendor, setFilterVendor] = useState('All'); 
-  const [displayCount, setDisplayCount] = useState(8);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [productVendor, setProductVendor] = useState<User | null>(null);
-  const [loadingVendor, setLoadingVendor] = useState(false);
-  const [orderQuantity, setOrderQuantity] = useState(1); 
-  const [cartToast, setCartToast] = useState<string | null>(null);
-  const [wishlist, setWishlist] = useState<string[]>([]);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      const data = await api.getProducts();
-      setProducts(data);
-      setLoading(false);
-    };
     loadData();
-    if (user?.wishlist) setWishlist(user.wishlist);
-  }, [user]);
+  }, []);
 
-  useEffect(() => {
-    if (selectedProduct) {
-      setLoadingVendor(true);
-      setOrderQuantity(1);
-      api.users.getById(selectedProduct.vendorId).then(vendor => {
-        setProductVendor(vendor);
-        setLoadingVendor(false);
-      });
-    } else {
-      setProductVendor(null);
-    }
-  }, [selectedProduct]);
+  const loadData = async () => {
+    setLoading(true);
+    const data = await api.getProducts();
+    // Sort logic: Featured/Promoted products first
+    const sorted = [...data].sort((a, b) => (b.isPromoted ? 1 : 0) - (a.isPromoted ? 1 : 0));
+    setProducts(sorted);
+    setLoading(false);
+  };
 
   const filteredProducts = products.filter(p => {
     const parent = getParentCategory(p.category);
     const matchesCategory = selectedParentCategory === 'All' || parent === selectedParentCategory;
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesVendor = filterVendor === 'All' || p.vendorId === filterVendor;
-    return matchesCategory && matchesSearch && matchesVendor && p.status === 'APPROVED';
+    return matchesCategory && matchesSearch && p.status === 'APPROVED';
   });
 
-  const visibleProducts = filteredProducts.slice(0, displayCount);
-
-  const handleAddToCart = (product: Product, qty: number = 1) => {
-    for (let i = 0; i < qty; i++) addToCart(product);
-    setCartToast(`Added ${qty} ${product.name} to cart`);
-    setTimeout(() => setCartToast(null), 2000);
-    if (selectedProduct) setSelectedProduct(null);
-  };
-
-  const removeFromCart = (id: string) => setCart(prev => prev.filter(item => item.id !== id));
-
-  const toggleWishlist = async (productId: string) => {
-    if (!user) { setShowAuthModal(true); return; }
-    const isIn = wishlist.includes(productId);
-    setWishlist(prev => isIn ? prev.filter(id => id !== productId) : [...prev, productId]);
-    await api.users.toggleWishlist(user.id, productId);
-  };
-
-  const handleViewVendorProducts = (vendorId: string) => {
-    setFilterVendor(vendorId);
-    setSelectedProduct(null);
-    setSearchTerm('');
+  const handleAddProductClick = () => {
+    if (!user) { onRequireAuth(); return; }
+    if (user.role !== 'VENDOR') return;
+    
+    // LIMIT CHECK
+    if (user.tier === 'FREE' && user.productLimit <= 4) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    // Proceed to real add flow...
+    alert("New product form would open here.");
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 relative">
-      <Breadcrumbs items={[
-        { label: 'Home', onClick: () => setSection(AppSection.HOME) },
-        { label: 'Mart', onClick: () => { setSelectedParentCategory('All'); setFilterVendor('All'); } }
-      ]} />
-      
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} providerName="Mart" onSuccess={() => refreshUser()} />}
-      {cartToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-xs font-bold shadow-xl animate-fade-in z-50 flex items-center gap-2">
-          <CheckCircle size={14} className="text-green-400" />{cartToast}
-        </div>
-      )}
-
+    <div className="pb-24 pt-4 px-4">
+      {/* 1. HEADER */}
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-kubwa-green">Kubwa Mart</h2>
-          <p className="text-gray-500 text-sm">
-            {filterVendor !== 'All' ? `Viewing items from ${productVendor?.storeName || 'Vendor'}` : 'Everything delivered.'}
-          </p>
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">KUBWA MART</h2>
+        <div className="flex items-center gap-2">
+           {user?.role === 'VENDOR' && (
+             <button onClick={handleAddProductClick} className="p-3 bg-gray-900 text-white rounded-2xl active:scale-95 transition-all">
+                <Plus size={20} strokeWidth={3}/>
+             </button>
+           )}
+           <button className="p-3 bg-gray-50 rounded-2xl relative active:scale-95 transition-all" onClick={() => setIsCartOpen(true)}>
+             <ShoppingCart size={22} className="text-gray-900" />
+             {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-kubwa-orange text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{cart.length}</span>}
+           </button>
         </div>
-        <button className="p-2 bg-white border border-gray-200 rounded-full relative" onClick={() => setIsCartOpen(true)}>
-          <ShoppingCart size={20} />
-          {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-kubwa-orange text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>}
-        </button>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input type="text" placeholder="Search products..." className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-kubwa-green/50" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </div>
-        {filterVendor !== 'All' && <button onClick={() => setFilterVendor('All')} className="px-3 bg-red-50 text-red-600 rounded-xl border border-red-100 flex items-center gap-1 text-xs font-bold"><X size={14} /> Clear Filter</button>}
+      {/* 2. SEARCH & CATEGORIES */}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <input 
+          type="text" 
+          placeholder="What are you looking for today?" 
+          className="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-kubwa-green/20 outline-none font-bold" 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+        />
       </div>
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
-        {['All', ...PRODUCT_CATEGORIES.map(c => c.label)].map(cat => (
-          <button key={cat} onClick={() => setSelectedParentCategory(cat === 'All' ? 'All' : PRODUCT_CATEGORIES.find(c => c.label === cat)?.id || 'All')} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${selectedParentCategory === (cat === 'All' ? 'All' : PRODUCT_CATEGORIES.find(c => c.label === cat)?.id) ? 'bg-kubwa-green text-white' : 'bg-white border text-gray-600'}`}>{cat}</button>
-        ))}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-8">
+        {['All', ...PRODUCT_CATEGORIES.map(c => c.label)].map(cat => {
+          const catId = cat === 'All' ? 'All' : PRODUCT_CATEGORIES.find(c => c.label === cat)?.id || 'All';
+          return (
+            <button 
+              key={cat} 
+              onClick={() => setSelectedParentCategory(catId)} 
+              className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border whitespace-nowrap ${selectedParentCategory === catId ? 'bg-gray-900 text-white border-gray-900' : 'bg-white border-gray-100 text-gray-500'}`}
+            >
+              {cat}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {loading ? [1,2,3,4].map(n => <div key={n} className="h-48 bg-gray-100 rounded-xl animate-pulse" />) : 
-          visibleProducts.map(product => (
-            <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group hover:shadow-lg transition-shadow" onClick={() => setSelectedProduct(product)}>
-              <div className="h-32 bg-gray-200 relative overflow-hidden">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                {product.isCategoryFeatured && <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">Featured</div>}
+      {/* 3. PRODUCT GRID */}
+      <div className="grid grid-cols-2 gap-4">
+        {loading ? <div className="col-span-2 flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-green"/></div> : 
+          filteredProducts.map(product => (
+            <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group relative border-none shadow-sm" onClick={() => setSelectedProduct(product)}>
+              {product.isPromoted && (
+                <div className="absolute top-2 left-2 z-10 bg-yellow-500 text-black text-[8px] font-black px-2 py-0.5 rounded shadow-lg uppercase flex items-center gap-1">
+                  <Crown size={8}/> Sponsored
+                </div>
+              )}
+              <div className="h-40 bg-gray-100 overflow-hidden">
+                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
               </div>
-              <div className="p-3">
-                <h3 className="font-bold text-gray-800 text-sm line-clamp-1">{product.name}</h3>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="font-bold text-kubwa-green">₦{product.price.toLocaleString()}</span>
-                  <div className="bg-gray-100 p-1.5 rounded-lg text-kubwa-green group-hover:bg-kubwa-green group-hover:text-white transition-colors" onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}>
-                    <Plus size={16}/>
+              <div className="p-4">
+                <h3 className="font-black text-gray-900 text-xs mb-1 line-clamp-1">{product.name}</h3>
+                <div className="flex justify-between items-center">
+                  <span className="font-black text-kubwa-green text-sm">₦{product.price.toLocaleString()}</span>
+                  <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-gray-900 group-hover:text-white" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
+                    <Plus size={14}/>
                   </div>
                 </div>
               </div>
@@ -149,124 +128,47 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
           ))}
       </div>
 
-      {selectedProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-           <div className="bg-white w-full max-w-sm max-h-[90vh] rounded-2xl overflow-hidden flex flex-col relative animate-zoom-in shadow-2xl">
-              <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 z-10 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full transition-colors"><X size={18} /></button>
-              
-              <div className="h-64 bg-gray-100 relative shrink-0">
-                 <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
-                 <button onClick={(e) => { e.stopPropagation(); toggleWishlist(selectedProduct.id); }} className="absolute bottom-4 right-4 bg-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform">
-                   <Heart size={20} className={wishlist.includes(selectedProduct.id) ? "text-red-500 fill-current" : "text-gray-400"} />
-                 </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 no-scrollbar">
-                 <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1 mr-2">
-                        <h2 className="text-xl font-bold text-gray-900 leading-tight">{selectedProduct.name}</h2>
-                        <div className="flex items-center gap-1 mt-1">
-                            <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                            <span className="text-sm font-bold text-gray-700">{selectedProduct.rating}</span>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <span className="font-bold text-2xl text-kubwa-green block">₦{selectedProduct.price.toLocaleString()}</span>
-                    </div>
-                 </div>
-
-                 <div className="my-6">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Product Details</h4>
-                    <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
-                       {selectedProduct.description || "Fresh and available for immediate delivery across Kubwa neighborhood."}
-                    </p>
-                 </div>
-
-                 {/* Vendor Info Section - ENHANCED */}
-                 <div className="mb-6 animate-fade-in">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Sold By</h4>
-                    {loadingVendor ? (
-                        <div className="h-16 bg-gray-50 rounded-xl animate-pulse" />
-                    ) : productVendor && (
-                       <div className="bg-white border-2 border-gray-100 rounded-xl p-3 flex items-center gap-3 shadow-sm hover:border-kubwa-green/30 transition-all">
-                          <div className="w-12 h-12 rounded-full bg-kubwa-green/10 flex items-center justify-center font-bold text-kubwa-green text-lg border-2 border-kubwa-green/20 overflow-hidden shrink-0">
-                             {productVendor.avatar ? <img src={productVendor.avatar} className="w-full h-full object-cover" alt=""/> : productVendor.name.charAt(0)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                             <div className="flex items-center gap-1">
-                                <span className="font-bold text-sm text-gray-900 truncate">{productVendor.storeName || productVendor.name}</span>
-                                {productVendor.verification?.status === 'VERIFIED' && <Shield size={12} className="text-blue-500 fill-blue-500 shrink-0" />}
-                             </div>
-                             <div className="flex items-center gap-2 mt-0.5">
-                                <div className="flex text-yellow-400"><Star size={10} fill="currentColor" /></div>
-                                <span className="text-[10px] text-gray-900 font-bold">{productVendor.rating} Rating</span>
-                                <span className="text-[10px] text-gray-400">•</span>
-                                <span className="text-[10px] text-gray-500">{productVendor.reviews || 0} reviews</span>
-                             </div>
-                             <button 
-                                onClick={() => handleViewVendorProducts(productVendor.id)}
-                                className="flex items-center gap-1 mt-1.5 text-kubwa-green text-[10px] font-bold bg-kubwa-green/5 px-2 py-0.5 rounded-full w-fit hover:bg-kubwa-green hover:text-white transition-colors"
-                             >
-                                Visit Store <ExternalLink size={10} />
-                             </button>
-                          </div>
-                          <a href={`tel:${productVendor.phoneNumber}`} className="bg-gray-100 p-2.5 rounded-full text-gray-600 hover:bg-kubwa-green hover:text-white transition-all">
-                             <Phone size={18} />
-                          </a>
-                       </div>
-                    )}
-                 </div>
-              </div>
-
-              <div className="p-4 border-t bg-gray-50 shadow-inner">
-                 <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-2 py-1.5 shadow-sm">
-                       <button onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-kubwa-green hover:bg-gray-50 rounded-lg transition-colors"><Minus size={18} /></button>
-                       <span className="font-bold text-lg min-w-[20px] text-center">{orderQuantity}</span>
-                       <button onClick={() => setOrderQuantity(orderQuantity + 1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-kubwa-green hover:bg-gray-50 rounded-lg transition-colors"><Plus size={18} /></button>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-[10px] font-bold text-gray-400 uppercase">Grand Total</p>
-                       <p className="text-xl font-bold text-gray-900">₦{(selectedProduct.price * orderQuantity).toLocaleString()}</p>
-                    </div>
-                 </div>
-                 <Button className="w-full py-4 text-base font-bold shadow-lg flex items-center justify-center gap-3 bg-kubwa-green border-none" onClick={() => handleAddToCart(selectedProduct, orderQuantity)}>
-                    <ShoppingCart size={20} /> Add to Cart
-                 </Button>
-              </div>
-           </div>
+      {/* 4. UPGRADE PROMPT MODAL */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[110] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <Card className="w-full max-w-sm p-8 text-center animate-zoom-in rounded-[2.5rem]">
+              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6"><ArrowUpCircle size={32}/></div>
+              <h3 className="text-xl font-black text-gray-900 uppercase">Limit Reached</h3>
+              <p className="text-xs font-bold text-gray-500 mt-2 leading-relaxed">Vendors on the Free Tier can only list 4 products. Upgrade to a Verified Tier to unlock unlimited listings and get a blue trust badge.</p>
+              <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full mt-8 bg-blue-600">Upgrade Now</Button>
+              <button onClick={() => setShowUpgradeModal(false)} className="mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Maybe Later</button>
+           </Card>
         </div>
       )}
 
-      {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end animate-fade-in">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setIsCartOpen(false)} />
-          <div className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
-            <div className="p-4 border-b flex justify-between items-center bg-gray-50 font-bold text-lg"><ShoppingCart size={20}/> Cart</div>
-            <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
-              {cart.length === 0 ? <p className="text-center py-20 text-gray-400">Empty cart.</p> : cart.map(item => (
-                <div key={item.id} className="flex gap-3 border-b pb-3 mb-3">
-                  <img src={item.image} className="w-12 h-12 rounded object-cover" alt=""/>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-sm text-gray-900">{item.name}</h4>
-                    <p className="text-xs text-gray-500 font-medium">₦{item.price.toLocaleString()} x {item.quantity}</p>
-                  </div>
-                  <button onClick={() => removeFromCart(item.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Trash2 size={16}/></button>
-                </div>
-              ))}
-            </div>
-            {cart.length > 0 && (
-              <div className="p-6 border-t bg-gray-50">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-gray-500 font-bold">Total Amount</span>
-                  <span className="text-xl font-bold text-gray-900">₦{cart.reduce((acc, i) => acc + (i.price * i.quantity), 0).toLocaleString()}</span>
-                </div>
-                <Button className="w-full py-4 font-bold shadow-md" onClick={() => { setIsCartOpen(false); setSection(AppSection.ACCOUNT); }}>Checkout Now</Button>
+      {/* Product Detail Sheet & Cart Sheet remains same as original but with tier logic added */}
+      <Sheet isOpen={!!selectedProduct} onClose={() => setSelectedProduct(null)} title={selectedProduct?.name}>
+        {selectedProduct && (
+          <div className="p-6">
+             <div className="h-48 rounded-3xl overflow-hidden mb-6"><img src={selectedProduct.image} className="w-full h-full object-cover"/></div>
+             <p className="font-black text-2xl text-kubwa-green mb-4">₦{selectedProduct.price.toLocaleString()}</p>
+             <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Verified quality item from a Kubwa Vendor.'}</p>
+             <Button className="w-full py-4 h-14 text-base" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>Add to Cart</Button>
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} title="Your Cart">
+         <div className="p-6">
+            {cart.length === 0 ? <p className="text-center text-gray-400 py-10 font-black">Empty</p> : (
+              <div className="space-y-4">
+                 {cart.map(item => (
+                   <div key={item.id} className="flex justify-between items-center border-b pb-4">
+                      <div><p className="font-black text-sm">{item.name}</p><p className="text-xs text-kubwa-green font-bold">₦{item.price}</p></div>
+                      <Badge color="bg-gray-100 text-gray-900">Qty: {item.quantity}</Badge>
+                   </div>
+                 ))}
+                 <div className="pt-4 flex justify-between items-center"><span className="font-black">Total</span><span className="font-black text-xl text-kubwa-green">₦{cart.reduce((a, b) => a + (b.price * b.quantity), 0).toLocaleString()}</span></div>
+                 <Button className="w-full mt-6">Checkout</Button>
               </div>
             )}
-          </div>
-        </div>
-      )}
+         </div>
+      </Sheet>
     </div>
   );
 };

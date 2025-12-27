@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Wrench, Truck, ChevronRight, User, Store, Bike, Search, MapPin, Bell, X, Star, ShieldCheck, Crown, Flame, Clock, Briefcase } from 'lucide-react';
+import { ShoppingBag, Wrench, Truck, ChevronRight, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Flame, Clock, Briefcase } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
-import { Button, Card, Select } from '../components/ui';
+import { Button, Card } from '../components/ui';
 import { KUBWA_AREAS, api } from '../services/data';
 
 interface HomeProps {
@@ -11,389 +12,165 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
-  const [activeTab, setActiveTab] = useState<'RESIDENT' | 'BUSINESS' | 'RIDER'>('RESIDENT');
-  
-  // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState('All Kubwa');
-
-  // Data
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [visibleAnnouncement, setVisibleAnnouncement] = useState<Announcement | null>(null);
   const [featuredVendors, setFeaturedVendors] = useState<UserType[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
-  const [productSortMode, setProductSortMode] = useState<'NEW' | 'TRENDING'>('NEW');
-
-  // Hero Slider State
   const [heroIndex, setHeroIndex] = useState(0);
+
   const heroMessages = [
-    "Find Trusted Artisans in Kubwa in Under 2 Minutes.",
-    "Find verified vendors for quality products in Kubwa.",
-    "Engage riders and movers to move your items."
+    "Find Trusted Artisans in Kubwa in Minutes.",
+    "Order quality products from local vendors.",
+    "Send and track packages across Kubwa instantly."
   ];
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % heroMessages.length);
-    }, 5000); // 5 seconds interval
+    const interval = setInterval(() => setHeroIndex((prev) => (prev + 1) % heroMessages.length), 5000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-       // Announcements
-       const data = await api.admin.getAnnouncements();
-       if (data.length > 0) {
-          setAnnouncements(data);
-          setVisibleAnnouncement(data[0]);
-       }
-
-       // Featured Vendors
-       const featured = await api.users.getFeaturedVendors();
-       setFeaturedVendors(featured);
-
-       // Products
-       loadProducts();
-    };
-    loadData();
-  }, [productSortMode]);
-
-  const loadProducts = async () => {
-      const allProducts = await api.getProducts();
-      let sorted = allProducts.filter(p => p.status === 'APPROVED');
-      
-      if (productSortMode === 'NEW') {
-          sorted.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      } else {
-          // Trending
-          sorted.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
-      }
-      
-      setRecentProducts(sorted.slice(0, 6));
-  };
-
+    api.admin.getAnnouncements().then(data => data.length && setVisibleAnnouncement(data[0]));
+    api.users.getFeaturedVendors().then(setFeaturedVendors);
+    api.getProducts().then(all => setRecentProducts(all.filter(p => p.status === 'APPROVED').slice(0, 4)));
+  }, []);
 
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
-    
-    // Simple heuristic routing logic
     const query = searchQuery.toLowerCase();
-    const serviceKeywords = ['plumber', 'electrician', 'cleaner', 'tutor', 'repair', 'mechanic', 'tailor', 'artisan'];
-    
-    // If it looks like a service request, go to FixIt
-    if (serviceKeywords.some(k => query.includes(k))) {
-       setSection(AppSection.FIXIT);
-    } else {
-       // Default to Mart for product searches or general queries
-       setSection(AppSection.MART);
-    }
+    const serviceKeywords = ['plumber', 'electrician', 'cleaner', 'tutor', 'repair', 'mechanic', 'tailor'];
+    setSection(serviceKeywords.some(k => query.includes(k)) ? AppSection.FIXIT : AppSection.MART);
   };
 
-  const handleVendorAction = () => {
-    if (user?.role === 'VENDOR') {
-      setSection(AppSection.MART);
-    } else {
-      setAuthIntent({ section: AppSection.MART, role: 'VENDOR' });
+  const handleRoleAction = (section: AppSection, role: UserRole) => {
+    if (user?.role === role) setSection(section);
+    else {
+      setAuthIntent({ section, role });
       setSection(AppSection.ACCOUNT);
     }
   };
-
-  const handleRiderAction = () => {
-    if (user?.role === 'RIDER') {
-      setSection(AppSection.RIDE);
-    } else {
-      setAuthIntent({ section: AppSection.RIDE, role: 'RIDER' });
-      setSection(AppSection.ACCOUNT);
-    }
-  };
-
-  const handleProviderAction = () => {
-    if (user?.role === 'PROVIDER') {
-      setSection(AppSection.FIXIT);
-    } else {
-      setAuthIntent({ section: AppSection.FIXIT, role: 'PROVIDER' });
-      setSection(AppSection.ACCOUNT);
-    }
-  };
-
-  const trendingItems = [
-    {
-      id: 1,
-      title: "Fresh Yam",
-      subtitle: "₦1,200/kg",
-      image: "https://picsum.photos/200/200?random=1",
-      section: AppSection.MART,
-      tag: "Mart"
-    },
-    {
-      id: 2,
-      title: "Emmanuel Fixes",
-      subtitle: "Plumber • 4.9★",
-      image: "https://picsum.photos/200/200?random=5",
-      section: AppSection.FIXIT,
-      tag: "Pro"
-    },
-    {
-      id: 3,
-      title: "Musa Express",
-      subtitle: "Rider • 500+ Trips",
-      image: "https://picsum.photos/200/200?random=15",
-      section: AppSection.RIDE,
-      tag: "Rider"
-    }
-  ];
-
-  const locations = ['All Kubwa', ...KUBWA_AREAS];
 
   return (
     <div className="pb-24">
-      {/* Hero Section with Search System */}
-      <div className="bg-kubwa-green text-white rounded-b-3xl p-6 pt-12 relative overflow-hidden shadow-xl min-h-[340px]">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-kubwa-orange opacity-20 rounded-full -ml-5 -mb-5"></div>
-        
+      {/* Dynamic Hero Section */}
+      <div className="bg-kubwa-green text-white rounded-b-[3rem] p-8 pt-16 relative overflow-hidden shadow-2xl min-h-[400px]">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl animate-pulse" />
         <div className="relative z-10">
-          {/* Logo Header */}
-          <div className="flex items-center gap-2 mb-6 opacity-90">
-             <div className="bg-white p-1.5 rounded-lg shadow-sm">
-               {/* Use placeholder if logo.png is missing or just text */}
-               <span className="text-2xl">⚡</span>
-             </div>
-             <span className="text-lg font-bold tracking-wide text-white drop-shadow-md">KUBWA CONNECT</span>
+          <div className="flex items-center gap-3 mb-8">
+             <div className="bg-white p-2.5 rounded-2xl shadow-xl transform rotate-12"><span className="text-3xl">⚡</span></div>
+             <span className="text-xl font-black tracking-widest uppercase">KUBWA CONNECT</span>
           </div>
           
-          {/* Slider Headline */}
-          <div className="h-20 mb-4 flex items-center">
-             <h1 
-               key={heroIndex} 
-               className="text-2xl font-bold leading-tight animate-fade-in"
-             >
+          <div className="h-24 mb-6">
+             <h1 key={heroIndex} className="text-3xl font-black leading-none tracking-tighter animate-fade-in uppercase">
                {heroMessages[heroIndex]}
              </h1>
           </div>
           
-          <p className="text-white/90 mb-6 text-sm">Join 2,500+ Kubwa Residents – It's Free</p>
-
-          {/* Search Bar */}
-          <div className="bg-white rounded-xl p-2 shadow-lg flex flex-col gap-2">
-             <div className="flex items-center gap-2 border-b border-gray-100 pb-2 px-2">
-                <Search className="text-gray-400" size={18} />
+          <div className="bg-white rounded-3xl p-3 shadow-2xl flex flex-col gap-3">
+             <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-2xl">
+                <Search className="text-gray-400" size={20} />
                 <input 
                   type="text" 
                   placeholder="What are you looking for?" 
-                  className="flex-1 bg-transparent text-gray-800 placeholder-gray-400 text-sm focus:outline-none"
+                  className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 text-sm font-black focus:outline-none"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
              </div>
              <div className="flex gap-2">
-                <div className="relative flex-1">
-                   <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"><MapPin size={14} /></div>
+                <div className="flex-1 bg-gray-50 rounded-2xl px-4 py-3 flex items-center gap-2">
+                   <MapPin size={16} className="text-kubwa-orange" />
                    <select 
-                     className="w-full pl-7 pr-2 py-2 bg-gray-50 rounded-lg text-xs text-gray-600 appearance-none focus:outline-none"
+                     className="bg-transparent text-[10px] font-black uppercase tracking-widest text-gray-900 outline-none w-full appearance-none"
                      value={searchLocation}
                      onChange={(e) => setSearchLocation(e.target.value)}
                    >
-                      {locations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                      {['All Kubwa', ...KUBWA_AREAS].map(loc => <option key={loc}>{loc}</option>)}
                    </select>
                 </div>
-                <button 
-                  onClick={handleSearch}
-                  className="bg-kubwa-orange text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-orange-600 transition-colors"
-                >
-                  Search
-                </button>
+                <Button onClick={handleSearch} className="px-8 shadow-none h-12">Search</Button>
              </div>
           </div>
         </div>
       </div>
 
-      {/* Announcement Banner */}
       {visibleAnnouncement && (
-        <div className="mx-4 -mt-4 relative z-20 bg-white rounded-xl shadow-md p-3 border-l-4 border-l-kubwa-orange flex justify-between items-start animate-slide-in-bottom">
-           <div>
-              <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                 <Bell size={14} className="text-kubwa-orange fill-orange-100" /> {visibleAnnouncement.title}
-              </h4>
-              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{visibleAnnouncement.message}</p>
+        <div className="mx-6 -mt-6 relative z-20 bg-gray-900 text-white rounded-3xl shadow-2xl p-4 flex justify-between items-center animate-slide-in-bottom">
+           <div className="flex items-center gap-4">
+              <div className="bg-kubwa-orange p-2.5 rounded-2xl"><Bell size={18} className="text-white" /></div>
+              <div>
+                 <h4 className="text-xs font-black uppercase tracking-widest">{visibleAnnouncement.title}</h4>
+                 <p className="text-[10px] text-white/60 line-clamp-1">{visibleAnnouncement.message}</p>
+              </div>
            </div>
-           <button onClick={() => setVisibleAnnouncement(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+           <button onClick={() => setVisibleAnnouncement(null)} className="p-1 hover:bg-white/10 rounded-full"><X size={18} /></button>
         </div>
       )}
 
-      {/* Main Action Grid */}
-      <div className="px-4 mt-8">
-         <div className="grid grid-cols-3 gap-3">
-            <button onClick={() => setSection(AppSection.MART)} className="bg-green-50 p-4 rounded-xl flex flex-col items-center gap-2 border border-green-100 hover:bg-green-100 transition-colors group">
-               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-green-600 group-hover:scale-110 transition-transform">
-                  <ShoppingBag size={20} />
-               </div>
-               <span className="text-xs font-bold text-gray-700">Mart</span>
-            </button>
-            <button onClick={() => setSection(AppSection.FIXIT)} className="bg-orange-50 p-4 rounded-xl flex flex-col items-center gap-2 border border-orange-100 hover:bg-orange-100 transition-colors group">
-               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-orange-600 group-hover:scale-110 transition-transform">
-                  <Wrench size={20} />
-               </div>
-               <span className="text-xs font-bold text-gray-700">FixIt</span>
-            </button>
-            <button onClick={() => setSection(AppSection.RIDE)} className="bg-blue-50 p-4 rounded-xl flex flex-col items-center gap-2 border border-blue-100 hover:bg-blue-100 transition-colors group">
-               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 group-hover:scale-110 transition-transform">
-                  <Truck size={20} />
-               </div>
-               <span className="text-xs font-bold text-gray-700">Ride</span>
-            </button>
-         </div>
+      {/* Main Categories Grid */}
+      <div className="px-6 mt-12 grid grid-cols-3 gap-4">
+         {[
+           { section: AppSection.MART, icon: ShoppingBag, label: 'Mart', color: 'bg-green-50 text-green-600', border: 'border-green-100' },
+           { section: AppSection.FIXIT, icon: Wrench, label: 'FixIt', color: 'bg-orange-50 text-orange-600', border: 'border-orange-100' },
+           { section: AppSection.RIDE, icon: Truck, label: 'Ride', color: 'bg-blue-50 text-blue-600', border: 'border-blue-100' }
+         ].map((cat) => (
+           <button 
+            key={cat.label}
+            onClick={() => setSection(cat.section)} 
+            className={`${cat.color} ${cat.border} p-5 rounded-[2rem] border-2 flex flex-col items-center gap-3 hover:scale-105 transition-all group`}
+           >
+              <div className="bg-white p-3.5 rounded-2xl shadow-sm group-hover:shadow-md transition-all"><cat.icon size={24} /></div>
+              <span className="text-[10px] font-black uppercase tracking-widest">{cat.label}</span>
+           </button>
+         ))}
       </div>
 
-      {/* Role-Based CTA Cards (Updated for 3 columns) */}
-      <div className="px-4 mt-8">
-         <div className="grid grid-cols-3 gap-2">
+      {/* Role CTA Section */}
+      <div className="px-6 mt-12">
+         <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">Start Earning</h3>
+         </div>
+         <div className="grid grid-cols-2 gap-4">
             <div 
-              onClick={handleVendorAction}
-              className="bg-gradient-to-br from-gray-900 to-gray-800 p-2.5 rounded-xl text-white relative overflow-hidden cursor-pointer shadow-sm active:scale-95 transition-transform"
+              onClick={() => handleRoleAction(AppSection.MART, 'VENDOR')}
+              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
             >
-               <div className="relative z-10">
-                  <Store size={18} className="mb-1.5 text-kubwa-green" />
-                  <h4 className="font-bold text-[10px] leading-tight">Become a Vendor</h4>
-                  <p className="text-[8px] text-gray-400 mt-0.5 line-clamp-1">Sell to Kubwa</p>
-               </div>
-               <div className="absolute right-[-10px] bottom-[-10px] opacity-10">
-                  <Store size={50} />
-               </div>
+               <Store size={28} className="text-kubwa-green mb-3 group-hover:scale-110 transition-transform" />
+               <h4 className="font-black text-xs uppercase tracking-tight">Become a Vendor</h4>
+               <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Sell to Kubwa</p>
             </div>
-
             <div 
-              onClick={handleProviderAction}
-              className="bg-gradient-to-br from-orange-600 to-amber-500 p-2.5 rounded-xl text-white relative overflow-hidden cursor-pointer shadow-sm active:scale-95 transition-transform"
+              onClick={() => handleRoleAction(AppSection.FIXIT, 'PROVIDER')}
+              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
             >
-               <div className="relative z-10">
-                  <Briefcase size={18} className="mb-1.5 text-white" />
-                  <h4 className="font-bold text-[10px] leading-tight">Provide Services</h4>
-                  <p className="text-[8px] text-orange-100 mt-0.5 line-clamp-1">Find clients fast</p>
-               </div>
-               <div className="absolute right-[-10px] bottom-[-10px] opacity-20">
-                  <Briefcase size={50} />
-               </div>
-            </div>
-            
-            <div 
-              onClick={handleRiderAction}
-              className="bg-gradient-to-br from-blue-600 to-blue-500 p-2.5 rounded-xl text-white relative overflow-hidden cursor-pointer shadow-sm active:scale-95 transition-transform"
-            >
-               <div className="relative z-10">
-                  <Bike size={18} className="mb-1.5 text-white" />
-                  <h4 className="font-bold text-[10px] leading-tight">Earn as Rider</h4>
-                  <p className="text-[8px] text-blue-100 mt-0.5 line-clamp-1">Daily earnings</p>
-               </div>
-               <div className="absolute right-[-10px] bottom-[-10px] opacity-10">
-                  <Bike size={50} />
-               </div>
+               <Briefcase size={28} className="text-kubwa-orange mb-3 group-hover:scale-110 transition-transform" />
+               <h4 className="font-black text-xs uppercase tracking-tight">Hire out Skills</h4>
+               <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Find fixit jobs</p>
             </div>
          </div>
       </div>
 
-      {/* Fresh from Mart Section */}
-      <div className="px-4 mt-8">
-         <div className="flex justify-between items-center mb-4">
+      {/* Trending Products */}
+      <div className="px-6 mt-12">
+         <div className="flex justify-between items-end mb-6">
             <div>
-               <h3 className="text-lg font-bold text-gray-800">Fresh from Mart</h3>
-               <p className="text-xs text-gray-500">Best deals in Kubwa today</p>
+               <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">MART DEALS</h3>
+               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fresh Today</p>
             </div>
-            <div className="flex bg-gray-100 p-1 rounded-lg">
-                <button 
-                  onClick={() => setProductSortMode('NEW')}
-                  className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${productSortMode === 'NEW' ? 'bg-white shadow text-kubwa-green' : 'text-gray-500'}`}
-                >
-                   <Clock size={10} /> New
-                </button>
-                <button 
-                  onClick={() => setProductSortMode('TRENDING')}
-                  className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${productSortMode === 'TRENDING' ? 'bg-white shadow text-orange-500' : 'text-gray-500'}`}
-                >
-                   <Flame size={10} /> Hot
-                </button>
-            </div>
+            <button onClick={() => setSection(AppSection.MART)} className="text-[10px] font-black text-kubwa-green uppercase tracking-widest flex items-center gap-1">View All <ChevronRight size={14}/></button>
          </div>
          
-         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+         <div className="grid grid-cols-2 gap-4">
             {recentProducts.map(product => (
-               <div 
-                 key={product.id} 
-                 onClick={() => setSection(AppSection.MART)}
-                 className="bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
-               >
-                  <div className="h-28 bg-gray-100 relative">
-                     <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                     {product.isCategoryFeatured && (
-                        <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1">
-                           <Crown size={8} fill="black"/> Top
-                        </div>
-                     )}
+               <div key={product.id} onClick={() => setSection(AppSection.MART)} className="cursor-pointer group">
+                  <div className="h-40 bg-gray-100 rounded-3xl overflow-hidden mb-3">
+                     <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt=""/>
                   </div>
-                  <div className="p-2">
-                     <h4 className="text-xs font-bold text-gray-800 line-clamp-1">{product.name}</h4>
-                     <div className="flex justify-between items-center mt-1">
-                        <span className="text-xs font-bold text-kubwa-green">₦{product.price.toLocaleString()}</span>
-                        <div className="bg-gray-100 p-1 rounded-full text-gray-400 hover:bg-kubwa-green hover:text-white transition-colors">
-                           <ShoppingBag size={12} />
-                        </div>
-                     </div>
-                  </div>
-               </div>
-            ))}
-         </div>
-         <button onClick={() => setSection(AppSection.MART)} className="w-full mt-3 py-2 text-xs text-gray-500 font-bold hover:text-kubwa-green">
-            View All Products
-         </button>
-      </div>
-
-      {/* Featured Vendors Carousel */}
-      <div className="mt-8 bg-gray-50 py-6">
-         <div className="px-4 flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800">Verified Vendors</h3>
-            <button onClick={() => setSection(AppSection.MART)} className="text-xs text-kubwa-green font-bold flex items-center">
-               View All <ChevronRight size={14} />
-            </button>
-         </div>
-         <div className="flex overflow-x-auto gap-4 px-4 pb-4 no-scrollbar">
-            {featuredVendors.map((vendor) => (
-               <div key={vendor.id} className="min-w-[140px] bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-                  <div className="w-14 h-14 bg-gray-200 rounded-full mb-2 overflow-hidden border-2 border-green-100">
-                     <img src={vendor.avatar || `https://ui-avatars.com/api/?name=${vendor.name}&background=random`} alt={vendor.name} className="w-full h-full object-cover" />
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{vendor.storeName || vendor.name}</h4>
-                  <p className="text-[10px] text-gray-500 mb-2 line-clamp-1">{vendor.bio || 'Kubwa Vendor'}</p>
-                  <div className="flex gap-1 text-[10px] text-yellow-500 font-bold items-center bg-yellow-50 px-2 py-0.5 rounded-full">
-                     <Star size={10} fill="currentColor" /> {vendor.rating || 'New'}
-                  </div>
-               </div>
-            ))}
-         </div>
-      </div>
-
-      {/* Trending in Kubwa (Mixed) */}
-      <div className="px-4 mt-8 mb-8">
-         <h3 className="text-lg font-bold text-gray-800 mb-4">Trending in Kubwa</h3>
-         <div className="space-y-3">
-            {trendingItems.map((item) => (
-               <div 
-                 key={item.id} 
-                 onClick={() => setSection(item.section)}
-                 className="flex items-center gap-4 bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-               >
-                  <img src={item.image} alt={item.title} className="w-16 h-16 rounded-lg object-cover bg-gray-100" />
-                  <div className="flex-1">
-                     <div className="flex justify-between items-start">
-                        <h4 className="font-bold text-gray-900">{item.title}</h4>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${item.tag === 'Mart' ? 'bg-green-100 text-green-700' : item.tag === 'Pro' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
-                           {item.tag}
-                        </span>
-                     </div>
-                     <p className="text-sm text-gray-500">{item.subtitle}</p>
-                  </div>
-                  <div className="bg-gray-50 p-2 rounded-full text-gray-400">
-                     <ChevronRight size={16} />
-                  </div>
+                  <h4 className="text-xs font-black text-gray-900 px-1">{product.name}</h4>
+                  <p className="text-sm font-black text-kubwa-green px-1 mt-1">₦{product.price.toLocaleString()}</p>
                </div>
             ))}
          </div>

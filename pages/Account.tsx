@@ -1,865 +1,326 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, AppSection, ActivityItem, Address } from '../types';
-import { api, FIXIT_SERVICES, KUBWA_AREAS } from '../services/data';
-import { Button, Input, Card, Badge, Select } from '../components/ui';
-import { Mail, Lock, LogOut, CheckCircle, AlertCircle, Loader2, X, Shield, CreditCard, Crown, Star, ShoppingBag, Truck, Wrench, MapPin, Edit2, Check, User as UserIcon, Phone, FileText, LayoutDashboard, ArrowLeft, Bike, Store, Briefcase } from 'lucide-react';
+import { User, AppSection, MonetisationTier, UserRole, PaymentIntent } from '../types';
+import { api } from '../services/data';
+import { PaymentService } from '../services/payments';
+import { Button, Card, Badge } from '../components/ui';
+import AuthModal from '../components/AuthModal';
+import { 
+  LogOut, 
+  ShieldCheck, 
+  Crown, 
+  Zap, 
+  Loader2, 
+  CreditCard, 
+  AlertTriangle, 
+  ShieldAlert, 
+  ArrowRight, 
+  ShoppingBag,
+  User as UserIcon,
+  LogIn,
+  UserPlus,
+  Heart,
+  Truck,
+  Wrench,
+  Settings,
+  Bell,
+  X,
+  ChevronRight,
+  CheckCircle,
+  Clock,
+  Info,
+  TrendingUp,
+  BarChart3
+} from 'lucide-react';
 
 interface AccountProps {
   user: User | null;
   setUser: (user: User | null) => void;
-  setSection?: (section: AppSection) => void;
-  triggerNotification?: () => void;
-  authIntent?: { section: AppSection; role: UserRole } | null;
+  setSection: (section: AppSection) => void;
   refreshUser: () => void;
+  authIntent: { section: AppSection; role: UserRole } | null;
 }
 
-const Account: React.FC<AccountProps> = ({ user, setUser, setSection, authIntent, refreshUser }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'address'>('profile');
-  
-  // Auth Form State
-  const [authView, setAuthView] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT'>('LOGIN');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  
-  // Vendor specific signup fields
-  const [storeName, setStoreName] = useState('');
-  const [storeDescription, setStoreDescription] = useState('');
-  const [businessAddress, setBusinessAddress] = useState('');
+const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUser, authIntent }) => {
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<UserRole>(authIntent?.role || 'USER');
+  const [authView, setAuthView] = useState<'LOGIN' | 'SIGNUP'>(authIntent ? 'SIGNUP' : 'LOGIN');
 
-  // Profile Edit State
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: '',
-    bio: '',
-    phoneNumber: '',
-    storeName: '',
-    address: ''
-  });
-
-  // Vendor Form State for Upgrade/Signup Completion
-  const [vendorForm, setVendorForm] = useState({
-    storeName: '',
-    description: '',
-    businessAddress: ''
-  });
-
-  // Data State
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [newAddress, setNewAddress] = useState({ title: '', details: '' });
-  const [showAddAddress, setShowAddAddress] = useState(false);
-
-  // Status State
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showFixitModal, setShowFixitModal] = useState(false);
-
-  // Fixit Application State
-  const [fixitForm, setFixitForm] = useState({
-      businessName: '',
-      phoneNumber: '',
-      location: KUBWA_AREAS[0],
-      bio: '',
-      services: [] as string[]
-  });
-
-  // Determine signup role from intent or default to USER
-  const signupRole: UserRole = authIntent?.role || 'USER';
-
-  // Initial Load & Form Sync
   useEffect(() => {
-    if (user) {
-      if (activeTab === 'activity') loadActivity();
-      if (activeTab === 'address') loadAddresses();
-      
-      // Sync edit form with user data
-      setEditForm({
-        name: user.name || '',
-        bio: user.bio || '',
-        phoneNumber: user.phoneNumber || '',
-        storeName: user.storeName || '',
-        address: user.address || ''
-      });
-
-      // Pre-fill fixit form
-      setFixitForm(prev => ({
-          ...prev,
-          businessName: user.name,
-          phoneNumber: user.phoneNumber || ''
-      }));
-
-      // CHECK FOR UPGRADE INTENT OR INCOMPLETE VENDOR SIGNUP
-      const isVendorUpgradeNeeded = authIntent?.role === 'VENDOR' && user.role !== 'VENDOR';
-      const isVendorSignupIncomplete = user.role === 'VENDOR' && !user.storeName;
-      
-      if (isVendorUpgradeNeeded || isVendorSignupIncomplete) {
-          setShowUpgradeModal(true);
-          // Pre-fill vendor form if possible
-          setVendorForm(prev => ({
-            ...prev,
-            storeName: user.storeName || '',
-            description: user.bio || '',
-            businessAddress: user.address || ''
-          }));
-      }
+    if (authIntent) {
+      setAuthMode(authIntent.role);
+      setAuthView('SIGNUP');
+      setIsAuthModalOpen(true);
     }
-  }, [user, activeTab, authIntent]);
+  }, [authIntent]);
 
-  const loadActivity = async () => {
-    if (!user) return;
-    const data = await api.users.getActivity(user.id);
-    setActivity(data);
-  };
-
-  const loadAddresses = async () => {
-    if (!user) return;
-    const data = await api.users.getAddresses(user.id);
-    setAddresses(data);
-  };
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccessMsg('');
-    setLoading(true);
-
-    try {
-      if (authView === 'FORGOT') {
-        const { error } = await api.auth.resetPassword(email);
-        if (error) {
-          setError(error);
-        } else {
-          setSuccessMsg('Password reset link sent to your email.');
-        }
-      } else if (authView === 'LOGIN') {
-        const { user: loggedInUser, error } = await api.auth.signIn(email, password);
-        if (error) {
-          setError(error);
-        } else if (loggedInUser) {
-          setUser(loggedInUser);
-          if (authIntent && setSection) {
-            setSection(authIntent.section);
-          }
-        }
-      } else {
-        // SIGNUP
-        // Validate vendor specific fields if that's the role
-        if (signupRole === 'VENDOR') {
-          if (!storeName || !businessAddress) {
-            setError("Store Name and Business Address are required for vendors.");
-            setLoading(false);
-            return;
-          }
-        }
-
-        const { user: newUser, error } = await api.auth.signUp(email, password, name, signupRole);
-        if (error) {
-          setError(error);
-        } else if (newUser) {
-          // If vendor, update their profile with the extra info immediately
-          if (signupRole === 'VENDOR') {
-            await api.users.updateProfile(newUser.id, {
-              storeName: storeName,
-              bio: storeDescription,
-              address: businessAddress
-            });
-          }
-          
-          setUser(newUser);
-          if (authIntent && setSection) {
-            setSection(authIntent.section);
-          }
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await api.auth.signOut();
-    setUser(null);
-    if (setSection) setSection(AppSection.HOME);
-  };
-
-  const handleSaveProfile = async () => {
-    if (!user) return;
-    setLoading(true);
-    setError('');
-    
-    const updatedUser = await api.users.updateProfile(user.id, {
-      name: editForm.name,
-      bio: editForm.bio,
-      phoneNumber: editForm.phoneNumber,
-      storeName: editForm.storeName,
-      address: editForm.address
-    });
-
-    if (updatedUser) {
-      setSuccessMsg('Profile updated successfully!');
-      setIsEditing(false);
-      refreshUser(); 
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } else {
-      setError('Failed to update profile. Please try again.');
-    }
-    setLoading(false);
-  };
-
-  const handleUpgradeToVendor = async () => {
-      if (!user) return;
-      if (!vendorForm.storeName || !vendorForm.businessAddress) {
-          setError("Store Name and Business Address are required.");
-          return;
-      }
-      
-      setLoading(true);
-      setError('');
-      
-      const roleSuccess = await api.users.updateRole(user.id, 'VENDOR');
-      const profileSuccess = await api.users.updateProfile(user.id, {
-          storeName: vendorForm.storeName,
-          bio: vendorForm.description,
-          address: vendorForm.businessAddress
-      });
-
-      if (roleSuccess && profileSuccess) {
-          await refreshUser(); // Fetch new role and profile data
-          setShowUpgradeModal(false);
-          setSuccessMsg("Congratulations! Your vendor profile is set up.");
-          // Redirect to Mart after short delay
-          setTimeout(() => {
-              if (setSection) setSection(AppSection.MART);
-          }, 1500);
-      } else {
-          setError("Action failed. Please contact support.");
-      }
-      setLoading(false);
-  };
-
-  const handleBecomeFixit = async () => {
-      if (!user) return;
-      if (!fixitForm.phoneNumber || fixitForm.services.length === 0) {
-          alert("Please provide a phone number and select at least one service.");
-          return;
-      }
-      
-      setLoading(true);
-      
-      // 1. Update Profile info first if needed
-      if (!user.phoneNumber) {
-          await api.users.updateProfile(user.id, { phoneNumber: fixitForm.phoneNumber });
-      }
-
-      // 2. Call specialized API to create Provider record
-      const success = await api.users.becomeProvider(user.id, fixitForm);
-      
-      if (success) {
-          // 3. Update User Role to PROVIDER & Status to PENDING locally/remotely
-          await api.users.updateStatus(user.id, 'PENDING'); // Mark user as pending approval
-          await refreshUser();
-          setShowFixitModal(false);
-          setSuccessMsg("Application Sent! An admin will review your profile shortly.");
-          setTimeout(() => {
-              if (setSection) setSection(AppSection.FIXIT);
-          }, 1500);
-      } else {
-          setError("Application failed. Please try again.");
-      }
-      setLoading(false);
-  };
-
-  const toggleFixitService = (service: string) => {
-      setFixitForm(prev => {
-          const exists = prev.services.includes(service);
-          return {
-              ...prev,
-              services: exists ? prev.services.filter(s => s !== service) : [...prev.services, service]
-          };
-      });
-  };
-
-  const handleAddAddress = async () => {
-    if (!user || !newAddress.title || !newAddress.details) return;
-    setLoading(true);
-    const addr = await api.users.saveAddress(user.id, newAddress.title, newAddress.details);
-    if (addr) {
-      setAddresses([...addresses, addr]);
-      setNewAddress({ title: '', details: '' });
-      setShowAddAddress(false);
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteAddress = async (id: string) => {
-    const success = await api.users.deleteAddress(id);
-    if (success) {
-      setAddresses(prev => prev.filter(a => a.id !== id));
-    }
-  };
-
-  // --- GUEST VIEW ---
   if (!user) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 animate-fade-in">
-        <Card className="w-full max-w-md p-8">
-          <div className="text-center mb-8">
-            {signupRole === 'RIDER' && authView === 'SIGNUP' && (
-               <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <Bike size={24} />
-               </div>
-            )}
-            {signupRole === 'VENDOR' && authView === 'SIGNUP' && (
-               <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <Store size={24} />
-               </div>
-            )}
-            <h2 className="text-2xl font-bold text-gray-900">
-                {authView === 'LOGIN' ? 'Welcome Back' : authView === 'SIGNUP' ? 'Create Account' : 'Reset Password'}
-            </h2>
-            <p className="text-gray-500 text-sm mt-1">
-              {authView === 'LOGIN' ? 'Sign in to access your orders and profile.' : 
-               authView === 'SIGNUP' && signupRole === 'RIDER' ? 'Join as a Rider and start earning.' :
-               authView === 'SIGNUP' && signupRole === 'VENDOR' ? 'Open your store on Kubwa Connect.' :
-               authView === 'SIGNUP' ? 'Join the Kubwa Connect community today.' :
-               'Enter your email to receive a reset link.'}
-            </p>
-          </div>
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center animate-fade-in pb-32">
+        <div className="w-28 h-28 bg-kubwa-green/10 rounded-[3rem] flex items-center justify-center mb-10 shadow-inner relative group">
+          <div className="absolute inset-0 bg-kubwa-green/5 rounded-[3rem] animate-ping scale-110 opacity-50"></div>
+          <UserIcon size={56} className="text-kubwa-green relative z-10" />
+        </div>
+        
+        <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter mb-4 leading-none">Connect to Kubwa</h2>
+        <p className="text-gray-500 font-bold text-sm max-w-xs mb-12 leading-relaxed opacity-70">
+          The heart of your community. Join thousands of residents shopping and earning in Kubwa.
+        </p>
 
-          <form onSubmit={handleAuth} className="space-y-4">
-            {authView === 'SIGNUP' && (
-              <div>
-                <label className="text-xs font-bold text-gray-700 mb-1 block">Full Name</label>
-                <div className="relative">
-                  <UserIcon size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <Input 
-                    placeholder="e.g. Musa Ibrahim" 
-                    className="pl-10" 
-                    value={name} 
-                    onChange={e => setName(e.target.value)} 
-                    required
-                  />
-                </div>
-              </div>
-            )}
-            
-            <div>
-              <label className="text-xs font-bold text-gray-700 mb-1 block">Email Address</label>
-              <div className="relative">
-                <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <Input 
-                  type="email" 
-                  placeholder="name@example.com" 
-                  className="pl-10" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)}
-                  required 
-                />
-              </div>
-            </div>
+        <div className="w-full space-y-4 max-w-sm">
+          <Button 
+            className="w-full h-16 text-base rounded-3xl shadow-xl shadow-kubwa-green/20" 
+            onClick={() => { setAuthView('LOGIN'); setIsAuthModalOpen(true); }}
+          >
+            <LogIn size={20} strokeWidth={3} /> SIGN IN TO ACCOUNT
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            className="w-full h-16 text-base border-2 border-gray-100 rounded-3xl" 
+            onClick={() => { setAuthView('SIGNUP'); setIsAuthModalOpen(true); }}
+          >
+            <UserPlus size={20} strokeWidth={3} /> CREATE NEW PROFILE
+          </Button>
+        </div>
 
-            {authView !== 'FORGOT' && (
-              <div>
-                <label className="text-xs font-bold text-gray-700 mb-1 block">Password</label>
-                <div className="relative">
-                  <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <Input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    className="pl-10" 
-                    value={password} 
-                    onChange={e => setPassword(e.target.value)}
-                    required 
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Vendor Specific Onboarding Fields during Signup */}
-            {authView === 'SIGNUP' && signupRole === 'VENDOR' && (
-              <div className="space-y-4 pt-2 border-t mt-4">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Store Information</p>
-                <div>
-                  <label className="text-xs font-bold text-gray-700 mb-1 block">Store Name</label>
-                  <Input 
-                    placeholder="e.g. Phase 4 Provisions" 
-                    value={storeName} 
-                    onChange={e => setStoreName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-700 mb-1 block">Business Address</label>
-                  <Input 
-                    placeholder="e.g. Shop 45, Market Square" 
-                    value={businessAddress} 
-                    onChange={e => setBusinessAddress(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-700 mb-1 block">Store Description (Optional)</label>
-                  <textarea 
-                    className="w-full p-3 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-kubwa-green outline-none"
-                    rows={3}
-                    placeholder="What do you sell?"
-                    value={storeDescription}
-                    onChange={e => setStoreDescription(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {authView === 'LOGIN' && (
-                <div className="flex justify-end mt-1">
-                    <button type="button" onClick={() => { setAuthView('FORGOT'); setError(''); setSuccessMsg(''); }} className="text-xs text-kubwa-green hover:underline">
-                        Forgot Password?
-                    </button>
-                </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs flex items-center gap-2">
-                <AlertCircle size={16} /> {error}
-              </div>
-            )}
-            
-            {successMsg && (
-              <div className="bg-green-50 text-green-600 p-3 rounded-lg text-xs flex items-center gap-2">
-                <CheckCircle size={16} /> {successMsg}
-              </div>
-            )}
-
-            <Button className="w-full py-3 flex items-center justify-center gap-2" disabled={loading}>
-              {loading && <Loader2 className="animate-spin" size={18} />}
-              {authView === 'LOGIN' ? 'Sign In' : authView === 'SIGNUP' ? (signupRole === 'RIDER' ? 'Register Rider' : signupRole === 'VENDOR' ? 'Create Store' : 'Sign Up') : 'Send Link'}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-500">
-            {authView === 'LOGIN' ? (
-                <>
-                    Don't have an account? {' '}
-                    <button onClick={() => { setAuthView('SIGNUP'); setError(''); }} className="text-kubwa-green font-bold hover:underline">
-                        Sign Up
-                    </button>
-                </>
-            ) : authView === 'SIGNUP' ? (
-                <>
-                    Already have an account? {' '}
-                    <button onClick={() => { setAuthView('LOGIN'); setError(''); }} className="text-kubwa-green font-bold hover:underline">
-                        Log In
-                    </button>
-                </>
-            ) : (
-                <button onClick={() => { setAuthView('LOGIN'); setError(''); setSuccessMsg(''); }} className="flex items-center justify-center gap-1 mx-auto text-gray-600 hover:text-kubwa-green">
-                    <ArrowLeft size={14} /> Back to Sign In
-                </button>
-            )}
-          </div>
-        </Card>
+        {isAuthModalOpen && (
+          <AuthModal 
+            initialRole={authMode}
+            initialMode={authView}
+            onClose={() => setIsAuthModalOpen(false)}
+            onSuccess={(u) => {
+              setIsAuthModalOpen(false);
+              refreshUser();
+            }}
+          />
+        )}
       </div>
     );
   }
 
-  // --- LOGGED IN VIEW ---
+  const handleStartPayment = async (tier: MonetisationTier) => {
+    setProcessingPayment(true);
+    setPaymentError(null);
+
+    const intent: PaymentIntent = tier === 'VERIFIED' ? 'VENDOR_VERIFIED' : 'VENDOR_FEATURED';
+    const amount = tier === 'VERIFIED' ? 5000 : 15000;
+
+    try {
+      const response = await PaymentService.pay(intent, amount, user);
+      if (response.success) {
+        const fulfilled = await api.payments.fulfillIntent(user.id, intent, response.reference);
+        if (fulfilled) {
+          await refreshUser();
+          setPaymentSuccess(true);
+          setTimeout(() => setPaymentSuccess(false), 5000);
+        }
+      } else {
+        setPaymentError(response.error || "Payment was not completed.");
+      }
+    } catch (err) {
+      setPaymentError("An unexpected error occurred during payment.");
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const isVendor = user.role === 'VENDOR';
+  const isProvider = user.role === 'PROVIDER';
+  const isApproved = user.status === 'APPROVED';
+
   return (
-    <div className="pb-24 pt-4 px-4 max-w-2xl mx-auto relative">
-      
-      {/* VENDOR UPGRADE / SETUP MODAL */}
-      {showUpgradeModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <Card className="w-full max-w-md p-0 overflow-hidden flex flex-col max-h-[90vh] animate-zoom-in">
-                  <div className="bg-kubwa-green text-white p-4 text-center">
-                      <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <Store size={24} />
-                      </div>
-                      <h3 className="text-xl font-bold">Vendor Onboarding</h3>
-                      <p className="text-white/80 text-xs">Set up your store to start selling in Kubwa.</p>
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto flex-1 space-y-4">
-                      {error && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs flex items-center gap-2">
-                          <AlertCircle size={16} /> {error}
-                        </div>
-                      )}
-
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Store Name</label>
-                          <Input 
-                            value={vendorForm.storeName} 
-                            onChange={e => setVendorForm({...vendorForm, storeName: e.target.value})}
-                            placeholder="e.g. Mama Nkechi Groceries" 
-                            required
-                          />
-                      </div>
-
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Business Address</label>
-                          <Input 
-                            value={vendorForm.businessAddress} 
-                            onChange={e => setVendorForm({...vendorForm, businessAddress: e.target.value})}
-                            placeholder="e.g. Shop 12, Phase 4 Market, Kubwa" 
-                            required
-                          />
-                      </div>
-
-                      <div>
-                          <label className="text-xs font-bold text-gray-700 mb-1 block">Store Description</label>
-                          <textarea 
-                            className="w-full p-3 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-kubwa-green outline-none"
-                            rows={4}
-                            placeholder="Tell customers what you sell..."
-                            value={vendorForm.description}
-                            onChange={e => setVendorForm({...vendorForm, description: e.target.value})}
-                          />
-                      </div>
-                  </div>
-
-                  <div className="p-4 border-t bg-gray-50 flex gap-3">
-                      {user.role !== 'VENDOR' && (
-                        <Button variant="outline" className="flex-1" onClick={() => setShowUpgradeModal(false)}>Cancel</Button>
-                      )}
-                      <Button onClick={handleUpgradeToVendor} disabled={loading} className="flex-[2] bg-kubwa-green hover:opacity-90">
-                          {loading ? <Loader2 className="animate-spin" /> : 'Complete Setup'}
-                      </Button>
-                  </div>
-              </Card>
+    <div className="pb-32 pt-8 px-6 max-w-2xl mx-auto animate-fade-in">
+      {/* 1. PROFILE HEADER CARD */}
+      <div className="mb-10 relative">
+        <Card className="bg-gray-900 text-white border-none shadow-2xl rounded-[3rem] p-0 overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl" />
+          <div className="p-10 relative z-10">
+             <div className="flex justify-between items-start mb-8">
+                <div className="w-24 h-24 rounded-[2rem] bg-white/10 flex items-center justify-center text-4xl font-black border border-white/20 shadow-2xl backdrop-blur-md overflow-hidden">
+                  {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : user.name.charAt(0)}
+                </div>
+                <div className="flex gap-2">
+                   <button className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
+                      <Settings size={22} />
+                   </button>
+                   <button onClick={async () => { await api.auth.signOut(); refreshUser(); setSection(AppSection.HOME); }} className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all group">
+                      <LogOut size={22} />
+                   </button>
+                </div>
+             </div>
+             
+             <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-2xl font-black tracking-tight uppercase leading-none truncate max-w-[220px]">
+                    {isVendor && user.storeName ? user.storeName : user.name}
+                  </h2>
+                  {user.verificationStatus === 'VERIFIED' && <ShieldCheck size={24} className="text-blue-400 shrink-0" />}
+                </div>
+                <p className="text-white/50 text-xs font-bold mb-6">{user.email}</p>
+                <div className="flex flex-wrap gap-2">
+                   <Badge color="bg-kubwa-green text-white border-none px-3 py-1.5">{user.role}</Badge>
+                   {user.tier === 'FEATURED' && (
+                      <Badge color="bg-yellow-500 text-black border-none px-3 py-1.5">
+                        <Crown size={12} className="mr-1" /> FEATURED MERCHANT
+                      </Badge>
+                   )}
+                   {user.tier === 'VERIFIED' && (
+                      <Badge color="bg-blue-600 text-white border-none px-3 py-1.5">
+                         <ShieldCheck size={12} className="mr-1" /> VERIFIED PRO
+                      </Badge>
+                   )}
+                </div>
+             </div>
           </div>
-      )}
-
-      {/* Header Profile Card */}
-      <Card className="mb-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white border-none shadow-xl">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-2xl font-bold border-2 border-white/30">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h2 className="text-xl font-bold">{user.name}</h2>
-              <p className="text-white/70 text-sm">{user.email}</p>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <Badge color="bg-white/20 text-white border-none">{user.role}</Badge>
-                {user.subscription?.tier !== 'STARTER' && (
-                  <Badge color="bg-yellow-500/20 text-yellow-300 border-yellow-500/50 flex items-center gap-1">
-                    <Crown size={10} /> {user.subscription?.tier}
-                  </Badge>
-                )}
-                {user.isFeatured && (
-                  <Badge color="bg-yellow-400 text-black border-none flex items-center gap-1 font-bold">
-                    <Star size={10} fill="currentColor" /> Featured Vendor
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white/80 hover:text-white"
-            title="Sign Out"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/10">
-          <div className="text-center">
-             <p className="text-xs text-white/50 uppercase font-bold">Joined</p>
-             <p className="font-bold">{new Date(user.joinedAt || Date.now()).toLocaleDateString()}</p>
-          </div>
-          <div className="text-center border-l border-white/10">
-             <p className="text-xs text-white/50 uppercase font-bold">Orders</p>
-             <p className="font-bold">{activity.length}</p>
-          </div>
-          <div className="text-center border-l border-white/10">
-             <p className="text-xs text-white/50 uppercase font-bold">Status</p>
-             <p className="font-bold text-green-400">{user.status}</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Admin Access Button (Only for Admins) */}
-      {user.role === 'ADMIN' && (
-        <Button 
-          className="w-full mb-6 bg-gray-900 text-white hover:bg-gray-800 flex items-center justify-center gap-2 py-3 shadow-lg"
-          onClick={() => setSection && setSection(AppSection.ADMIN)}
-        >
-          <LayoutDashboard size={20} /> Access Admin Dashboard
-        </Button>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 mb-6">
-        {[
-          { id: 'profile', label: 'Profile', icon: UserIcon },
-          { id: 'activity', label: 'Activity', icon: ShoppingBag },
-          { id: 'address', label: 'Address', icon: MapPin },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${
-              activeTab === tab.id ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
-        ))}
+        </Card>
       </div>
 
-      {/* --- PROFILE TAB --- */}
-      {activeTab === 'profile' && (
-        <div className="space-y-4 animate-fade-in">
-          {successMsg && (
-            <div className="bg-green-50 text-green-700 p-3 rounded-lg flex items-center gap-2 text-sm font-bold">
-              <CheckCircle size={16} /> {successMsg}
-            </div>
-          )}
-          {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm font-bold">
-              <AlertCircle size={16} /> {error}
-            </div>
-          )}
-
-          {/* Become Vendor/Fixit Cards (Manual Trigger) */}
-          {user.role === 'USER' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div onClick={() => setShowUpgradeModal(true)} className="bg-green-50 border border-green-200 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-green-100 transition-colors">
-                      <div className="flex items-center gap-3">
-                          <div className="bg-green-200 p-2 rounded-full text-green-800">
-                              <Store size={20} />
-                          </div>
-                          <div>
-                              <h4 className="font-bold text-green-900">Start Selling</h4>
-                              <p className="text-xs text-green-700">Join as Vendor</p>
-                          </div>
-                      </div>
-                  </div>
-                  
-                  <div onClick={() => setShowFixitModal(true)} className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-orange-100 transition-colors">
-                      <div className="flex items-center gap-3">
-                          <div className="bg-orange-200 p-2 rounded-full text-orange-800">
-                              <Wrench size={20} />
-                          </div>
-                          <div>
-                              <h4 className="font-bold text-orange-900">Earn as a Pro</h4>
-                              <p className="text-xs text-orange-700">Join as Fixit Provider</p>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          )}
-
-          <Card className="relative">
-            <div className="flex justify-between items-center mb-6">
-               <h3 className="font-bold text-gray-800">Personal Information</h3>
-               {!isEditing && (
-                 <Button variant="outline" onClick={() => setIsEditing(true)} className="py-1.5 px-3 text-xs flex items-center gap-2">
-                   <Edit2 size={14} /> Edit Profile
-                 </Button>
-               )}
-            </div>
-
-            <div className="space-y-4">
-              {/* Name Field */}
-              <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Name</label>
-                 {isEditing ? (
-                   <Input 
-                     value={editForm.name} 
-                     onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                     className="bg-gray-50"
-                   />
-                 ) : (
-                   <p className="font-medium text-gray-900">{user.name}</p>
-                 )}
-              </div>
-
-              {/* Email Field (Read Only) */}
-              <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Email Address</label>
-                 <div className="flex items-center justify-between">
-                   <p className="font-medium text-gray-900">{user.email}</p>
-                   {isEditing && <Lock size={14} className="text-gray-400" />}
-                 </div>
-              </div>
-
-              {/* Phone Field */}
-              <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone Number</label>
-                 {isEditing ? (
-                   <Input 
-                     value={editForm.phoneNumber} 
-                     onChange={(e) => setEditForm({...editForm, phoneNumber: e.target.value})}
-                     placeholder="+234..."
-                     type="tel"
-                     className="bg-gray-50"
-                   />
-                 ) : (
-                   <p className="font-medium text-gray-900">{user.phoneNumber || 'Not set'}</p>
-                 )}
-              </div>
-
-              {/* Vendor Specific Fields */}
-              {user.role === 'VENDOR' && (
-                <div className="pt-4 mt-4 border-t border-gray-100 space-y-4">
-                  <h4 className="text-xs font-bold text-kubwa-green uppercase">Store Details</h4>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Store Name</label>
-                    {isEditing ? (
-                      <Input 
-                        value={editForm.storeName} 
-                        onChange={(e) => setEditForm({...editForm, storeName: e.target.value})}
-                        className="bg-gray-50"
-                      />
-                    ) : (
-                      <p className="font-medium text-gray-900">{user.storeName || 'Not set'}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Business Address</label>
-                    {isEditing ? (
-                      <Input 
-                        value={editForm.address} 
-                        onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                        className="bg-gray-50"
-                      />
-                    ) : (
-                      <p className="font-medium text-gray-900">{user.address || 'Not set'}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Bio / Description Field */}
-              <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{user.role === 'VENDOR' ? 'Store Description' : 'Bio'}</label>
-                 {isEditing ? (
-                   <textarea
-                     value={editForm.bio}
-                     onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
-                     className="w-full p-3 bg-gray-50 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kubwa-green"
-                     rows={3}
-                     placeholder={user.role === 'VENDOR' ? "Describe your store..." : "Tell us about yourself..."}
-                   />
-                 ) : (
-                   <p className="text-sm text-gray-600 leading-relaxed italic">
-                     {user.bio || "No description provided yet."}
-                   </p>
-                 )}
-              </div>
-            </div>
-
-            {/* Edit Actions */}
-            {isEditing && (
-               <div className="flex gap-3 mt-6 pt-4 border-t">
-                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1" disabled={loading}>
-                     Cancel
-                  </Button>
-                  <Button onClick={handleSaveProfile} className="flex-1" disabled={loading}>
-                     {loading ? <Loader2 className="animate-spin" size={16} /> : <span className="flex items-center gap-2"><Check size={16}/> Save Changes</span>}
-                  </Button>
-               </div>
-            )}
-          </Card>
-        </div>
-      )}
-
-      {/* --- ACTIVITY TAB --- */}
-      {activeTab === 'activity' && (
-        <div className="space-y-4 animate-fade-in">
-           <h3 className="font-bold text-gray-800 mb-2">Recent Activity</h3>
-           {activity.length === 0 ? (
-             <div className="text-center py-12 bg-white rounded-xl border border-dashed">
-                <ShoppingBag className="mx-auto text-gray-300 mb-3" size={32} />
-                <p className="text-gray-500 text-sm">No recent activity found.</p>
-                <Button variant="outline" className="mt-4 text-xs" onClick={() => setSection && setSection(AppSection.MART)}>Start Shopping</Button>
-             </div>
-           ) : (
-             activity.map((item, idx) => (
-               <Card key={idx} className="flex gap-4 items-center">
-                  <div className={`p-3 rounded-full ${item.type === 'MART' ? 'bg-orange-100 text-orange-600' : item.type === 'DELIVERY' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                     {item.type === 'MART' && <ShoppingBag size={20} />}
-                     {item.type === 'DELIVERY' && <Truck size={20} />}
-                     {item.type === 'SERVICE' && <Wrench size={20} />}
-                  </div>
-                  <div className="flex-1">
-                     <div className="flex justify-between mb-1">
-                        <h4 className="font-bold text-sm text-gray-800">
-                          {item.type === 'MART' ? `Order #${item.id.slice(-4)}` : item.type === 'DELIVERY' ? 'Delivery Request' : 'Service Booking'}
-                        </h4>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${item.status === 'COMPLETED' || item.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                           {item.status}
-                        </span>
-                     </div>
-                     <p className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</p>
-                  </div>
-               </Card>
-             ))
-           )}
-        </div>
-      )}
-
-      {/* --- ADDRESS TAB --- */}
-      {activeTab === 'address' && (
-        <div className="space-y-4 animate-fade-in">
-           <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-gray-800">Saved Locations</h3>
-              <Button onClick={() => setShowAddAddress(!showAddAddress)} className="py-1.5 px-3 text-xs">
-                 {showAddAddress ? 'Cancel' : 'Add New'}
-              </Button>
+      {/* 2. VENDOR STATUS ALERTS */}
+      {isVendor && !isApproved && (
+        <Card className="mb-8 p-6 bg-orange-50 border-2 border-orange-100 rounded-[2.5rem] flex gap-5 items-start animate-fade-in shadow-sm">
+           <div className="p-4 bg-orange-100 text-orange-600 rounded-2xl shrink-0"><Clock size={28} strokeWidth={3} /></div>
+           <div>
+              <h4 className="font-black text-sm uppercase text-orange-800 tracking-tight">Profile Under Review</h4>
+              <p className="text-xs font-bold text-orange-700/70 mt-1 leading-relaxed">
+                The Kubwa Trust Team is verifying your store details. You can setup your profile, but your shop isn't visible to residents just yet.
+              </p>
            </div>
-           
-           {showAddAddress && (
-             <Card className="mb-4 bg-gray-50 border-gray-200">
-                <h4 className="font-bold text-sm mb-3">Add New Address</h4>
-                <div className="space-y-3">
-                   <Input 
-                     placeholder="Label (e.g. Home, Office)" 
-                     value={newAddress.title}
-                     onChange={e => setNewAddress({...newAddress, title: e.target.value})}
-                   />
-                   <Input 
-                     placeholder="Full Address (e.g. Phase 4, Kubwa)" 
-                     value={newAddress.details}
-                     onChange={e => setNewAddress({...newAddress, details: e.target.value})}
-                   />
-                   <Button className="w-full" onClick={handleAddAddress} disabled={loading || !newAddress.title || !newAddress.details}>
-                      {loading ? <Loader2 className="animate-spin" /> : 'Save Address'}
-                   </Button>
-                </div>
-             </Card>
-           )}
+        </Card>
+      )}
 
-           {addresses.length === 0 ? (
-             <div className="text-center py-8 text-gray-400 text-sm italic">
-                No addresses saved yet.
+      {/* 3. DASHBOARD / BUSINESS HEALTH */}
+      {(isVendor || isProvider) && (
+        <div className="mb-12 space-y-8 animate-fade-in">
+           <div className="flex items-center justify-between px-2">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Merchant Hub</h3>
+              <div className="flex items-center gap-1.5 bg-green-50 px-3 py-1 rounded-full">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Store Online</span>
+              </div>
+           </div>
+
+           <div className="grid grid-cols-2 gap-4">
+              <Card className="p-8 bg-white border-none shadow-sm text-center flex flex-col items-center group hover:bg-gray-50 transition-colors">
+                 <div className="p-3 bg-gray-50 text-gray-400 rounded-2xl mb-3 group-hover:bg-kubwa-green/10 group-hover:text-kubwa-green transition-colors">
+                   <ShoppingBag size={20} />
+                 </div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Product Limit</p>
+                 <p className="text-2xl font-black text-gray-900">
+                   {user.productLimit === 999 ? '∞' : user.productLimit}
+                 </p>
+              </Card>
+              <Card className="p-8 bg-white border-none shadow-sm text-center flex flex-col items-center group hover:bg-gray-50 transition-colors">
+                 <div className="p-3 bg-gray-50 text-gray-400 rounded-2xl mb-3 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                   <TrendingUp size={20} />
+                 </div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Store Rank</p>
+                 <p className={`text-sm font-black uppercase ${isApproved ? 'text-green-500' : 'text-orange-500'}`}>
+                   {user.tier === 'FEATURED' ? 'Top Tier' : user.tier === 'VERIFIED' ? 'Pro Tier' : 'Basic Tier'}
+                 </p>
+              </Card>
+           </div>
+
+           {/* GROWTH UPGRADES */}
+           {isApproved && user.tier !== 'FEATURED' && (
+             <div className="space-y-4 pt-4">
+                <div className="flex items-center justify-between px-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Upgrade Center</h4>
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Boost Visibility <ChevronRight size={10} className="inline" /></span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                   {user.tier === 'FREE' && (
+                      <Card className="p-8 border-2 border-blue-50 bg-white rounded-[2.5rem] flex flex-col items-center text-center relative hover:border-blue-500 transition-all group overflow-hidden">
+                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform" />
+                         <div className="p-4 bg-blue-50 rounded-2xl text-blue-600 mb-5 relative z-10"><ShieldCheck size={36} strokeWidth={2.5}/></div>
+                         <h4 className="font-black text-base uppercase tracking-tight relative z-10">Verified Pro</h4>
+                         <p className="text-[10px] font-bold text-gray-400 mt-2 mb-8 leading-relaxed relative z-10">Get the blue badge, unlimited listings, and priority in service searches.</p>
+                         <Button onClick={() => handleStartPayment('VERIFIED')} className="w-full h-14 bg-blue-600 text-xs shadow-lg shadow-blue-600/20 relative z-10">Unlock for ₦5,000</Button>
+                      </Card>
+                   )}
+
+                   <Card className="p-8 border-2 border-yellow-100 bg-white rounded-[2.5rem] flex flex-col items-center text-center relative hover:border-yellow-500 transition-all group overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[9px] font-black px-4 py-2 rounded-bl-2xl uppercase tracking-widest shadow-md z-20">Recommended</div>
+                      <div className="absolute inset-0 bg-yellow-50/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="p-4 bg-yellow-50 rounded-2xl text-yellow-600 mb-5 relative z-10 group-hover:scale-110 transition-transform"><Crown size={36} strokeWidth={2.5}/></div>
+                      <h4 className="font-black text-base uppercase tracking-tight relative z-10">Featured Shop</h4>
+                      <p className="text-[10px] font-bold text-gray-400 mt-2 mb-8 leading-relaxed relative z-10">Homepage Hero Banner + Pinned at Mart top + Premium 24/7 Support.</p>
+                      <Button onClick={() => handleStartPayment('FEATURED')} className="w-full h-14 bg-yellow-500 text-black hover:bg-yellow-600 text-xs shadow-lg shadow-yellow-500/20 relative z-10 border-none">Promote for ₦15,000</Button>
+                   </Card>
+                </div>
              </div>
-           ) : (
-             addresses.map(addr => (
-               <Card key={addr.id} className="flex justify-between items-center group">
-                  <div className="flex items-center gap-3">
-                     <MapPin className="text-gray-400" size={20} />
-                     <div>
-                        <p className="font-bold text-gray-800 text-sm">{addr.title}</p>
-                        <p className="text-xs text-gray-500">{addr.details}</p>
-                     </div>
-                  </div>
-                  <button onClick={() => handleDeleteAddress(addr.id)} className="text-gray-300 hover:text-red-500">
-                     <X size={16} />
-                  </button>
-               </Card>
-             ))
            )}
+        </div>
+      )}
+
+      {/* 4. SETTINGS & QUICK LINKS */}
+      <div className="space-y-4">
+         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] px-2">Account Management</h3>
+         <Card className="rounded-[3rem] p-4 border-none shadow-sm bg-white divide-y divide-gray-50">
+            {[
+               { icon: ShieldAlert, label: 'Privacy & Permissions', sub: 'Control who sees your data', color: 'text-blue-500', bg: 'bg-blue-50' },
+               { icon: CreditCard, label: 'Payments & Wallet', sub: '₦0.00 Outstanding Balance', color: 'text-green-500', bg: 'bg-green-50' },
+               { icon: Bell, label: 'Notifications', sub: '3 Pending community alerts', color: 'text-orange-500', bg: 'bg-orange-50' }
+            ].map((link, idx) => (
+              <div key={idx} className="flex items-center gap-5 py-5 px-4 hover:bg-gray-50 rounded-[2rem] transition-all cursor-pointer group">
+                 <div className={`p-4 rounded-2xl ${link.bg} ${link.color} group-hover:scale-110 transition-transform`}>
+                    <link.icon size={22} />
+                 </div>
+                 <div className="flex-1">
+                    <p className="text-sm font-black text-gray-900 uppercase tracking-tight">{link.label}</p>
+                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{link.sub}</p>
+                 </div>
+                 <ChevronRight className="text-gray-200 group-hover:text-gray-400 transition-colors" size={20} strokeWidth={3} />
+              </div>
+            ))}
+         </Card>
+      </div>
+
+      {/* MODALS & OVERLAYS */}
+      {processingPayment && (
+        <div className="fixed inset-0 z-[300] bg-black/80 flex flex-col items-center justify-center p-6 text-center backdrop-blur-xl animate-fade-in">
+           <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl animate-zoom-in max-w-sm w-full border border-gray-100">
+              <div className="relative mb-8">
+                <Loader2 className="animate-spin text-kubwa-green mx-auto" size={72} strokeWidth={3} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xl">⚡</span>
+                </div>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Securing Upgrade</h3>
+              <p className="text-sm font-bold text-gray-500 mt-4 leading-relaxed">
+                Confirming transaction with the Paystack network. Please do not close your app.
+              </p>
+           </div>
+        </div>
+      )}
+
+      {paymentSuccess && (
+        <div className="fixed bottom-32 inset-x-6 z-[250] max-w-md mx-auto animate-slide-in-bottom">
+          <div className="p-6 bg-gray-900 text-white rounded-[2.5rem] shadow-2xl flex items-center gap-5 border-2 border-white/10 ring-8 ring-black/5">
+             <div className="bg-kubwa-green p-4 rounded-2xl shrink-0 shadow-lg shadow-kubwa-green/40"><CheckCircle size={28} strokeWidth={3} /></div>
+             <div className="flex-1">
+                <p className="text-sm font-black uppercase tracking-widest">Growth Plan Active!</p>
+                <p className="text-[10px] font-bold text-white/50 mt-1 uppercase">Your store limits are now unlimited.</p>
+             </div>
+             <button onClick={() => setPaymentSuccess(false)} className="p-2 hover:bg-white/10 rounded-full"><X size={20}/></button>
+          </div>
+        </div>
+      )}
+
+      {paymentError && (
+        <div className="fixed bottom-32 inset-x-6 z-[250] max-w-md mx-auto animate-slide-in-bottom">
+          <div className="p-6 bg-red-600 text-white rounded-[2.5rem] shadow-2xl flex items-center gap-5 border-2 border-white/10">
+             <div className="bg-white/20 p-4 rounded-2xl shrink-0"><AlertTriangle size={28} strokeWidth={3} /></div>
+             <div className="flex-1">
+                <p className="text-sm font-black uppercase tracking-tight">Payment Issue</p>
+                <p className="text-xs font-bold text-white/70 mt-0.5">{paymentError}</p>
+             </div>
+             <button onClick={() => setPaymentError(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={20}/></button>
+          </div>
         </div>
       )}
     </div>
