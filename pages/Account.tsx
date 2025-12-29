@@ -32,7 +32,8 @@ import {
   TrendingUp,
   BarChart3,
   Star,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
 
 interface AccountProps {
@@ -137,6 +138,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   const isVendor = user.role === 'VENDOR';
   const isProvider = user.role === 'PROVIDER';
   const isRider = user.role === 'RIDER';
+  const isAdmin = user.role === 'ADMIN';
   const isApproved = user.status === 'APPROVED';
 
   return (
@@ -186,6 +188,31 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
           </div>
         </Card>
       </div>
+
+      {/* ADMIN CONSOLE ENTRY */}
+      {isAdmin && (
+        <Card className="mb-8 p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border-none rounded-[3rem] shadow-xl shadow-indigo-500/20 relative overflow-hidden group">
+            <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
+            <div className="relative z-10">
+                <div className="flex items-center gap-4 mb-6">
+                    <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md">
+                        <Database size={24} />
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-black uppercase tracking-tight">Platform Governance</h4>
+                        <p className="text-[10px] font-bold text-indigo-100/70 uppercase tracking-widest">Active Site Administrator</p>
+                    </div>
+                </div>
+                <Button 
+                    variant="secondary" 
+                    className="w-full bg-white text-indigo-600 hover:bg-indigo-50 shadow-none border-none py-4"
+                    onClick={() => setSection(AppSection.ADMIN)}
+                >
+                    <ShieldCheck size={18} strokeWidth={3} /> ENTER ADMIN CONSOLE
+                </Button>
+            </div>
+        </Card>
+      )}
 
       {/* Verification Status Alerts for Business Users */}
       {(isVendor || isProvider || isRider) && !isApproved && (

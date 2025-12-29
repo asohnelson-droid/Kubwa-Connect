@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest } from '../types';
 
@@ -32,7 +33,7 @@ const mapUserMetadata = (sessionUser: any): User => {
         role: role,
         joinedAt: sessionUser.created_at,
         tier: meta.tier || 'FREE',
-        isFeatured: !!meta.isFeatured,
+        isFeatured: !!meta.isFeatured || meta.tier === 'FEATURED',
         productLimit: calculatedLimit,
         verificationStatus: meta.verificationStatus || 'NONE',
         paymentStatus: meta.paymentStatus || 'UNPAID',
@@ -64,7 +65,6 @@ export const api = {
         },
         signUp: async (email, password, name, role) => {
             try {
-                // 1. Verify Endpoint Security
                 const rawUrl = process.env.VITE_SUPABASE_URL || '';
                 const fallbackUrl = 'https://bzuwzvrmwketoyumiawi.supabase.co';
                 const endpoint = (rawUrl && rawUrl !== 'undefined' && rawUrl !== '') ? rawUrl : fallbackUrl;
@@ -74,7 +74,6 @@ export const api = {
                   return { error: "Security Error: Authentication is only permitted over secure HTTPS connections." };
                 }
 
-                // 2. Prepare Signup Payload
                 const redirectUrl = window.location.origin.replace(/\/$/, '') + '/';
                 const initialStatus = (role === 'VENDOR' || role === 'PROVIDER' || role === 'RIDER') ? 'PENDING' : 'APPROVED';
                 
@@ -196,7 +195,22 @@ export const api = {
                 { id: 'm3', name: 'Speedy Sam', role: 'RIDER', status: 'PENDING', joinedAt: new Date().toISOString(), email: 'sam@ride.com' }
             ] as any[];
         },
+        getPendingProducts: async () => {
+            return [
+                { id: 'p1', vendorId: 'm1', name: 'iPhone 15 Pro', price: 1200000, category: 'Electronics', status: 'PENDING', image: 'https://images.unsplash.com/photo-1696446701796-da61225697cc?auto=format&fit=crop&q=80&w=200' },
+                { id: 'p2', vendorId: 'm1', name: 'Samsung S24', price: 950000, category: 'Electronics', status: 'PENDING', image: 'https://images.unsplash.com/photo-1707064843232-273523321589?auto=format&fit=crop&q=80&w=200' }
+            ] as any[];
+        },
         updateUserStatus: async (userId: string, status: ApprovalStatus) => {
+            console.log(`[Admin] User ${userId} updated to ${status}`);
+            return true;
+        },
+        updateProductStatus: async (productId: string, status: ApprovalStatus) => {
+            console.log(`[Admin] Product ${productId} updated to ${status}`);
+            return true;
+        },
+        toggleFeatureUser: async (userId: string, isFeatured: boolean) => {
+            console.log(`[Admin] User ${userId} feature toggled to ${isFeatured}`);
             return true;
         }
     },
