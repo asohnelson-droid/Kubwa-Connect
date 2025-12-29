@@ -2,7 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { api } from './data';
 
-// Define the response schema for the AI assistant
 const assistantSchema = {
   type: Type.OBJECT,
   properties: {
@@ -18,58 +17,78 @@ const assistantSchema = {
 };
 
 export const askKubwaAssistant = async (userQuery: string) => {
+  // We wrap everything in a single try-catch to ensure we always return a valid object to the UI
   try {
-    // Check if API_KEY is available in environment
-    if (!process.env.API_KEY || process.env.API_KEY === "undefined" || process.env.API_KEY === "") {
-      console.warn("AI Assistant: API_KEY is missing. AI features will be unavailable.");
+    const apiKey = process.env.API_KEY;
+    
+    // Check if API_KEY is missing before attempting initialization
+    if (!apiKey || apiKey === "undefined" || apiKey === "") {
+      console.error("AI Service: API_KEY is missing from environment.");
       return {
-        message: "I'm sorry, the AI assistant is currently offline. Please check your environment variables.",
+        message: "Welcome! I'm your Kubwa assistant. I'm currently in offline mode, but you can still browse the Mart and FixIt sections manually.",
         suggestedAction: "NONE",
         searchQuery: ""
       };
     }
 
-    // Fix: Initialize GoogleGenAI with named parameter apiKey from process.env.API_KEY directly
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Step 1: Initialize the SDK inside the try block
+    const ai = new GoogleGenAI({ apiKey });
 
-    // Await the asynchronous data fetch from context
+    // Step 2: Fetch application context for grounding the response
     const { products, providers } = await api.getMockContext();
 
-    const context = `
-      You are KubwaBot, the helpful AI assistant for the 'Kubwa Connect' super app.
-      The app serves Kubwa, Abuja.
+    const systemInstruction = `
+      You are KubwaBot, the flagship AI for 'Kubwa Connect'. 
+      Location Context: Kubwa, Abuja, Nigeria.
+      Tone: Professional, helpful, slightly local (Naija friendly but polite).
       
-      Features:
-      1. Kubwa Mart: Buy groceries, fashion, etc. (Examples: ${products.map(p => p.name).join(', ')})
-      2. FixIt: Hire artisans (Plumbers, Cleaners, Tailors). (Examples: ${providers.map(p => p.category).join(', ')})
-      3. KubwaRide: Book local deliveries.
-
-      User Query: "${userQuery}"
-
-      Analyze the query. If they want to buy something, suggest SEARCH_MART.
-      If they need help/repairs, suggest SEARCH_SERVICES.
-      If they need to send a package, suggest BOOK_RIDE.
-      Otherwise, just chat friendly.
+      Inventory Context:
+      - Mart Examples: ${products.slice(0, 5).map(p => p.name).join(', ')}
+      - Services Examples: ${providers.slice(0, 5).map(p => p.category).join(', ')}
+      
+      Routing Logic:
+      - If they want to buy items (food, clothes, electronics): suggestedAction = SEARCH_MART.
+      - If they need a fix (plumber, electrician, repair): suggestedAction = SEARCH_SERVICES.
+      - If they need delivery or a ride: suggestedAction = BOOK_RIDE.
+      - Otherwise: NONE.
     `;
 
+    // Step 3: Generate content using the recommended Gemini 3 Flash model
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: context,
+      contents: [{ parts: [{ text: userQuery }] }],
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: assistantSchema,
+        temperature: 0.7,
       }
     });
 
-    // Fix: access response.text property directly
+    // Step 4: Extract the generated text safely using the .text property
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) {
+      throw new Error("AI returned an empty response body.");
+    }
     
+    // Parse and return the JSON payload
     return JSON.parse(text);
-  } catch (error) {
-    console.error("AI Error:", error);
+
+  } catch (error: any) {
+    // Categorize errors for better debugging and user feedback
+    console.error("KubwaBot Assistant Error:", error);
+
+    // Graceful fallback for API limits, network errors, or parsing issues
+    let userMessage = "Eyah! I hit a small snag while thinking. Could you try asking that again?";
+    
+    if (error.message?.includes("429")) {
+      userMessage = "I'm receiving too many requests right now! Please wait a few seconds before asking me again.";
+    } else if (error.message?.includes("API_KEY")) {
+      userMessage = "My intelligence core isn't configured yet. Please check the API key setup.";
+    }
+
     return {
-      message: "I'm having trouble connecting to the network. Please try again later.",
+      message: userMessage,
       suggestedAction: "NONE",
       searchQuery: ""
     };

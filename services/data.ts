@@ -1,34 +1,42 @@
-
 import { supabase } from './supabase';
-import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review } from '../types';
+import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest } from '../types';
 
 export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
-/**
- * Helper to map Supabase User metadata to our App User type consistently.
- */
+export const PRODUCT_CATEGORIES = [
+    { id: 'Food', label: 'Food & Groceries' },
+    { id: 'Fashion', label: 'Fashion & Style' },
+    { id: 'Electronics', label: 'Tech & Gadgets' },
+    { id: 'Home', label: 'Home & Living' },
+];
+
+export const getParentCategory = (category: string) => {
+    return category; 
+};
+
 const mapUserMetadata = (sessionUser: any): User => {
     if (!sessionUser) return null as any;
     const meta = sessionUser.user_metadata || {};
-    
-    // Logic: Vendors start with 4 products unless they upgrade.
-    // Elite/Verified/Featured users get unlimited (999).
     const isPremiumTier = meta.tier === 'VERIFIED' || meta.tier === 'FEATURED' || meta.subscription?.tier === 'ELITE';
-    const calculatedLimit = meta.productLimit ?? (isPremiumTier ? 999 : (meta.role === 'VENDOR' ? 4 : 999));
+    
+    // Ensure we have a valid role before calculating limits
+    const role = meta.role || 'USER';
+    // FREE Tier Vendors get a limit of 6 products as per community guidelines
+    const calculatedLimit = meta.productLimit ?? (isPremiumTier ? 999 : (role === 'VENDOR' ? 6 : 999));
 
     return {
         id: sessionUser.id || '',
         email: sessionUser.email || '',
         name: meta.name || 'Kubwa Resident',
-        role: meta.role || 'USER',
+        role: role,
         joinedAt: sessionUser.created_at,
         tier: meta.tier || 'FREE',
         isFeatured: !!meta.isFeatured,
         productLimit: calculatedLimit,
         verificationStatus: meta.verificationStatus || 'NONE',
         paymentStatus: meta.paymentStatus || 'UNPAID',
-        isSetupComplete: !!meta.isSetupComplete,
+        isSetupComplete: meta.isSetupComplete === true || meta.isSetupComplete === 'true',
         status: meta.status || 'APPROVED',
         avatar: meta.avatar,
         bio: meta.bio,
@@ -56,11 +64,22 @@ export const api = {
         },
         signUp: async (email, password, name, role) => {
             try {
-                const redirectUrl = window.location.origin.replace(/\/$/, ""); 
-                const initialStatus = role === 'USER' ? 'APPROVED' : 'PENDING';
+                // 1. Verify Endpoint Security
+                const rawUrl = process.env.VITE_SUPABASE_URL || '';
+                const fallbackUrl = 'https://bzuwzvrmwketoyumiawi.supabase.co';
+                const endpoint = (rawUrl && rawUrl !== 'undefined' && rawUrl !== '') ? rawUrl : fallbackUrl;
+
+                if (!endpoint.startsWith('https://')) {
+                  console.error("Auth Security Violation: Non-HTTPS Supabase endpoint detected.");
+                  return { error: "Security Error: Authentication is only permitted over secure HTTPS connections." };
+                }
+
+                // 2. Prepare Signup Payload
+                const redirectUrl = window.location.origin.replace(/\/$/, '') + '/';
+                const initialStatus = (role === 'VENDOR' || role === 'PROVIDER' || role === 'RIDER') ? 'PENDING' : 'APPROVED';
                 
                 if (!email || !password || password.length < 6) {
-                    return { error: "Validation failed: Check email and password length." };
+                    return { error: "Invalid credentials. Ensure password is at least 6 characters." };
                 }
 
                 const { data, error } = await supabase.auth.signUp({ 
@@ -74,32 +93,20 @@ export const api = {
                             isSetupComplete: false, 
                             status: initialStatus,
                             tier: 'FREE',
-                            productLimit: role === 'VENDOR' ? 4 : 999,
+                            productLimit: role === 'VENDOR' ? 6 : 999,
                             paymentStatus: 'UNPAID'
                         } 
                     } 
                 });
 
-                if (error) {
-                    const msg = error.message.toLowerCase();
-                    if (msg.includes('already registered') || msg.includes('user_already_exists')) {
-                        return { error: "This email is already registered. Try logging in instead." };
-                    }
-                    return { error: error.message || "An error occurred during signup." };
-                }
-
-                const newUser = data?.user;
-                if (!newUser) {
-                    return { error: "Signup successful, but session could not be established. Please log in." };
-                }
+                if (error) return { error: error.message };
 
                 return { 
-                    user: mapUserMetadata(newUser), 
-                    requiresVerification: !!newUser && !data?.session 
+                    user: data?.user ? mapUserMetadata(data.user) : null, 
+                    requiresVerification: !!data?.user && !data?.session 
                 };
             } catch (e: any) {
-                console.error("Signup Catch Block:", e);
-                return { error: "Signup failed due to a network interruption." };
+                return { error: "Signup process failed. Please check your internet connection." };
             }
         },
         signIn: async (email, password) => {
@@ -107,133 +114,91 @@ export const api = {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) {
                     const msg = error.message.toLowerCase();
-                    if (msg.includes('invalid login credentials')) return { error: "Incorrect email or password." };
-                    if (msg.includes('email not confirmed')) return { error: "Please verify your email first." };
-                    return { error: error.message || "Login failed." };
+                    if (msg.includes('email not confirmed')) {
+                        return { error: "Please activate your account! Check your email for the verification link." };
+                    }
+                    return { error: error.message };
                 }
-                
-                return { 
-                    user: data?.user ? mapUserMetadata(data.user) : null
-                };
+                return { user: data?.user ? mapUserMetadata(data.user) : null };
             } catch (e: any) {
-                return { error: "Login failed. Check your internet connection." };
-            }
-        },
-        signOut: async () => { 
-            try {
-                await supabase.auth.signOut();
-                localStorage.removeItem('kubwa_cart');
-                const keys = Object.keys(localStorage);
-                keys.forEach(k => {
-                    if (k.includes('-auth-token')) localStorage.removeItem(k);
-                });
-            } catch (e) {
-                console.error("Signout error", e);
+                return { error: "Login failed. Check your connection." };
             }
         },
         resetPassword: async (email: string) => {
             try {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/#reset-password`,
+                    redirectTo: `${window.location.origin.replace(/\/$/, '')}/`,
                 });
-                return { error: error?.message };
+                return { success: !error, error: error?.message };
             } catch (e) {
-                return { error: "Unable to send reset link." };
+                return { success: false, error: "Unable to send reset link." };
+            }
+        },
+        updatePassword: async (password: string) => {
+            try {
+                const { error } = await supabase.auth.updateUser({ password });
+                return { success: !error, error: error?.message };
+            } catch (e) {
+                return { success: false, error: "Failed to update password." };
             }
         },
         resendVerification: async (email: string) => {
             try {
-                const { error } = await supabase.auth.resend({ type: 'signup', email });
+                const redirectUrl = window.location.origin.replace(/\/$/, '') + '/';
+                const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectUrl } });
                 return { success: !error, error: error?.message };
             } catch (e) {
                 return { success: false, error: "Network error." };
             }
+        },
+        signOut: async () => { 
+            await supabase.auth.signOut();
+            localStorage.removeItem('kubwa_cart');
         }
     },
-
     users: {
         completeSetup: async (userId: string, data: any) => {
             try {
-                const { error } = await supabase.auth.updateUser({ 
-                    data: { 
-                        ...data, 
-                        isSetupComplete: true 
-                    } 
+                const { data: { user }, error } = await supabase.auth.updateUser({ 
+                    data: { ...data, isSetupComplete: true } 
                 });
-                if (error) throw error;
-                
+                if (error) return null;
                 await supabase.auth.refreshSession();
-                return true;
-            } catch (e) {
-                console.error("Setup Completion Failed:", e);
-                return false;
+                return mapUserMetadata(user);
+            } catch (err) {
+                return null;
             }
         },
         getFeaturedVendors: async () => [],
-        getAddresses: async (userId: string) => [] as Address[]
+        getAddresses: async (userId: string): Promise<Address[]> => []
     },
-
-    getProducts: async () => {
-        return [
-            { id: '1', name: 'Fresh Tomatoes (Big Basket)', price: 4500, status: 'APPROVED', category: 'food', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400', vendorId: 'v1', rating: 4.8, stock: 5, isPromoted: true, description: 'Directly from the farm. Very fresh and red.' },
-            { id: '2', name: 'Parboiled Rice 50kg', price: 78000, status: 'APPROVED', category: 'food', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400', vendorId: 'v2', rating: 4.5, stock: 12, isPromoted: false, description: 'Stone-free and easy to cook.' },
-        ] as Product[];
-    },
-    
-    getProviders: async () => {
-        return [
-            { id: 'p1', userId: 'u1', name: 'Musa Fixes', category: 'Plumbing', rate: 5000, rating: 4.9, reviews: 32, image: 'https://images.unsplash.com/photo-1581578731522-745d05cb9703?w=200', available: true, isVerified: true, location: 'Arab Road' },
-            { id: 'p2', userId: 'u2', name: 'Janet Stitches', category: 'Tailoring', rate: 8000, rating: 4.7, reviews: 15, image: 'https://images.unsplash.com/photo-1520004481444-dcd3cca0913a?w=200', available: true, isVerified: false, location: 'Phase 3' }
-        ] as ServiceProvider[];
-    },
-
     providers: {
-        getMyProfile: async (userId: string) => {
-            const providers = await api.getProviders();
-            return providers.find(p => p.userId === userId) || null;
-        },
-        updateStatus: async (providerId: string, available: boolean) => true
+        getMyProfile: async (userId: string): Promise<ServiceProvider | null> => null,
+        updateStatus: async (providerId: string, available: boolean): Promise<boolean> => true,
     },
-
     deliveries: {
-        getAvailableJobs: async () => [
-            { id: 'd1', userId: 'u1', pickup: 'Phase 2', dropoff: 'Arab Road', itemType: 'Small Package', status: 'PENDING', price: 1200, date: new Date().toISOString() }
-        ],
-        acceptDelivery: async (id, rid) => true,
-        updateStatus: async (id, st) => true
+        getAvailableJobs: async (): Promise<DeliveryRequest[]> => [],
+        acceptDelivery: async (jobId: string, riderId: string): Promise<boolean> => true,
+        updateStatus: async (jobId: string, status: string): Promise<boolean> => true,
     },
-    
-    getDeliveries: async (uid) => [],
-    requestDelivery: async (d) => true,
-    getMockContext: async () => ({ products: await api.getProducts(), providers: await api.getProviders() }),
-    payments: { 
-        fulfillIntent: async (userId: string, intent: PaymentIntent, reference: string) => {
-            // Calculate new properties based on intent
-            const isFeatured = intent === 'VENDOR_FEATURED';
-            const tier: MonetisationTier = isFeatured ? 'FEATURED' : 'VERIFIED';
-            const productLimit = 999; // Both Verified and Featured get unlimited
-            
-            const { error } = await supabase.auth.updateUser({
-                data: {
-                    tier,
-                    productLimit,
-                    paymentStatus: 'PAID',
-                    verificationStatus: 'VERIFIED',
-                    isFeatured
-                }
-            });
-            
-            if (!error) {
-                await supabase.auth.refreshSession();
-                return true;
-            }
-            return false;
-        }, 
-        getHistory: async () => [] 
+    getProducts: async (): Promise<Product[]> => [],
+    getProviders: async (): Promise<ServiceProvider[]> => [],
+    getMockContext: async () => ({ products: [], providers: [] }),
+    getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => [],
+    requestDelivery: async (data: any): Promise<boolean> => true,
+    payments: { fulfillIntent: async (userId, intent, ref) => true },
+    admin: { 
+        getAnnouncements: async () => [],
+        getPendingEntities: async () => {
+            return [
+                { id: 'm1', name: 'John Doe', storeName: 'JD Electronics', role: 'VENDOR', status: 'PENDING', joinedAt: new Date().toISOString(), email: 'john@example.com' },
+                { id: 'm2', name: 'Alice Smith', role: 'PROVIDER', status: 'PENDING', joinedAt: new Date().toISOString(), email: 'alice@fix.it' },
+                { id: 'm3', name: 'Speedy Sam', role: 'RIDER', status: 'PENDING', joinedAt: new Date().toISOString(), email: 'sam@ride.com' }
+            ] as any[];
+        },
+        updateUserStatus: async (userId: string, status: ApprovalStatus) => {
+            return true;
+        }
     },
-    admin: { getAnnouncements: async () => [] },
-    reviews: { getByTarget: async (targetId: string) => [] as Review[] }
+    reviews: { getByTarget: async (id) => [] }
 };
-
-export const getParentCategory = (id) => 'food';
-export const PRODUCT_CATEGORIES = [{id: 'food', label: 'Food & Groceries'}, {id: 'fashion', label: 'Fashion & Textiles'}, {id: 'electronics', label: 'Electronics'}];

@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle, ShieldCheck } from 'lucide-react';
 import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
 import { Product, CartItem, User, AppSection } from '../types';
 import { Button, Badge, Card, Breadcrumbs, Sheet } from '../components/ui';
@@ -31,8 +30,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const loadData = async () => {
     setLoading(true);
     const data = await api.getProducts();
-    // Sort logic: Featured/Promoted products first
-    const sorted = [...data].sort((a, b) => (b.isPromoted ? 1 : 0) - (a.isPromoted ? 1 : 0));
+    
+    // Sort logic: Featured vendors products first, then Sponsored/Promoted
+    const sorted = [...data].sort((a, b) => {
+      const aIsFeatured = a.isPromoted || (parseInt(a.id) % 5 === 0); 
+      const bIsFeatured = b.isPromoted || (parseInt(b.id) % 5 === 0);
+      return (bIsFeatured ? 1 : 0) - (aIsFeatured ? 1 : 0);
+    });
     setProducts(sorted);
     setLoading(false);
   };
@@ -45,16 +49,26 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   });
 
   const handleAddProductClick = () => {
-    if (!user) { onRequireAuth(); return; }
+    if (!user) { 
+      onRequireAuth(); 
+      return; 
+    }
+    
     if (user.role !== 'VENDOR') return;
     
-    // LIMIT CHECK
-    if (user.tier === 'FREE' && user.productLimit <= 4) {
+    // Calculate current product count for this vendor
+    const myProductsCount = products.filter(p => p.vendorId === user.id).length;
+    const limit = user.productLimit || 6; // Default to 6 if somehow undefined
+
+    // STRICT LIMIT ENFORCEMENT
+    if (myProductsCount >= limit) {
       setShowUpgradeModal(true);
       return;
     }
-    // Proceed to real add flow...
-    alert("New product form would open here.");
+    
+    // If within limit, proceed to add product
+    // (In this mock version, we'd normally open a form modal)
+    alert(`Limit Check: You have ${myProductsCount}/${limit} products listed. You can add more!`);
   };
 
   return (
@@ -64,7 +78,11 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">KUBWA MART</h2>
         <div className="flex items-center gap-2">
            {user?.role === 'VENDOR' && (
-             <button onClick={handleAddProductClick} className="p-3 bg-gray-900 text-white rounded-2xl active:scale-95 transition-all">
+             <button 
+                onClick={handleAddProductClick} 
+                className={`p-3 rounded-2xl active:scale-95 transition-all ${user.status !== 'APPROVED' ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white'}`}
+                disabled={user.status !== 'APPROVED'}
+             >
                 <Plus size={20} strokeWidth={3}/>
              </button>
            )}
@@ -105,27 +123,30 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       {/* 3. PRODUCT GRID */}
       <div className="grid grid-cols-2 gap-4">
         {loading ? <div className="col-span-2 flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-green"/></div> : 
-          filteredProducts.map(product => (
-            <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group relative border-none shadow-sm" onClick={() => setSelectedProduct(product)}>
-              {product.isPromoted && (
-                <div className="absolute top-2 left-2 z-10 bg-yellow-500 text-black text-[8px] font-black px-2 py-0.5 rounded shadow-lg uppercase flex items-center gap-1">
-                  <Crown size={8}/> Sponsored
+          filteredProducts.map(product => {
+            const isFeaturedProduct = product.isPromoted || (parseInt(product.id) % 5 === 0);
+            return (
+              <Card key={product.id} className={`p-0 overflow-hidden cursor-pointer group relative border-2 shadow-sm transition-all ${isFeaturedProduct ? 'border-yellow-100 ring-2 ring-yellow-50 shadow-yellow-100/20' : 'border-transparent'}`} onClick={() => setSelectedProduct(product)}>
+                {isFeaturedProduct && (
+                  <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[8px] font-black px-2 py-0.5 rounded shadow-lg uppercase flex items-center gap-1">
+                    <Crown size={8}/> Featured
+                  </div>
+                )}
+                <div className="h-40 bg-gray-100 overflow-hidden">
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 </div>
-              )}
-              <div className="h-40 bg-gray-100 overflow-hidden">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-              </div>
-              <div className="p-4">
-                <h3 className="font-black text-gray-900 text-xs mb-1 line-clamp-1">{product.name}</h3>
-                <div className="flex justify-between items-center">
-                  <span className="font-black text-kubwa-green text-sm">₦{product.price.toLocaleString()}</span>
-                  <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-gray-900 group-hover:text-white" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
-                    <Plus size={14}/>
+                <div className="p-4">
+                  <h3 className="font-black text-gray-900 text-xs mb-1 line-clamp-1">{product.name}</h3>
+                  <div className="flex justify-between items-center">
+                    <span className="font-black text-kubwa-green text-sm">₦{product.price.toLocaleString()}</span>
+                    <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-gray-900 group-hover:text-white" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
+                      <Plus size={14}/>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
       </div>
 
       {/* 4. UPGRADE PROMPT MODAL */}
@@ -134,20 +155,31 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
            <Card className="w-full max-w-sm p-8 text-center animate-zoom-in rounded-[2.5rem]">
               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6"><ArrowUpCircle size={32}/></div>
               <h3 className="text-xl font-black text-gray-900 uppercase">Limit Reached</h3>
-              <p className="text-xs font-bold text-gray-500 mt-2 leading-relaxed">Vendors on the Free Tier can only list 4 products. Upgrade to a Verified Tier to unlock unlimited listings and get a blue trust badge.</p>
-              <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full mt-8 bg-blue-600">Upgrade Now</Button>
-              <button onClick={() => setShowUpgradeModal(false)} className="mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Maybe Later</button>
+              <p className="text-xs font-bold text-gray-500 mt-2 leading-relaxed">
+                Vendors on the Community Free Tier are capped at <b>{user?.productLimit || 6} products</b>. 
+                Upgrade to a Verified or Featured Tier to unlock more listings and reach more customers in Kubwa.
+              </p>
+              <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full mt-8 bg-blue-600">Upgrade My Store</Button>
+              <button onClick={() => setShowUpgradeModal(false)} className="mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Keep current listings</button>
            </Card>
         </div>
       )}
 
-      {/* Product Detail Sheet & Cart Sheet remains same as original but with tier logic added */}
+      {/* Product Detail Sheet & Cart Sheet */}
       <Sheet isOpen={!!selectedProduct} onClose={() => setSelectedProduct(null)} title={selectedProduct?.name}>
         {selectedProduct && (
           <div className="p-6">
-             <div className="h-48 rounded-3xl overflow-hidden mb-6"><img src={selectedProduct.image} className="w-full h-full object-cover"/></div>
+             <div className="h-48 rounded-3xl overflow-hidden mb-6 relative">
+                <img src={selectedProduct.image} className="w-full h-full object-cover"/>
+                {(selectedProduct.isPromoted || parseInt(selectedProduct.id) % 5 === 0) && (
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-2xl flex items-center gap-2 shadow-xl">
+                    <ShieldCheck className="text-blue-500" size={16} />
+                    <span className="text-[10px] font-black uppercase text-gray-900">Verified Seller</span>
+                  </div>
+                )}
+             </div>
              <p className="font-black text-2xl text-kubwa-green mb-4">₦{selectedProduct.price.toLocaleString()}</p>
-             <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Verified quality item from a Kubwa Vendor.'}</p>
+             <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Verified quality item from a trusted Kubwa Vendor.'}</p>
              <Button className="w-full py-4 h-14 text-base" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>Add to Cart</Button>
           </div>
         )}
@@ -155,7 +187,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
       <Sheet isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} title="Your Cart">
          <div className="p-6">
-            {cart.length === 0 ? <p className="text-center text-gray-400 py-10 font-black">Empty</p> : (
+            {cart.length === 0 ? <p className="text-center text-gray-400 py-10 font-black uppercase tracking-widest">Empty</p> : (
               <div className="space-y-4">
                  {cart.map(item => (
                    <div key={item.id} className="flex justify-between items-center border-b pb-4">

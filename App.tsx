@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Shield, Bell, Loader2, X, AlertTriangle } from 'lucide-react';
+import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
 import Home from './pages/Home';
 import Mart from './pages/Mart';
@@ -11,6 +11,7 @@ import Account from './pages/Account';
 import InfoPages from './pages/InfoPages';
 import Onboarding from './pages/Onboarding';
 import SetupWizard from './components/SetupWizard';
+import AuthModal from './components/AuthModal';
 import { askKubwaAssistant } from './services/ai';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
@@ -30,6 +31,7 @@ function App() {
   });
 
   const [authIntent, setAuthIntent] = useState<{ section: AppSection; role: UserRole } | null>(null);
+  const [recoveryModal, setRecoveryModal] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState<{role: 'user' | 'model', text: string}[]>([
     {role: 'model', text: 'Hello! I am KubwaBot. Ask me anything about local services or products in Kubwa.'}
@@ -37,92 +39,84 @@ function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Use a ref to prevent multiple initialization calls
   const initRef = useRef(false);
 
-  /**
-   * Refreshes the local user state from the Supabase session
-   */
-  const refreshUser = useCallback(async () => {
-    try {
-      const currentUser = await api.auth.getSession();
-      setUser(currentUser);
-      return currentUser;
-    } catch (err) {
-      console.error("User refresh failed", err);
-      return null;
+  // Centralized routing logic
+  const routeToDashboard = useCallback((u: UserType, targetSection?: AppSection) => {
+    if (!u || !u.isSetupComplete) return;
+    if (targetSection) {
+      setCurrentSection(targetSection);
+      return;
     }
-  }, []);
-
-  /**
-   * Auto-routes merchant roles to their respective dashboards
-   */
-  const routeToDashboard = useCallback((u: UserType) => {
-    if (!u) return;
     if (u.role === 'VENDOR') setCurrentSection(AppSection.MART);
     else if (u.role === 'RIDER') setCurrentSection(AppSection.RIDE);
     else if (u.role === 'PROVIDER') setCurrentSection(AppSection.FIXIT);
+    else if (u.role === 'ADMIN') setCurrentSection(AppSection.ADMIN);
     else setCurrentSection(AppSection.HOME);
   }, []);
+
+  // Fetch session and update user state
+  const refreshUser = useCallback(async (targetSection?: AppSection) => {
+    try {
+      const currentUser = await api.auth.getSession();
+      setUser(currentUser);
+      if (currentUser && currentUser.isSetupComplete) {
+        routeToDashboard(currentUser, targetSection);
+      }
+      return currentUser;
+    } catch (err) {
+      console.error("Session refresh failed", err);
+      return null;
+    }
+  }, [routeToDashboard]);
 
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     const initApp = async () => {
-      try {
-        const currentUser = await refreshUser();
-        const hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
-        
-        // Logical flow: 
-        // 1. If not logged in and never seen onboarding -> show onboarding
-        // 2. If logged in and setup complete -> route to dashboard
-        if (!currentUser && !hasSeenOnboarding) {
-          setShowOnboarding(true);
-        } else if (currentUser && currentUser.isSetupComplete) {
-          routeToDashboard(currentUser);
-        }
-      } catch (e) {
-        console.error("Critical App Init Failure", e);
-      } finally {
-        // Ensure splash screen always resolves within a reasonable time
-        setTimeout(() => setIsInitializing(false), 800);
+      // 1. Resolve Auth State
+      const currentUser = await refreshUser();
+      
+      // 2. Check Onboarding
+      const hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
+      if (!currentUser && !hasSeenOnboarding) {
+        setShowOnboarding(true);
       }
+
+      // 3. Complete Initialization
+      setIsInitializing(false);
     };
 
     initApp();
 
-    // Global Auth listener
+    // Listen for Auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[Auth Event]: ${event}`);
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         const u = await refreshUser();
-        // If they just signed in and are already setup, send them home or to dashboard
-        if (event === 'SIGNED_IN' && u?.isSetupComplete) {
-           routeToDashboard(u);
+        // If we were waiting to login to go somewhere specific, do it now
+        if (u && authIntent) {
+          routeToDashboard(u, authIntent.section);
+          setAuthIntent(null);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setCurrentSection(AppSection.HOME);
+        setAuthIntent(null);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [refreshUser, routeToDashboard]);
+  }, [refreshUser, authIntent, routeToDashboard]);
 
-  /**
-   * Final step after Setup Wizard completes
-   */
-  const handleSetupComplete = async () => {
-    setIsInitializing(true);
-    const updatedUser = await refreshUser();
-    setIsInitializing(false);
-
-    if (updatedUser) {
-      routeToDashboard(updatedUser);
-    }
+  const handleSetupComplete = (updatedUser: UserType) => {
+    setUser(updatedUser);
+    routeToDashboard(updatedUser, authIntent?.section);
+    setAuthIntent(null);
   };
 
   const addToCart = (product: any) => {
@@ -136,22 +130,26 @@ function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem('kubwa_cart', JSON.stringify(cart));
+    if (cart.length > 0) {
+      try {
+        localStorage.setItem('kubwa_cart', JSON.stringify(cart));
+      } catch (e) {
+        // If storage is full, we stop saving the cart to prioritize the session
+        console.warn("Cart storage failed, prioritizing auth session space.");
+      }
+    }
   }, [cart]);
 
   const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiInput.trim() || aiLoading) return;
-
     const userMsg = aiInput;
     setAiInput('');
     setAiMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setAiLoading(true);
-
     try {
       const result = await askKubwaAssistant(userMsg);
       setAiMessages(prev => [...prev, { role: 'model', text: result.message }]);
-      
       if (result.suggestedAction === 'SEARCH_MART') setCurrentSection(AppSection.MART);
       else if (result.suggestedAction === 'SEARCH_SERVICES') setCurrentSection(AppSection.FIXIT);
       else if (result.suggestedAction === 'BOOK_RIDE') setCurrentSection(AppSection.RIDE);
@@ -163,46 +161,32 @@ function App() {
   };
 
   const renderContent = () => {
-    // Admin access guard
     if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN') {
         return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
     }
-
     switch (currentSection) {
-      case AppSection.HOME: 
-        return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
-      case AppSection.MART: 
-        return <Mart addToCart={addToCart} cart={cart} setCart={setCart} user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
-      case AppSection.FIXIT: 
-        return <FixIt user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
-      case AppSection.RIDE: 
-        return <Deliveries user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
-      case AppSection.ADMIN: 
-        return <Admin currentUser={user} />;
-      case AppSection.ACCOUNT: 
-        return <Account user={user} setUser={setUser} setSection={setCurrentSection} authIntent={authIntent} refreshUser={refreshUser} />;
+      case AppSection.HOME: return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
+      case AppSection.MART: return <Mart addToCart={addToCart} cart={cart} setCart={setCart} user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
+      case AppSection.FIXIT: return <FixIt user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
+      case AppSection.RIDE: return <Deliveries user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
+      case AppSection.ADMIN: return <Admin currentUser={user} />;
+      case AppSection.ACCOUNT: return <Account user={user} setUser={setUser} setSection={setCurrentSection} authIntent={authIntent} clearAuthIntent={() => setAuthIntent(null)} refreshUser={refreshUser} />;
       case AppSection.ABOUT:
       case AppSection.PRIVACY:
       case AppSection.TERMS:
       case AppSection.CONTACT:
-      case AppSection.FAQ:
-        return <InfoPages section={currentSection} setSection={setCurrentSection} />;
-      default: 
-        return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
+      case AppSection.FAQ: return <InfoPages section={currentSection} setSection={setCurrentSection} />;
+      default: return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
     }
   };
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center animate-fade-in">
-         <div className="w-20 h-20 bg-kubwa-green rounded-[2.5rem] shadow-2xl shadow-kubwa-green/20 flex items-center justify-center mb-8 animate-bounce">
-            <span className="text-4xl text-white">⚡</span>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+         <div className="w-16 h-16 bg-kubwa-green rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
+            <span className="text-white text-2xl">⚡</span>
          </div>
-         <Loader2 className="animate-spin text-kubwa-green mb-4" size={40} strokeWidth={3} />
-         <div className="flex flex-col items-center">
-            <p className="text-gray-900 font-black uppercase tracking-[0.2em] text-[11px]">Connecting</p>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-[9px] mt-1">Kubwa Super App</p>
-         </div>
+         <p className="mt-6 text-xs font-black uppercase tracking-widest text-gray-400">Syncing Community...</p>
       </div>
     );
   }
@@ -210,18 +194,18 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
       {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
-      
-      {/* Setup Wizard Overlay - Block interactions until complete profile created */}
-      {user && !user.isSetupComplete && (
-        <SetupWizard user={user} onComplete={handleSetupComplete} />
+      {user && !user.isSetupComplete && <SetupWizard user={user} onComplete={handleSetupComplete} />}
+      {recoveryModal && (
+        <AuthModal 
+          initialMode="UPDATE_PASSWORD" 
+          onClose={() => setRecoveryModal(false)} 
+          onSuccess={() => { setRecoveryModal(false); refreshUser(); }}
+        />
       )}
-
-      <div className="h-screen overflow-y-auto no-scrollbar bg-white">
+      <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">
          {renderContent()}
       </div>
-
-      {/* Navigation Bar */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/90 backdrop-blur-xl border-t border-gray-100 px-6 py-5 flex justify-between items-center z-40 rounded-t-[3rem] shadow-2xl">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-6 py-5 flex justify-between items-center z-40 rounded-t-[2.5rem] shadow-2xl">
         {[
           { id: AppSection.HOME, icon: HomeIcon, label: 'Home' },
           { id: AppSection.MART, icon: ShoppingBag, label: 'Mart' },
@@ -232,68 +216,34 @@ function App() {
           <button 
             key={item.id}
             onClick={() => setCurrentSection(item.id)}
-            className={`flex flex-col items-center gap-1.5 transition-all active:scale-90 ${currentSection === item.id ? 'text-kubwa-green' : 'text-gray-300'}`}
+            className={`flex flex-col items-center gap-1 transition-all ${currentSection === item.id ? 'text-kubwa-green' : 'text-gray-300'}`}
           >
-            <item.icon size={24} strokeWidth={currentSection === item.id ? 3 : 2} />
-            <span className={`text-[8px] font-black uppercase tracking-widest ${currentSection === item.id ? 'opacity-100' : 'opacity-60'}`}>{item.label}</span>
+            <item.icon size={22} strokeWidth={currentSection === item.id ? 3 : 2} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
           </button>
         ))}
       </div>
-
-      {/* AI Assistant Button */}
-      <button 
-        onClick={() => setAiChatOpen(true)}
-        className="fixed bottom-28 right-6 bg-gray-900 text-white p-5 rounded-[2rem] shadow-2xl z-40 active:scale-90 transition-all group border-4 border-white"
-      >
-        <Bot size={28} className="group-hover:rotate-12 transition-transform" />
-      </button>
-
-      {/* AI Chat Modal */}
+      <button onClick={() => setAiChatOpen(true)} className="fixed bottom-28 right-6 bg-gray-900 text-white p-4 rounded-2xl shadow-xl z-40 active:scale-95 transition-all"><Bot size={24} /></button>
       {aiChatOpen && (
         <div className="fixed inset-0 z-[200] flex items-end justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setAiChatOpen(false)} />
-          <div className="relative w-full max-w-sm bg-white rounded-[3rem] h-[75vh] flex flex-col shadow-2xl overflow-hidden animate-slide-in-bottom">
-             <div className="p-8 bg-gray-900 text-white flex justify-between items-center">
-               <div className="flex items-center gap-4">
-                 <div className="bg-kubwa-green p-3 rounded-2xl shadow-xl shadow-kubwa-green/20"><Bot size={20} /></div>
-                 <div>
-                   <h3 className="text-sm font-black uppercase tracking-widest">Assistant</h3>
-                   <div className="flex items-center gap-1.5">
-                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></div>
-                     <span className="text-[9px] font-black uppercase tracking-widest text-white/50">Online</span>
-                   </div>
-                 </div>
-               </div>
-               <button onClick={() => setAiChatOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={24} /></button>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAiChatOpen(false)} />
+          <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] h-[70vh] flex flex-col shadow-2xl overflow-hidden animate-slide-in-bottom">
+             <div className="p-6 bg-gray-900 text-white flex justify-between items-center">
+               <div className="flex items-center gap-3"><Bot size={20} /><h3 className="text-sm font-black uppercase tracking-widest">KubwaBot</h3></div>
+               <button onClick={() => setAiChatOpen(false)}><X size={20} /></button>
              </div>
-             
-             <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar bg-gray-50/50">
+             <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-gray-50">
                 {aiMessages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm font-bold shadow-sm leading-relaxed ${m.role === 'user' ? 'bg-kubwa-green text-white rounded-tr-none' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'}`}>
+                    <div className={`max-w-[80%] p-4 rounded-2xl text-xs font-bold ${m.role === 'user' ? 'bg-kubwa-green text-white' : 'bg-white text-gray-800 shadow-sm'}`}>
                       {m.text}
                     </div>
                   </div>
                 ))}
-                {aiLoading && (
-                  <div className="flex gap-1.5 p-5 bg-white border border-gray-100 rounded-[2rem] rounded-tl-none w-20 justify-center">
-                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                  </div>
-                )}
              </div>
-
-             <form onSubmit={handleAiSubmit} className="p-6 bg-white border-t border-gray-100 flex gap-3">
-               <input 
-                 className="flex-1 bg-gray-100 border-none rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-kubwa-green/10 transition-all"
-                 placeholder="How can I help you today?"
-                 value={aiInput}
-                 onChange={e => setAiInput(e.target.value)}
-               />
-               <button type="submit" className="bg-kubwa-green text-white p-4 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center">
-                 <MessageSquare size={24} />
-               </button>
+             <form onSubmit={handleAiSubmit} className="p-4 bg-white border-t flex gap-2">
+               <input className="flex-1 bg-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none" placeholder="Ask anything..." value={aiInput} onChange={e => setAiInput(e.target.value)} />
+               <button type="submit" className="bg-kubwa-green text-white p-3 rounded-xl"><MessageSquare size={18} /></button>
              </form>
           </div>
         </div>

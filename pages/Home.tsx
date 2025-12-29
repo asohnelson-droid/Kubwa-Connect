@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Wrench, Truck, ChevronRight, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Flame, Clock, Briefcase } from 'lucide-react';
+import { ShoppingBag, Wrench, Truck, ChevronRight, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Flame, Clock, Briefcase, Sparkles } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
 import { Button, Card } from '../components/ui';
 import { KUBWA_AREAS, api } from '../services/data';
@@ -32,7 +32,20 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
 
   useEffect(() => {
     api.admin.getAnnouncements().then(data => data.length && setVisibleAnnouncement(data[0]));
-    api.users.getFeaturedVendors().then(setFeaturedVendors);
+    
+    // For demo/mock purposes, we simulate some featured vendors if the list is empty
+    api.users.getFeaturedVendors().then(data => {
+      if (data.length === 0) {
+        setFeaturedVendors([
+          { id: 'f1', name: 'Musa Repairs', storeName: 'Musa Gadgets', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=musa', status: 'APPROVED' },
+          { id: 'f2', name: 'Sarah Bakes', storeName: 'Sarah’s Delights', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=sarah', status: 'APPROVED' },
+          { id: 'f3', name: 'John Doe', storeName: 'Tech Hub Kubwa', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=john', status: 'APPROVED' }
+        ] as any);
+      } else {
+        setFeaturedVendors(data);
+      }
+    });
+
     api.getProducts().then(all => setRecentProducts(all.filter(p => p.status === 'APPROVED').slice(0, 4)));
   }, []);
 
@@ -107,6 +120,39 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
               </div>
            </div>
            <button onClick={() => setVisibleAnnouncement(null)} className="p-1 hover:bg-white/10 rounded-full"><X size={18} /></button>
+        </div>
+      )}
+
+      {/* Featured Merchants Carousel */}
+      {featuredVendors.length > 0 && (
+        <div className="mt-12 px-6">
+           <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Crown className="text-yellow-500 fill-yellow-500" size={18} />
+                <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">Featured Merchants</h3>
+              </div>
+              <Sparkles className="text-yellow-400 animate-pulse" size={16} />
+           </div>
+           
+           <div className="flex gap-6 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
+              {featuredVendors.map((vendor) => (
+                <div key={vendor.id} className="flex flex-col items-center shrink-0 w-24 group cursor-pointer" onClick={() => setSection(AppSection.MART)}>
+                  <div className="relative mb-3">
+                    <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-yellow-400 to-orange-500 p-0.5 shadow-xl transition-transform group-hover:scale-110">
+                      <div className="w-full h-full rounded-[1.9rem] overflow-hidden bg-white">
+                        <img src={vendor.avatar} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 bg-gray-900 text-white p-1.5 rounded-xl border-2 border-white shadow-lg">
+                      <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black text-gray-900 uppercase tracking-tight text-center truncate w-full">
+                    {vendor.storeName || vendor.name}
+                  </span>
+                </div>
+              ))}
+           </div>
         </div>
       )}
 
