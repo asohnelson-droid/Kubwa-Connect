@@ -31,54 +31,36 @@ function App() {
   });
 
   const [authIntent, setAuthIntent] = useState<{ section: AppSection; role: UserRole } | null>(null);
-  const [recoveryModal, setRecoveryModal] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState<{role: 'user' | 'model', text: string}[]>([
-    {role: 'model', text: 'Hello! I am KubwaBot. Ask me anything about local services or products in Kubwa.'}
+    {role: 'model', text: 'Hello! I am KubwaBot. Ask me anything about local services in Kubwa.'}
   ]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
+  // Heartbeat Ref to prevent redundant initializations
   const initRef = useRef(false);
 
-  // Centralized routing logic
-  const routeToDashboard = useCallback((u: UserType, targetSection?: AppSection) => {
-    if (!u || !u.isSetupComplete) return;
-    if (targetSection) {
-      setCurrentSection(targetSection);
-      return;
-    }
-    if (u.role === 'VENDOR') setCurrentSection(AppSection.MART);
-    else if (u.role === 'RIDER') setCurrentSection(AppSection.RIDE);
-    else if (u.role === 'PROVIDER') setCurrentSection(AppSection.FIXIT);
-    else if (u.role === 'ADMIN') setCurrentSection(AppSection.ADMIN);
-    else setCurrentSection(AppSection.HOME);
-  }, []);
-
-  // Fetch session and update user state
   const refreshUser = useCallback(async (targetSection?: AppSection) => {
     try {
       const currentUser = await api.auth.getSession();
       setUser(currentUser);
-      if (currentUser && currentUser.isSetupComplete) {
-        routeToDashboard(currentUser, targetSection);
-      }
       return currentUser;
     } catch (err) {
-      console.error("Session refresh failed", err);
+      console.error("Session heartbeat failed", err);
       return null;
     }
-  }, [routeToDashboard]);
+  }, []);
 
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     const initApp = async () => {
-      // 1. Resolve Auth State
+      // 1. Resolve Session
       const currentUser = await refreshUser();
       
-      // 2. Check Onboarding
+      // 2. Deployment Logic
       const hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
       if (!currentUser && !hasSeenOnboarding) {
         setShowOnboarding(true);
@@ -90,34 +72,19 @@ function App() {
 
     initApp();
 
-    // Listen for Auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth Event]: ${event}`);
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        const u = await refreshUser();
-        // If we were waiting to login to go somewhere specific, do it now
-        if (u && authIntent) {
-          routeToDashboard(u, authIntent.section);
-          setAuthIntent(null);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        await refreshUser();
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setCurrentSection(AppSection.HOME);
-        setAuthIntent(null);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [refreshUser, authIntent, routeToDashboard]);
-
-  const handleSetupComplete = (updatedUser: UserType) => {
-    setUser(updatedUser);
-    routeToDashboard(updatedUser, authIntent?.section);
-    setAuthIntent(null);
-  };
+  }, [refreshUser]);
 
   const addToCart = (product: any) => {
     setCart(prev => {
@@ -130,13 +97,11 @@ function App() {
   };
 
   useEffect(() => {
-    if (cart.length > 0) {
-      try {
-        localStorage.setItem('kubwa_cart', JSON.stringify(cart));
-      } catch (e) {
-        // If storage is full, we stop saving the cart to prioritize the session
-        console.warn("Cart storage failed, prioritizing auth session space.");
-      }
+    try {
+      localStorage.setItem('kubwa_cart', JSON.stringify(cart));
+    } catch (e) {
+      console.warn("Storage quota full. Pruning cart...");
+      if (cart.length > 5) setCart(cart.slice(0, 5));
     }
   }, [cart]);
 
@@ -154,16 +119,18 @@ function App() {
       else if (result.suggestedAction === 'SEARCH_SERVICES') setCurrentSection(AppSection.FIXIT);
       else if (result.suggestedAction === 'BOOK_RIDE') setCurrentSection(AppSection.RIDE);
     } catch (error) {
-      setAiMessages(prev => [...prev, { role: 'model', text: "Connection error. Please try again." }]);
+      setAiMessages(prev => [...prev, { role: 'model', text: "Service temporarily unavailable." }]);
     } finally {
       setAiLoading(false);
     }
   };
 
   const renderContent = () => {
-    if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN') {
+    // SECURITY GUARD: Direct Admin Check
+    if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
         return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
     }
+
     switch (currentSection) {
       case AppSection.HOME: return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
       case AppSection.MART: return <Mart addToCart={addToCart} cart={cart} setCart={setCart} user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
@@ -184,9 +151,9 @@ function App() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
          <div className="w-16 h-16 bg-kubwa-green rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
-            <span className="text-white text-2xl">⚡</span>
+            <span className="text-white text-2xl font-black">KC</span>
          </div>
-         <p className="mt-6 text-xs font-black uppercase tracking-widest text-gray-400">Syncing Community...</p>
+         <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Verifying Identity...</p>
       </div>
     );
   }
@@ -194,24 +161,19 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
       {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
-      {user && !user.isSetupComplete && <SetupWizard user={user} onComplete={handleSetupComplete} />}
-      {recoveryModal && (
-        <AuthModal 
-          initialMode="UPDATE_PASSWORD" 
-          onClose={() => setRecoveryModal(false)} 
-          onSuccess={() => { setRecoveryModal(false); refreshUser(); }}
-        />
-      )}
+      {user && !user.isSetupComplete && <SetupWizard user={user} onComplete={refreshUser} />}
+      
       <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">
          {renderContent()}
       </div>
+
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-6 py-5 flex justify-between items-center z-40 rounded-t-[2.5rem] shadow-2xl">
         {[
           { id: AppSection.HOME, icon: HomeIcon, label: 'Home' },
           { id: AppSection.MART, icon: ShoppingBag, label: 'Mart' },
           { id: AppSection.FIXIT, icon: Wrench, label: 'FixIt' },
           { id: AppSection.RIDE, icon: Truck, label: 'Ride' },
-          { id: AppSection.ACCOUNT, icon: User, label: user ? 'Profile' : 'Sign In' }
+          { id: AppSection.ACCOUNT, icon: User, label: user ? 'Profile' : 'Join' }
         ].map((item) => (
           <button 
             key={item.id}
@@ -223,7 +185,9 @@ function App() {
           </button>
         ))}
       </div>
+
       <button onClick={() => setAiChatOpen(true)} className="fixed bottom-28 right-6 bg-gray-900 text-white p-4 rounded-2xl shadow-xl z-40 active:scale-95 transition-all"><Bot size={24} /></button>
+      
       {aiChatOpen && (
         <div className="fixed inset-0 z-[200] flex items-end justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAiChatOpen(false)} />

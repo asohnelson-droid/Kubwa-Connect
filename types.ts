@@ -1,9 +1,12 @@
 
-export type UserRole = 'USER' | 'VENDOR' | 'PROVIDER' | 'RIDER' | 'ADMIN';
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type UserRole = 'USER' | 'VENDOR' | 'PROVIDER' | 'RIDER' | 'ADMIN' | 'SUPER_ADMIN';
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 export type MonetisationTier = 'FREE' | 'VERIFIED' | 'FEATURED';
 export type PaymentIntent = 'VENDOR_VERIFIED' | 'VENDOR_FEATURED' | 'FIXIT_VERIFIED';
 export type PaymentStatus = 'UNPAID' | 'PAID' | 'EXPIRED' | 'PROCESSING';
+
+// Order Management Lifecycle
+export type OrderStatus = 'CREATED' | 'VENDOR_CONFIRMED' | 'RIDER_ASSIGNED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
 
 export interface Transaction {
   id: string;
@@ -40,7 +43,7 @@ export interface User {
   productLimit: number;
   verificationStatus: 'NONE' | 'PENDING' | 'VERIFIED';
   
-  // Payment History (Simplified)
+  // Payment History
   paymentStatus: PaymentStatus;
   lastPaymentRef?: string;
 
@@ -78,6 +81,18 @@ export enum AppSection {
   FAQ = 'FAQ'
 }
 
+export interface MartOrder {
+  id: string;
+  userId: string;
+  vendorId: string;
+  items: CartItem[];
+  total: number;
+  status: OrderStatus;
+  date: string;
+  deliveryOption: 'PICKUP' | 'DISPATCH';
+  riderId?: string;
+}
+
 export type ActivityItem = any;
 export type CartItem = Product & { quantity: number };
 export interface Address { id: string; userId: string; title: string; details: string; }
@@ -87,5 +102,4 @@ export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolea
 export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; }
 export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; date: string; }
 export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: string; price: number; date: string; phoneNumber?: string; }
-export interface MartOrder { id: string; userId: string; total: number; status: string; date: string; }
 export interface PushNotification { title: string; body: string; }
