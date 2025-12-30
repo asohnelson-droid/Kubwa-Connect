@@ -16,6 +16,10 @@ export const getParentCategory = (category: string) => {
     return category; 
 };
 
+/**
+ * MAPPER: Converts Supabase Auth User to Kubwa App User type
+ * This is an in-memory transformation. No storage occurs here.
+ */
 const mapUserMetadata = (sessionUser: any): User => {
     if (!sessionUser) return null as any;
     const meta = sessionUser.user_metadata || {};
@@ -49,6 +53,7 @@ export const api = {
     auth: {
         getSession: async () => {
             try {
+                // Rely on the internal persistSession hydration
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 if (sessionError || !session) return null;
 
@@ -57,7 +62,7 @@ export const api = {
                 
                 return mapUserMetadata(sessionUser);
             } catch (e: any) {
-                console.error("Auth API: getSession Error:", e.message);
+                console.error("Auth hydration error:", e.message);
                 return null;
             }
         },
@@ -84,9 +89,8 @@ export const api = {
                 });
 
                 if (error) {
-                    console.error("Supabase SignUp Error:", error);
                     if (error.message.includes('fetch')) {
-                        return { error: "Network Error: Could not reach Supabase. Check your URL configuration." };
+                        return { error: "Network Error: Could not reach Supabase. Check your connection." };
                     }
                     return { error: error.message };
                 }
@@ -96,28 +100,26 @@ export const api = {
                     requiresVerification: !!data?.user && !data?.session 
                 };
             } catch (e: any) {
-                console.error("SignUp Catch:", e);
-                return { error: "Signup failed. Please try again later." };
+                return { error: "Signup failed. Please try again." };
             }
         },
         signIn: async (email, password) => {
             try {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) {
-                    console.error("Supabase SignIn Error:", error);
                     if (error.message.includes('fetch')) {
-                        return { error: "Connection Error: Failed to reach Kubwa Connect servers. Check environment variables." };
+                        return { error: "Network Error: Verify your internet connection." };
                     }
                     return { error: error.message };
                 }
                 return { user: data?.user ? mapUserMetadata(data.user) : null };
             } catch (e: any) {
-                console.error("SignIn Catch:", e);
-                return { error: "Login failed due to a system configuration error." };
+                return { error: "Login failed." };
             }
         },
         signOut: async () => { 
             await supabase.auth.signOut();
+            // Clear cart but let Supabase clear its own auth token
             localStorage.removeItem('kubwa_cart');
         },
         resetPassword: async (email: string) => {
@@ -126,7 +128,7 @@ export const api = {
                 if (error) return { success: false, error: error.message };
                 return { success: true };
             } catch (err: any) {
-                return { success: false, error: "Network error during reset." };
+                return { success: false, error: "Network error." };
             }
         },
         updatePassword: async (password: string) => {
@@ -135,7 +137,7 @@ export const api = {
                 if (error) return { success: false, error: error.message };
                 return { success: true };
             } catch (err: any) {
-                return { success: false, error: "Failed to update password." };
+                return { success: false, error: "Update failed." };
             }
         },
         resendVerification: async (email: string) => {
@@ -150,21 +152,19 @@ export const api = {
     },
     orders: {
         placeOrder: async (orderData: Partial<MartOrder>) => {
-            console.log("[API] Order Placed:", orderData);
             return { success: true, orderId: 'ord-' + Math.random().toString(36).substr(2, 9) };
         },
-        getMyOrders: async (userId: string): Promise<MartOrder[]> => {
-            return [];
-        }
+        getMyOrders: async (userId: string): Promise<MartOrder[]> => []
     },
     users: {
         completeSetup: async (userId: string, data: any) => {
             try {
+                // Update Supabase metadata directly
                 const { data: { user }, error } = await supabase.auth.updateUser({ 
                     data: { ...data, isSetupComplete: true } 
                 });
                 if (error) return null;
-                await supabase.auth.refreshSession();
+                // Session is updated automatically in storage
                 return mapUserMetadata(user);
             } catch (err) {
                 return null;
@@ -177,35 +177,23 @@ export const api = {
         getMyProfile: async (userId: string): Promise<ServiceProvider | null> => null,
         updateStatus: async (providerId: string, available: boolean): Promise<boolean> => true,
     },
-    getProducts: async (): Promise<Product[]> => {
-        return [
-            { id: '1', vendorId: 'v1', name: 'Fresh Tomatoes', price: 2500, category: 'Food', status: 'APPROVED', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=200', stock: 10, rating: 4.5 },
-            { id: '2', vendorId: 'v2', name: 'Original Levi Jeans', price: 15000, category: 'Fashion', status: 'APPROVED', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&q=80&w=200', stock: 5, rating: 4.8 }
-        ] as any[];
-    },
-    getProviders: async (): Promise<ServiceProvider[]> => {
-        return [
-            { id: 's1', userId: 'u1', name: 'Bature Repairs', category: 'Plumbing', rate: 3000, rating: 4.9, reviews: 24, image: 'https://i.pravatar.cc/150?u=bature', available: true, isVerified: true }
-        ] as any[];
-    },
+    getProducts: async (): Promise<Product[]> => [
+        { id: '1', vendorId: 'v1', name: 'Fresh Tomatoes', price: 2500, category: 'Food', status: 'APPROVED', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=200', stock: 10, rating: 4.5 },
+        { id: '2', vendorId: 'v2', name: 'Original Levi Jeans', price: 15000, category: 'Fashion', status: 'APPROVED', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&q=80&w=200', stock: 5, rating: 4.8 }
+    ],
+    getProviders: async (): Promise<ServiceProvider[]> => [
+        { id: 's1', userId: 'u1', name: 'Bature Repairs', category: 'Plumbing', rate: 3000, rating: 4.9, reviews: 24, image: 'https://i.pravatar.cc/150?u=bature', available: true, isVerified: true }
+    ],
     getMockContext: async () => ({ products: [], providers: [] }),
     getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => [],
     requestDelivery: async (data: any): Promise<boolean> => true,
     deliveries: {
-        getAvailableJobs: async (): Promise<DeliveryRequest[]> => {
-            return [
-                { id: 'dr1', userId: 'u2', pickup: 'Phase 1', dropoff: 'Phase 4', itemType: 'Document', status: 'PENDING', price: 1200, date: new Date().toISOString(), phoneNumber: '08000000001' },
-                { id: 'dr2', userId: 'u3', pickup: 'Gwarinpa', dropoff: 'Phase 2', itemType: 'Food', status: 'PENDING', price: 1500, date: new Date().toISOString(), phoneNumber: '08000000002' }
-            ];
-        },
-        acceptDelivery: async (jobId: string, riderId: string): Promise<boolean> => {
-            console.log(`[API] Rider ${riderId} accepted job ${jobId}`);
-            return true;
-        },
-        updateStatus: async (jobId: string, status: string): Promise<boolean> => {
-            console.log(`[API] Job ${jobId} status updated to ${status}`);
-            return true;
-        }
+        getAvailableJobs: async (): Promise<DeliveryRequest[]> => [
+            { id: 'dr1', userId: 'u2', pickup: 'Phase 1', dropoff: 'Phase 4', itemType: 'Document', status: 'PENDING', price: 1200, date: new Date().toISOString(), phoneNumber: '08000000001' },
+            { id: 'dr2', userId: 'u3', pickup: 'Gwarinpa', dropoff: 'Phase 2', itemType: 'Food', status: 'PENDING', price: 1500, date: new Date().toISOString(), phoneNumber: '08000000002' }
+        ],
+        acceptDelivery: async (jobId: string, riderId: string): Promise<boolean> => true,
+        updateStatus: async (jobId: string, status: string): Promise<boolean> => true
     },
     payments: { fulfillIntent: async (userId, intent, ref) => true },
     admin: { 

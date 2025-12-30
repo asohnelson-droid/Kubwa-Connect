@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
 import Home from './pages/Home';
@@ -10,7 +11,6 @@ import Account from './pages/Account';
 import InfoPages from './pages/InfoPages';
 import Onboarding from './pages/Onboarding';
 import SetupWizard from './components/SetupWizard';
-import AuthModal from './components/AuthModal';
 import { askKubwaAssistant } from './services/ai';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
@@ -21,7 +21,6 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
-  // Storage-safe cart initialization
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const savedCart = localStorage.getItem('kubwa_cart');
@@ -39,49 +38,49 @@ function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
+  // STORAGE CLEANUP: Remove any legacy/manual user objects that might clog storage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const legacyKeys = ['user', 'profile', 'currentUser', 'kubwa_user_data'];
+    legacyKeys.forEach(key => localStorage.removeItem(key));
+  }, []);
+
   const refreshUser = useCallback(async () => {
     try {
-      // getSession reads directly from localStorage first
+      // Strictly rely on Supabase session state
       const currentUser = await api.auth.getSession();
       setUser(currentUser);
       return currentUser;
     } catch (err) {
-      console.error("Session refresh failed:", err);
+      console.error("Auth hydration failed:", err);
       return null;
     }
   }, []);
 
-  // Initialization: Wait for session hydration
   useEffect(() => {
     let mounted = true;
 
     const initApp = async () => {
-      // 1. Give Supabase a tiny window to hydrate from localStorage
       const currentUser = await refreshUser();
       
       if (!mounted) return;
 
-      // 2. Decide if onboarding is needed
       const hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
       if (!currentUser && !hasSeenOnboarding) {
         setShowOnboarding(true);
       }
 
-      // 3. Mark app as ready
       setIsInitializing(false);
     };
 
     initApp();
 
-    // 4. Listen for Auth State Changes (Login/Logout/Refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`Auth Event: ${event}`);
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
         if (mounted) await refreshUser();
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);
-          // Only redirect to home if they weren't already there
           if (currentSection !== AppSection.HOME) setCurrentSection(AppSection.HOME);
         }
       }
@@ -93,21 +92,17 @@ function App() {
     };
   }, [refreshUser]);
 
-  // Cart Management - Protect Storage Quota
+  // Cart Management - Size limited to protect auth token storage space
   useEffect(() => {
     try {
-      // We stringify the cart but check its size
       const cartData = JSON.stringify(cart);
-      // If cart is getting dangerously large (e.g. > 100KB), prune it
-      // This protects the 5MB limit for Auth Tokens
-      if (cartData.length > 100000) {
-        console.warn("Cart size critical. Pruning for storage safety.");
-        setCart(prev => prev.slice(0, 3));
+      if (cartData.length > 50000) { // 50KB limit for cart
+        setCart(prev => prev.slice(0, 5));
         return;
       }
       localStorage.setItem('kubwa_cart', cartData);
     } catch (e) {
-      console.error("Cart save failed - likely storage quota:", e);
+      console.error("Storage error:", e);
     }
   }, [cart]);
 
@@ -142,7 +137,6 @@ function App() {
   };
 
   const renderContent = () => {
-    // SECURITY GUARD: Direct Admin Check
     if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
         return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
     }
@@ -169,7 +163,7 @@ function App() {
          <div className="w-16 h-16 bg-kubwa-green rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
             <span className="text-white text-2xl font-black">KC</span>
          </div>
-         <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Verifying Identity...</p>
+         <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Restoring Session...</p>
       </div>
     );
   }
