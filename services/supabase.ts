@@ -19,7 +19,8 @@ const getSanitizedUrl = () => {
     url = fallbackUrl; // Revert to known-good secure fallback if protocol is missing
   }
 
-  return url;
+  // CRITICAL FIX: Remove trailing slashes which cause "Failed to fetch" in many environments
+  return url.replace(/\/$/, "");
 };
 
 const supabaseUrl = getSanitizedUrl();

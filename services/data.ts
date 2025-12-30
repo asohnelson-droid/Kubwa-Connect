@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus } from '../types';
 
@@ -64,14 +63,6 @@ export const api = {
         },
         signUp: async (email, password, name, role) => {
             try {
-                const rawUrl = process.env.VITE_SUPABASE_URL || '';
-                const fallbackUrl = 'https://bzuwzvrmwketoyumiawi.supabase.co';
-                const endpoint = (rawUrl && rawUrl !== 'undefined' && rawUrl !== '') ? rawUrl : fallbackUrl;
-
-                if (!endpoint.startsWith('https://')) {
-                  return { error: "Security Error: HTTPS required for authentication." };
-                }
-
                 const redirectUrl = window.location.origin.replace(/\/$/, '') + '/';
                 const initialStatus = (role === 'VENDOR' || role === 'PROVIDER' || role === 'RIDER') ? 'PENDING' : 'APPROVED';
                 
@@ -92,68 +83,74 @@ export const api = {
                     } 
                 });
 
-                if (error) return { error: error.message };
+                if (error) {
+                    if (error.message.includes('fetch')) {
+                        return { error: "Network Error: Could not reach the server. Please check your internet connection." };
+                    }
+                    return { error: error.message };
+                }
 
                 return { 
                     user: data?.user ? mapUserMetadata(data.user) : null, 
                     requiresVerification: !!data?.user && !data?.session 
                 };
             } catch (e: any) {
-                return { error: "Signup failed. Check network." };
+                return { error: "Signup failed. Please try again later." };
             }
         },
         signIn: async (email, password) => {
             try {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) return { error: error.message };
+                if (error) {
+                    if (error.message.includes('fetch')) {
+                        return { error: "Connection Error: Failed to reach Kubwa Connect servers. Please check your connection." };
+                    }
+                    return { error: error.message };
+                }
                 return { user: data?.user ? mapUserMetadata(data.user) : null };
             } catch (e: any) {
-                return { error: "Login failed." };
+                return { error: "Login failed due to a network error." };
             }
         },
         signOut: async () => { 
             await supabase.auth.signOut();
             localStorage.removeItem('kubwa_cart');
         },
-        // Fix: Added missing resetPassword method
         resetPassword: async (email: string) => {
             try {
                 const { error } = await supabase.auth.resetPasswordForEmail(email);
                 if (error) return { success: false, error: error.message };
                 return { success: true };
             } catch (err: any) {
-                return { success: false, error: err.message };
+                return { success: false, error: "Network error during reset." };
             }
         },
-        // Fix: Added missing updatePassword method
         updatePassword: async (password: string) => {
             try {
                 const { error } = await supabase.auth.updateUser({ password });
                 if (error) return { success: false, error: error.message };
                 return { success: true };
             } catch (err: any) {
-                return { success: false, error: err.message };
+                return { success: false, error: "Failed to update password." };
             }
         },
-        // Fix: Added missing resendVerification method
         resendVerification: async (email: string) => {
             try {
                 const { error } = await supabase.auth.resend({ type: 'signup', email });
                 if (error) return { success: false, error: error.message };
                 return { success: true };
             } catch (err: any) {
-                return { success: false, error: err.message };
+                return { success: false, error: "Resend failed." };
             }
         }
     },
     orders: {
         placeOrder: async (orderData: Partial<MartOrder>) => {
-            // In a real app, this writes to the 'orders' table
             console.log("[API] Order Placed:", orderData);
             return { success: true, orderId: 'ord-' + Math.random().toString(36).substr(2, 9) };
         },
         getMyOrders: async (userId: string): Promise<MartOrder[]> => {
-            return []; // Mock
+            return [];
         }
     },
     users: {
@@ -177,7 +174,6 @@ export const api = {
         updateStatus: async (providerId: string, available: boolean): Promise<boolean> => true,
     },
     getProducts: async (): Promise<Product[]> => {
-        // Mock data for initial load until DB is populated
         return [
             { id: '1', vendorId: 'v1', name: 'Fresh Tomatoes', price: 2500, category: 'Food', status: 'APPROVED', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=200', stock: 10, rating: 4.5 },
             { id: '2', vendorId: 'v2', name: 'Original Levi Jeans', price: 15000, category: 'Fashion', status: 'APPROVED', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&q=80&w=200', stock: 5, rating: 4.8 }
@@ -191,10 +187,8 @@ export const api = {
     getMockContext: async () => ({ products: [], providers: [] }),
     getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => [],
     requestDelivery: async (data: any): Promise<boolean> => true,
-    // Fix: Added deliveries object with expected methods
     deliveries: {
         getAvailableJobs: async (): Promise<DeliveryRequest[]> => {
-            // Mock available jobs for riders
             return [
                 { id: 'dr1', userId: 'u2', pickup: 'Phase 1', dropoff: 'Phase 4', itemType: 'Document', status: 'PENDING', price: 1200, date: new Date().toISOString(), phoneNumber: '08000000001' },
                 { id: 'dr2', userId: 'u3', pickup: 'Gwarinpa', dropoff: 'Phase 2', itemType: 'Food', status: 'PENDING', price: 1500, date: new Date().toISOString(), phoneNumber: '08000000002' }
