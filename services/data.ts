@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus } from '../types';
 
@@ -21,7 +22,6 @@ const mapUserMetadata = (sessionUser: any): User => {
     const isPremiumTier = meta.tier === 'VERIFIED' || meta.tier === 'FEATURED' || meta.subscription?.tier === 'ELITE';
     
     const role = meta.role || 'USER';
-    // PRODUCTION: Free tier is capped at 4 products
     const calculatedLimit = meta.productLimit ?? (isPremiumTier ? 999 : (role === 'VENDOR' ? 4 : 999));
 
     return {
@@ -49,11 +49,9 @@ export const api = {
     auth: {
         getSession: async () => {
             try {
-                // Read session from local storage immediately
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 if (sessionError || !session) return null;
 
-                // Double check user freshness
                 const { data: { user: sessionUser }, error: fetchError } = await supabase.auth.getUser();
                 if (fetchError || !sessionUser) return null;
                 
@@ -86,8 +84,9 @@ export const api = {
                 });
 
                 if (error) {
+                    console.error("Supabase SignUp Error:", error);
                     if (error.message.includes('fetch')) {
-                        return { error: "Network Error: Could not reach the server. Please check your internet connection." };
+                        return { error: "Network Error: Could not reach Supabase. Check your URL configuration." };
                     }
                     return { error: error.message };
                 }
@@ -97,6 +96,7 @@ export const api = {
                     requiresVerification: !!data?.user && !data?.session 
                 };
             } catch (e: any) {
+                console.error("SignUp Catch:", e);
                 return { error: "Signup failed. Please try again later." };
             }
         },
@@ -104,14 +104,16 @@ export const api = {
             try {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) {
+                    console.error("Supabase SignIn Error:", error);
                     if (error.message.includes('fetch')) {
-                        return { error: "Connection Error: Failed to reach Kubwa Connect servers. Please check your connection." };
+                        return { error: "Connection Error: Failed to reach Kubwa Connect servers. Check environment variables." };
                     }
                     return { error: error.message };
                 }
                 return { user: data?.user ? mapUserMetadata(data.user) : null };
             } catch (e: any) {
-                return { error: "Login failed due to a network error." };
+                console.error("SignIn Catch:", e);
+                return { error: "Login failed due to a system configuration error." };
             }
         },
         signOut: async () => { 
