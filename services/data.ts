@@ -49,15 +49,17 @@ export const api = {
     auth: {
         getSession: async () => {
             try {
+                // Read session from local storage immediately
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 if (sessionError || !session) return null;
 
+                // Double check user freshness
                 const { data: { user: sessionUser }, error: fetchError } = await supabase.auth.getUser();
                 if (fetchError || !sessionUser) return null;
                 
                 return mapUserMetadata(sessionUser);
             } catch (e: any) {
-                console.error("Auth Session Fetch Failed:", e.message);
+                console.error("Auth API: getSession Error:", e.message);
                 return null;
             }
         },

@@ -8,8 +8,7 @@ const assistantSchema = {
     message: { type: Type.STRING, description: "A helpful, friendly response to the user." },
     suggestedAction: {
       type: Type.STRING,
-      enum: ["NONE", "SEARCH_MART", "SEARCH_SERVICES", "BOOK_RIDE"],
-      description: "The best app section to direct the user to."
+      description: "The best app section to direct the user to. Must be one of: NONE, SEARCH_MART, SEARCH_SERVICES, BOOK_RIDE."
     },
     searchQuery: { type: Type.STRING, description: "A refined search term based on user input." }
   },
@@ -19,10 +18,8 @@ const assistantSchema = {
 export const askKubwaAssistant = async (userQuery: string) => {
   // We wrap everything in a single try-catch to ensure we always return a valid object to the UI
   try {
-    const apiKey = process.env.API_KEY;
-    
     // Check if API_KEY is missing before attempting initialization
-    if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    if (!process.env.API_KEY || process.env.API_KEY === "undefined" || process.env.API_KEY === "") {
       console.error("AI Service: API_KEY is missing from environment.");
       return {
         message: "Welcome! I'm your Kubwa assistant. I'm currently in offline mode, but you can still browse the Mart and FixIt sections manually.",
@@ -31,8 +28,9 @@ export const askKubwaAssistant = async (userQuery: string) => {
       };
     }
 
-    // Step 1: Initialize the SDK inside the try block
-    const ai = new GoogleGenAI({ apiKey });
+    // Step 1: Initialize the SDK strictly following the guideline to use the environment variable directly
+    // Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     // Step 2: Fetch application context for grounding the response
     const { products, providers } = await api.getMockContext();
@@ -53,7 +51,7 @@ export const askKubwaAssistant = async (userQuery: string) => {
       - Otherwise: NONE.
     `;
 
-    // Step 3: Generate content using the recommended Gemini 3 Flash model
+    // Step 3: Generate content using the recommended Gemini 3 Flash model for basic tasks
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [{ parts: [{ text: userQuery }] }],
@@ -65,7 +63,7 @@ export const askKubwaAssistant = async (userQuery: string) => {
       }
     });
 
-    // Step 4: Extract the generated text safely using the .text property
+    // Step 4: Extract the generated text safely using the .text property (not a method)
     const text = response.text;
     if (!text) {
       throw new Error("AI returned an empty response body.");

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
@@ -21,6 +20,8 @@ function App() {
   const [user, setUser] = useState<UserType | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // Storage-safe cart initialization
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const savedCart = localStorage.getItem('kubwa_cart');
@@ -38,53 +39,77 @@ function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Heartbeat Ref to prevent redundant initializations
-  const initRef = useRef(false);
-
-  const refreshUser = useCallback(async (targetSection?: AppSection) => {
+  const refreshUser = useCallback(async () => {
     try {
+      // getSession reads directly from localStorage first
       const currentUser = await api.auth.getSession();
       setUser(currentUser);
       return currentUser;
     } catch (err) {
-      console.error("Session heartbeat failed", err);
+      console.error("Session refresh failed:", err);
       return null;
     }
   }, []);
 
+  // Initialization: Wait for session hydration
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
+    let mounted = true;
 
     const initApp = async () => {
-      // 1. Resolve Session
+      // 1. Give Supabase a tiny window to hydrate from localStorage
       const currentUser = await refreshUser();
       
-      // 2. Deployment Logic
+      if (!mounted) return;
+
+      // 2. Decide if onboarding is needed
       const hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
       if (!currentUser && !hasSeenOnboarding) {
         setShowOnboarding(true);
       }
 
-      // 3. Complete Initialization
+      // 3. Mark app as ready
       setIsInitializing(false);
     };
 
     initApp();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+    // 4. Listen for Auth State Changes (Login/Logout/Refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`Auth Event: ${event}`);
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        await refreshUser();
+        if (mounted) await refreshUser();
       } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setCurrentSection(AppSection.HOME);
+        if (mounted) {
+          setUser(null);
+          // Only redirect to home if they weren't already there
+          if (currentSection !== AppSection.HOME) setCurrentSection(AppSection.HOME);
+        }
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [refreshUser]);
+
+  // Cart Management - Protect Storage Quota
+  useEffect(() => {
+    try {
+      // We stringify the cart but check its size
+      const cartData = JSON.stringify(cart);
+      // If cart is getting dangerously large (e.g. > 100KB), prune it
+      // This protects the 5MB limit for Auth Tokens
+      if (cartData.length > 100000) {
+        console.warn("Cart size critical. Pruning for storage safety.");
+        setCart(prev => prev.slice(0, 3));
+        return;
+      }
+      localStorage.setItem('kubwa_cart', cartData);
+    } catch (e) {
+      console.error("Cart save failed - likely storage quota:", e);
+    }
+  }, [cart]);
 
   const addToCart = (product: any) => {
     setCart(prev => {
@@ -95,15 +120,6 @@ function App() {
       return [...prev, { ...product, quantity: 1 }];
     });
   };
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('kubwa_cart', JSON.stringify(cart));
-    } catch (e) {
-      console.warn("Storage quota full. Pruning cart...");
-      if (cart.length > 5) setCart(cart.slice(0, 5));
-    }
-  }, [cart]);
 
   const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
