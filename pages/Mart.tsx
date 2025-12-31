@@ -23,6 +23,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -51,7 +52,6 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     
     if (user.role !== 'VENDOR') return;
     
-    // PRODUCTION: Enforce 4-product limit for FREE tier
     const myProductsCount = products.filter(p => p.vendorId === user.id).length;
     const limit = user.productLimit || 4; 
 
@@ -60,17 +60,40 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       return;
     }
     
-    alert(`Vendor Dashboard: You have used ${myProductsCount}/${limit} slots. Add more products to grow!`);
+    alert(`Vendor Dashboard: You have used ${myProductsCount}/${limit} slots. Go to your profile to manage inventory.`);
   };
 
   const calculateTotal = () => cart.reduce((a, b) => a + (b.price * b.quantity), 0);
 
   const handleCheckout = async () => {
     if (!user) { onRequireAuth(); return; }
-    // Implement order logic
-    alert("Order successfully initiated. Check your notifications!");
-    setCart([]);
-    setIsCartOpen(false);
+    if (cart.length === 0) return;
+
+    setPlacingOrder(true);
+    try {
+      // For simplicity in this community app, we handle checkout per major vendor or as a combined cart
+      // Here we create a single order record with all items
+      const result = await api.orders.placeOrder({
+        userId: user.id,
+        items: cart,
+        total: calculateTotal(),
+        status: 'CREATED',
+        deliveryOption: 'DISPATCH',
+        vendorId: cart[0].vendorId // Assign to primary vendor
+      });
+
+      if (result.success) {
+        alert("Success! Your order has been sent to the vendor. Track it in your account.");
+        setCart([]);
+        setIsCartOpen(false);
+      } else {
+        alert("Failed to place order. Please try again.");
+      }
+    } catch (err) {
+      alert("Network error. Could not connect to Kubwa servers.");
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   return (
@@ -98,7 +121,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
         <input 
           type="text" 
-          placeholder="What do you need?" 
+          placeholder="Search products..." 
           className="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-kubwa-green/20 outline-none font-bold" 
           value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)} 
@@ -146,8 +169,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6"><ArrowUpCircle size={32}/></div>
               <h3 className="text-xl font-black text-gray-900 uppercase">Tier Limit Reached</h3>
               <p className="text-xs font-bold text-gray-500 mt-2 leading-relaxed">
-                Standard Vendors are capped at <b>4 active products</b>. 
-                Upgrade to the Featured Tier to list unlimited items.
+                Standard Vendors are capped at 4 active products. Upgrade to Pro for unlimited listings.
               </p>
               <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full mt-8 bg-blue-600">Upgrade Shop</Button>
            </Card>
@@ -177,8 +199,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                       <Badge color="bg-gray-100 text-gray-900">x{item.quantity}</Badge>
                    </div>
                  ))}
-                 <div className="pt-4 flex justify-between items-center"><span className="font-black uppercase text-gray-400">Total</span><span className="font-black text-xl text-kubwa-green">₦{calculateTotal().toLocaleString()}</span></div>
-                 <Button className="w-full mt-6" onClick={handleCheckout}>Checkout Order</Button>
+                 <div className="pt-4 flex justify-between items-center">
+                    <span className="font-black uppercase text-gray-400">Total</span>
+                    <span className="font-black text-xl text-kubwa-green">₦{calculateTotal().toLocaleString()}</span>
+                 </div>
+                 <Button className="w-full mt-6" onClick={handleCheckout} disabled={placingOrder}>
+                    {placingOrder ? <Loader2 className="animate-spin" /> : 'Confirm Checkout'}
+                 </Button>
               </div>
             )}
          </div>

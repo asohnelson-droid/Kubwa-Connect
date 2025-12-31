@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound } from 'lucide-react';
+import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity } from 'lucide-react';
 import { Button, Card, Input } from './ui';
 import { api } from '../services/data';
+import { testSupabaseConnection } from '../services/supabase';
 import { User as UserType, UserRole } from '../types';
 
 interface AuthModalProps {
@@ -28,6 +29,10 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   
+  // Connection Testing State
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{ ok: boolean; message: string } | null>(null);
+
   // Resend/Timer State
   const [resending, setResending] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
@@ -44,6 +49,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError('');
     setSuccessMsg('');
+    setConnectionResult(null);
     setLoading(true);
     
     try {
@@ -85,10 +91,17 @@ const AuthModal: React.FC<AuthModalProps> = ({
           }
       }
     } catch (e: any) {
-      setError("An unexpected error occurred.");
+      setError(e.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRunDiagnostics = async () => {
+    setTestingConnection(true);
+    const result = await testSupabaseConnection();
+    setConnectionResult(result);
+    setTestingConnection(false);
   };
 
   const handleResend = async () => {
@@ -100,7 +113,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
       setResendTimer(60); 
       setSuccessMsg("Verification link resent! Check your inbox.");
       if (mode === 'LOGIN') {
-        // Switch view to help user understand they need to check email
         setTimeout(() => setVerificationSent(true), 1500);
       }
     } else {
@@ -109,7 +121,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setResending(false);
   };
 
-  const isEmailUnconfirmedError = error.toLowerCase().includes("activate your account") || error.toLowerCase().includes("email not confirmed");
+  const isNetworkError = error.toLowerCase().includes("failed to fetch") || 
+                        error.toLowerCase().includes("network error") || 
+                        error.toLowerCase().includes("blocked");
 
   if (verificationSent) {
     return (
@@ -146,7 +160,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
         <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors z-10">
           <X size={24} strokeWidth={3} />
         </button>
-        <form onSubmit={handleSubmit} className="p-10">
+        <form onSubmit={handleSubmit} className="p-10 max-h-[90vh] overflow-y-auto no-scrollbar">
           <div className="text-center mb-10">
              <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
                 {mode === 'SIGNUP' ? <UserPlus size={36} /> : mode === 'FORGOT' || mode === 'UPDATE_PASSWORD' ? <KeyRound size={36} /> : <span className="text-3xl">⚡</span>}
@@ -182,20 +196,48 @@ const AuthModal: React.FC<AuthModalProps> = ({
               )}
 
               {error && (
-                <div className="p-4 bg-red-50 text-red-700 rounded-2xl flex flex-col gap-3 animate-fade-in">
-                  <div className="flex gap-3 items-center">
-                    <AlertCircle size={18} className="shrink-0" />
-                    <p className="text-[10px] font-black leading-tight">{error}</p>
+                <div className="p-5 bg-red-50 text-red-700 rounded-[2rem] flex flex-col gap-4 animate-fade-in border border-red-100 shadow-sm">
+                  <div className="flex gap-3 items-start">
+                    {isNetworkError ? <WifiOff size={20} className="shrink-0 text-red-600" /> : <AlertCircle size={20} className="shrink-0" />}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-black leading-tight uppercase tracking-wide">Connection Failure</p>
+                      <p className="text-[10px] font-medium leading-relaxed opacity-80">
+                        {error}
+                      </p>
+                    </div>
                   </div>
-                  {isEmailUnconfirmedError && (
-                    <button 
-                      type="button" 
-                      onClick={handleResend}
-                      disabled={resending || resendTimer > 0}
-                      className="text-[10px] font-black uppercase tracking-widest text-kubwa-green hover:underline flex items-center gap-1 mt-1 disabled:opacity-50"
-                    >
-                      {resending ? <Loader2 size={12} className="animate-spin" /> : (resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Link Now')}
-                    </button>
+                  
+                  {isNetworkError && (
+                    <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-red-100/50">
+                       <div className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-400">
+                         <HelpCircle size={12} /> Diagnostic Tools
+                       </div>
+                       
+                       <Button 
+                         type="button" 
+                         variant="outline" 
+                         className="w-full h-10 text-[9px] font-black border-red-100 bg-white"
+                         onClick={handleRunDiagnostics}
+                         disabled={testingConnection}
+                       >
+                         {testingConnection ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} TEST PROJECT CONNECTION
+                       </Button>
+
+                       {connectionResult && (
+                         <div className={`p-2 rounded-xl text-[9px] font-bold ${connectionResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                           {connectionResult.ok ? '✅ ' : '❌ '}{connectionResult.message}
+                         </div>
+                       )}
+
+                       {!connectionResult?.ok && (
+                         <ul className="text-[9px] font-bold text-gray-600 space-y-1.5 list-disc pl-4 mt-2">
+                            <li>Check for <b>Adblockers</b> (uBlock, Ghostery).</li>
+                            <li>Brave users: Turn off <b>Brave Shields</b> for this site.</li>
+                            <li>Ensure you are not on a restricted Office or Public Wi-Fi.</li>
+                            <li>Open this app in <b>Incognito Mode</b>.</li>
+                         </ul>
+                       )}
+                    </div>
                   )}
                 </div>
               )}
@@ -224,6 +266,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   <button type="button" onClick={() => {
                     setError('');
                     setSuccessMsg('');
+                    setConnectionResult(null);
                     if (mode === 'LOGIN') setMode('SIGNUP');
                     else setMode('LOGIN');
                   }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">

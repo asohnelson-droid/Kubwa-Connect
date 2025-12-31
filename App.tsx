@@ -38,34 +38,36 @@ function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // STORAGE CLEANUP: Remove any legacy/manual user objects that might clog storage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const legacyKeys = ['user', 'profile', 'currentUser', 'kubwa_user_data'];
-    legacyKeys.forEach(key => localStorage.removeItem(key));
-  }, []);
-
+  /**
+   * REFRESH USER
+   * Strictly fetches the latest user session/profile from Supabase.
+   */
   const refreshUser = useCallback(async () => {
     try {
-      // Strictly rely on Supabase session state
       const currentUser = await api.auth.getSession();
       setUser(currentUser);
       return currentUser;
     } catch (err) {
-      console.error("Auth hydration failed:", err);
+      console.error("[App] Session recovery failed:", err);
+      setUser(null);
       return null;
     }
   }, []);
 
+  /**
+   * APP INITIALIZATION
+   * One-time effect to restore session and check onboarding.
+   */
   useEffect(() => {
     let mounted = true;
 
     const initApp = async () => {
       const currentUser = await refreshUser();
-      
       if (!mounted) return;
 
       const hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
+      
+      // LOGIC: Only show onboarding if user is logged out AND hasn't seen it
       if (!currentUser && !hasSeenOnboarding) {
         setShowOnboarding(true);
       }
@@ -75,13 +77,21 @@ function App() {
 
     initApp();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+    // Listen for global auth changes (SignIn, SignOut, Metadata Updates)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.debug("[Auth] Event Traced:", event);
+      
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
         if (mounted) await refreshUser();
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);
-          if (currentSection !== AppSection.HOME) setCurrentSection(AppSection.HOME);
+          // Safety: Don't force redirect to Home unless user is on a protected section
+          setCurrentSection(prev => {
+            const protectedSections = [AppSection.ACCOUNT, AppSection.ADMIN];
+            if (protectedSections.includes(prev)) return AppSection.HOME;
+            return prev;
+          });
         }
       }
     });
@@ -92,18 +102,14 @@ function App() {
     };
   }, [refreshUser]);
 
-  // Cart Management - Size limited to protect auth token storage space
+  /**
+   * PERSIST CART
+   */
   useEffect(() => {
     try {
-      const cartData = JSON.stringify(cart);
-      if (cartData.length > 50000) { // 50KB limit for cart
-        setCart(prev => prev.slice(0, 5));
-        return;
-      }
-      localStorage.setItem('kubwa_cart', cartData);
-    } catch (e) {
-      console.error("Storage error:", e);
-    }
+      const limitedCart = cart.slice(0, 10); 
+      localStorage.setItem('kubwa_cart', JSON.stringify(limitedCart));
+    } catch (e) {}
   }, [cart]);
 
   const addToCart = (product: any) => {
@@ -163,7 +169,7 @@ function App() {
          <div className="w-16 h-16 bg-kubwa-green rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
             <span className="text-white text-2xl font-black">KC</span>
          </div>
-         <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Restoring Session...</p>
+         <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Booting Super App...</p>
       </div>
     );
   }
@@ -171,6 +177,8 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
       {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
+      
+      {/* SetupWizard is exclusively for logged-in users who haven't finished profiling */}
       {user && !user.isSetupComplete && <SetupWizard user={user} onComplete={refreshUser} />}
       
       <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">

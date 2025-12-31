@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, AppSection, MonetisationTier, UserRole, PaymentIntent } from '../types';
+import { User, AppSection, MonetisationTier, UserRole, PaymentIntent, MartOrder, DeliveryRequest } from '../types';
 import { api } from '../services/data';
 import { PaymentService } from '../services/payments';
 import { Button, Card, Badge } from '../components/ui';
@@ -33,7 +33,9 @@ import {
   BarChart3,
   Star,
   Sparkles,
-  Database
+  Database,
+  History,
+  PackageCheck
 } from 'lucide-react';
 
 interface AccountProps {
@@ -46,9 +48,10 @@ interface AccountProps {
 }
 
 const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUser, authIntent, clearAuthIntent }) => {
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'activity'>('profile');
+  const [orders, setOrders] = useState<MartOrder[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<UserRole>(authIntent?.role || 'USER');
   const [authView, setAuthView] = useState<'LOGIN' | 'SIGNUP'>(authIntent ? 'SIGNUP' : 'LOGIN');
@@ -60,6 +63,27 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
       setIsAuthModalOpen(true);
     }
   }, [authIntent]);
+
+  useEffect(() => {
+    if (user && activeTab === 'activity') {
+      loadActivity();
+    }
+  }, [user, activeTab]);
+
+  const loadActivity = async () => {
+    if (!user) return;
+    setLoadingActivity(true);
+    try {
+      const [orderData, deliveryData] = await Promise.all([
+        api.orders.getMyOrders(user.id),
+        api.getDeliveries(user.id)
+      ]);
+      setOrders(orderData);
+      setDeliveries(deliveryData);
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -109,42 +133,14 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     );
   }
 
-  const handleStartPayment = async (tier: MonetisationTier) => {
-    setProcessingPayment(true);
-    setPaymentError(null);
-
-    const intent: PaymentIntent = tier === 'VERIFIED' ? 'VENDOR_VERIFIED' : 'VENDOR_FEATURED';
-    const amount = tier === 'VERIFIED' ? 5000 : 15000;
-
-    try {
-      const response = await PaymentService.pay(intent, amount, user);
-      if (response.success) {
-        const fulfilled = await api.payments.fulfillIntent(user.id, intent, response.reference);
-        if (fulfilled) {
-          await refreshUser();
-          setPaymentSuccess(true);
-          setTimeout(() => setPaymentSuccess(false), 5000);
-        }
-      } else {
-        setPaymentError(response.error || "Payment was not completed.");
-      }
-    } catch (err) {
-      setPaymentError("An unexpected error occurred during payment.");
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
   const isVendor = user.role === 'VENDOR';
-  const isProvider = user.role === 'PROVIDER';
-  const isRider = user.role === 'RIDER';
   const isAdmin = user.role === 'ADMIN';
   const isApproved = user.status === 'APPROVED';
 
   return (
     <div className="pb-32 pt-8 px-6 max-w-2xl mx-auto animate-fade-in">
       {/* Profile Header */}
-      <div className="mb-10 relative">
+      <div className="mb-6 relative">
         <Card className="bg-gray-900 text-white border-none shadow-2xl rounded-[3rem] p-0 overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl" />
           <div className="p-10 relative z-10">
@@ -178,113 +174,129 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                 <p className="text-white/50 text-xs font-bold mb-6">{user.email}</p>
                 <div className="flex flex-wrap gap-2">
                    <Badge color="bg-kubwa-green text-white border-none px-3 py-1.5">{user.role}</Badge>
-                   {user.tier === 'FEATURED' && (
-                      <Badge color="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-none px-3 py-1.5 shadow-lg shadow-yellow-500/20">
-                        <Crown size={12} className="mr-1 animate-bounce" /> FEATURED MERCHANT
-                      </Badge>
-                   )}
                 </div>
              </div>
           </div>
         </Card>
       </div>
 
-      {/* ADMIN CONSOLE ENTRY */}
-      {isAdmin && (
-        <Card className="mb-8 p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border-none rounded-[3rem] shadow-xl shadow-indigo-500/20 relative overflow-hidden group">
-            <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
-            <div className="relative z-10">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md">
-                        <Database size={24} />
+      {/* Tabs */}
+      <div className="flex bg-gray-100 p-1.5 rounded-[2rem] mb-8">
+        <button 
+          onClick={() => setActiveTab('profile')}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all ${activeTab === 'profile' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+        >
+          Profile
+        </button>
+        <button 
+          onClick={() => setActiveTab('activity')}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all ${activeTab === 'activity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+        >
+          Activity History
+        </button>
+      </div>
+
+      {activeTab === 'profile' ? (
+        <div className="space-y-6 animate-fade-in">
+          {isAdmin && (
+            <Card className="p-8 bg-indigo-600 text-white border-none rounded-[2.5rem] shadow-xl shadow-indigo-500/20 group">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-white/20 rounded-2xl"><ShieldCheck size={24} /></div>
+                        <h4 className="font-black text-sm uppercase">Site Admin</h4>
                     </div>
-                    <div>
-                        <h4 className="text-lg font-black uppercase tracking-tight">Platform Governance</h4>
-                        <p className="text-[10px] font-bold text-indigo-100/70 uppercase tracking-widest">Active Site Administrator</p>
-                    </div>
+                    <Button variant="outline" className="bg-white/10 border-white/20 text-white h-10 px-4" onClick={() => setSection(AppSection.ADMIN)}>
+                        Dashboard
+                    </Button>
                 </div>
-                <Button 
-                    variant="secondary" 
-                    className="w-full bg-white text-indigo-600 hover:bg-indigo-50 shadow-none border-none py-4"
-                    onClick={() => setSection(AppSection.ADMIN)}
-                >
-                    <ShieldCheck size={18} strokeWidth={3} /> ENTER ADMIN CONSOLE
-                </Button>
-            </div>
-        </Card>
-      )}
+            </Card>
+          )}
 
-      {/* Verification Status Alerts for Business Users */}
-      {(isVendor || isProvider || isRider) && !isApproved && (
-        <Card className="mb-8 p-6 bg-orange-50 border-2 border-orange-100 rounded-[2.5rem] flex gap-5 items-start animate-fade-in shadow-sm">
-           <div className="p-4 bg-orange-100 text-orange-600 rounded-2xl shrink-0"><Clock size={28} strokeWidth={3} /></div>
-           <div>
-              <h4 className="font-black text-sm uppercase text-orange-800 tracking-tight">Application Pending</h4>
-              <p className="text-xs font-bold text-orange-700/70 mt-1 leading-relaxed">
-                The Kubwa Trust Team is currently reviewing your {isVendor ? 'store' : isRider ? 'rider' : 'service'} application. You will be notified once verified.
-              </p>
-           </div>
-        </Card>
-      )}
-
-      {/* Business Dashboard */}
-      {(isVendor || isProvider) && (
-        <div className="mb-12 space-y-8 animate-fade-in">
-           <div className="flex items-center justify-between px-2">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Business Hub</h3>
-              <div className="flex items-center gap-1.5 bg-green-50 px-3 py-1 rounded-full">
-                <div className={`w-1.5 h-1.5 ${isApproved ? 'bg-green-500 animate-pulse' : 'bg-orange-400'} rounded-full`}></div>
-                <span className={`text-[9px] font-black ${isApproved ? 'text-green-600' : 'text-orange-500'} uppercase tracking-widest`}>
-                  {isApproved ? 'Active Profile' : 'Awaiting Review'}
-                </span>
-              </div>
-           </div>
-
-           <div className="grid grid-cols-2 gap-4">
-              <Card className="p-8 bg-white border-none shadow-sm text-center flex flex-col items-center group hover:bg-gray-50 transition-colors">
-                 <div className="p-3 bg-gray-50 text-gray-400 rounded-2xl mb-3 group-hover:bg-kubwa-green/10 group-hover:text-kubwa-green transition-colors">
-                   <ShoppingBag size={20} />
-                 </div>
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Listings Limit</p>
-                 <p className="text-2xl font-black text-gray-900">
-                   {user.productLimit === 999 ? '∞' : user.productLimit}
-                 </p>
+          <div className="grid grid-cols-2 gap-4">
+              <Card className="p-6 text-center border-none shadow-sm rounded-[2rem]">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                 <Badge color={isApproved ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'} className="mx-auto">
+                    {isApproved ? 'Verified' : 'Pending'}
+                 </Badge>
               </Card>
-              <Card className="p-8 bg-white border-none shadow-sm text-center flex flex-col items-center group hover:bg-gray-50 transition-colors">
-                 <div className="p-3 bg-gray-50 text-gray-400 rounded-2xl mb-3 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                   <TrendingUp size={20} />
-                 </div>
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Tier</p>
-                 <p className={`text-sm font-black uppercase ${isApproved ? (user.tier === 'FEATURED' ? 'text-yellow-500' : 'text-green-500') : 'text-orange-500'}`}>
-                   {user.tier === 'FEATURED' ? 'Featured' : user.tier === 'VERIFIED' ? 'Pro' : 'Basic'}
-                 </p>
+              <Card className="p-6 text-center border-none shadow-sm rounded-[2rem]">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Wallet</p>
+                 <p className="font-black text-gray-900">₦0.00</p>
               </Card>
-           </div>
+          </div>
+
+          <Card className="rounded-[2.5rem] p-4 border-none shadow-sm bg-white divide-y divide-gray-50">
+             {[
+                { icon: ShieldAlert, label: 'Privacy', sub: 'Security settings', color: 'text-blue-500', bg: 'bg-blue-50' },
+                { icon: Bell, label: 'Alerts', sub: 'Smart notifications', color: 'text-orange-500', bg: 'bg-orange-50' }
+             ].map((link, idx) => (
+               <div key={idx} className="flex items-center gap-5 py-4 px-4 hover:bg-gray-50 rounded-2xl transition-all cursor-pointer">
+                  <div className={`p-3 rounded-xl ${link.bg} ${link.color}`}><link.icon size={20} /></div>
+                  <div className="flex-1">
+                     <p className="text-sm font-black text-gray-900 uppercase">{link.label}</p>
+                     <p className="text-[10px] font-bold text-gray-400">{link.sub}</p>
+                  </div>
+                  <ChevronRight className="text-gray-200" size={18} />
+               </div>
+             ))}
+          </Card>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-fade-in">
+           {loadingActivity ? (
+             <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-green" /></div>
+           ) : (
+             <>
+               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2">Recent Mart Orders</h3>
+               {orders.length === 0 ? (
+                 <div className="text-center py-10 text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] bg-gray-50 rounded-[2rem] border border-dashed">No orders yet</div>
+               ) : (
+                 <div className="space-y-3">
+                    {orders.map(order => (
+                      <Card key={order.id} className="p-6 border-none shadow-sm rounded-[2rem] flex justify-between items-center">
+                         <div className="flex items-center gap-4">
+                            <div className="p-3 bg-green-50 text-green-600 rounded-xl"><PackageCheck size={20} /></div>
+                            <div>
+                               <p className="text-sm font-black text-gray-900 uppercase">Order #{order.id.slice(0, 5)}</p>
+                               <p className="text-[10px] font-bold text-gray-400">{new Date(order.date).toLocaleDateString()}</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <p className="font-black text-kubwa-green">₦{order.total.toLocaleString()}</p>
+                            <Badge color="bg-gray-100 text-gray-600 mt-1">{order.status}</Badge>
+                         </div>
+                      </Card>
+                    ))}
+                 </div>
+               )}
+
+               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2 mt-8">Delivery History</h3>
+               {deliveries.length === 0 ? (
+                 <div className="text-center py-10 text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] bg-gray-50 rounded-[2rem] border border-dashed">No deliveries yet</div>
+               ) : (
+                 <div className="space-y-3">
+                    {deliveries.map(delivery => (
+                      <Card key={delivery.id} className="p-6 border-none shadow-sm rounded-[2rem] flex justify-between items-center">
+                         <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Truck size={20} /></div>
+                            <div>
+                               <p className="text-sm font-black text-gray-900 uppercase">{delivery.pickup} → {delivery.dropoff}</p>
+                               <p className="text-[10px] font-bold text-gray-400">{delivery.itemType}</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <Badge color={delivery.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
+                               {delivery.status}
+                            </Badge>
+                         </div>
+                      </Card>
+                    ))}
+                 </div>
+               )}
+             </>
+           )}
         </div>
       )}
-
-      {/* Common Links */}
-      <div className="space-y-4">
-         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] px-2">Account Management</h3>
-         <Card className="rounded-[3rem] p-4 border-none shadow-sm bg-white divide-y divide-gray-50">
-            {[
-               { icon: ShieldAlert, label: 'Privacy & Security', sub: 'Control your profile visibility', color: 'text-blue-500', bg: 'bg-blue-50' },
-               { icon: CreditCard, label: 'Kubwa Wallet', sub: '₦0.00 Outstanding Balance', color: 'text-green-500', bg: 'bg-green-50' },
-               { icon: Bell, label: 'Smart Alerts', sub: 'Manage community notifications', color: 'text-orange-500', bg: 'bg-orange-50' }
-            ].map((link, idx) => (
-              <div key={idx} className="flex items-center gap-5 py-5 px-4 hover:bg-gray-50 rounded-[2rem] transition-all cursor-pointer group">
-                 <div className={`p-4 rounded-2xl ${link.bg} ${link.color} group-hover:scale-110 transition-transform`}>
-                    <link.icon size={22} />
-                 </div>
-                 <div className="flex-1">
-                    <p className="text-sm font-black text-gray-900 uppercase tracking-tight">{link.label}</p>
-                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{link.sub}</p>
-                 </div>
-                 <ChevronRight className="text-gray-200 group-hover:text-gray-400 transition-colors" size={20} strokeWidth={3} />
-              </div>
-            ))}
-         </Card>
-      </div>
     </div>
   );
 };
