@@ -52,6 +52,18 @@ export interface User {
   };
 }
 
+export interface ProductOption {
+  id: string;
+  label: string;
+  priceModifier: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  name: string; // e.g. "Size"
+  options: ProductOption[];
+}
+
 export interface Product {
   id: string;
   vendorId: string;
@@ -63,8 +75,13 @@ export interface Product {
   rating: number;
   status: ApprovalStatus;
   rejectionReason?: string;
+  rejectionNote?: string; // Admin feedback for products
+  approvedBy?: string;    // Admin ID who approved
+  approvedAt?: string;    // Timestamp of approval
+  submittedAt?: string;   // Timestamp of vendor submission
   description?: string;
   isPromoted?: boolean; 
+  variants?: ProductVariant[];
 }
 
 export enum AppSection {
@@ -74,6 +91,8 @@ export enum AppSection {
   RIDE = 'RIDE',
   ACCOUNT = 'ACCOUNT',
   ADMIN = 'ADMIN',
+  VENDOR_DASHBOARD = 'VENDOR_DASHBOARD',
+  PROVIDER_DASHBOARD = 'PROVIDER_DASHBOARD',
   ABOUT = 'ABOUT',
   PRIVACY = 'PRIVACY',
   TERMS = 'TERMS',
@@ -94,7 +113,11 @@ export interface MartOrder {
 }
 
 export type ActivityItem = any;
-export type CartItem = Product & { quantity: number };
+export type CartItem = Product & { 
+  quantity: number; 
+  selectedVariants?: Record<string, string>; // Maps variant group name to option label
+};
+
 export interface Address { id: string; userId: string; title: string; details: string; }
 export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; date: string; }
 export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; userStats?: any; }

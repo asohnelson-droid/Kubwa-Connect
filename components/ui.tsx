@@ -2,7 +2,7 @@
 import React from 'react';
 
 export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' }> = ({ 
-  children, variant = 'primary', className = '', ...props 
+  children, variant = 'primary', className = '', type = 'button', ...props 
 }) => {
   const baseStyle = "px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 select-none";
   
@@ -15,7 +15,7 @@ export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
   };
 
   return (
-    <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
+    <button type={type} className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
       {children}
     </button>
   );

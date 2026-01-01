@@ -1,5 +1,6 @@
+
 import { supabase } from './supabase';
-import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus } from '../types';
+import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, ProductVariant, Announcement, PushNotification } from '../types';
 
 export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
@@ -15,117 +16,106 @@ export const getParentCategory = (category: string) => {
     return category; 
 };
 
-/**
- * MAPS SUPABASE AUTH METADATA TO APP USER TYPE
- */
-const mapUserMetadata = (sessionUser: any): User => {
+// Simple internal observer for notifications since we are in a single-page app context
+type NotificationCallback = (notif: PushNotification) => void;
+const notificationListeners: Set<NotificationCallback> = new Set();
+
+const mapUserData = (sessionUser: any, profile: any = null): User => {
     if (!sessionUser) return null as any;
     const meta = sessionUser.user_metadata || {};
-    const name = meta.full_name || meta.name || 'Kubwa Resident';
-    const isPremiumTier = meta.tier === 'VERIFIED' || meta.tier === 'FEATURED' || meta.subscription?.tier === 'ELITE';
-    const role = meta.role || 'USER';
-    const calculatedLimit = meta.productLimit ?? (isPremiumTier ? 999 : (role === 'VENDOR' ? 4 : 999));
+    const data = profile || meta;
+    const name = data.full_name || data.name || meta.full_name || meta.name || 'Kubwa Resident';
+    const role = (data.role || meta.role || 'USER') as UserRole;
+    const tier = (data.tier || meta.tier || 'FREE') as MonetisationTier;
+    const status = (data.status || data.approval_status || meta.status || meta.approval_status || 'APPROVED') as ApprovalStatus;
+
+    const isPremiumTier = tier === 'VERIFIED' || tier === 'FEATURED' || data.subscription?.tier === 'ELITE';
+    const defaultLimit = role === 'VENDOR' ? (isPremiumTier ? 999 : 6) : 999;
+    const calculatedLimit = data.productLimit ?? meta.productLimit ?? defaultLimit;
 
     return {
         id: sessionUser.id || '',
         email: sessionUser.email || '',
         name: name,
-        role: role as UserRole,
+        role: role,
         joinedAt: sessionUser.created_at,
-        tier: (meta.tier || 'FREE') as MonetisationTier,
-        isFeatured: !!meta.isFeatured || meta.tier === 'FEATURED',
+        tier: tier,
+        isFeatured: !!data.isFeatured || tier === 'FEATURED',
         productLimit: Number(calculatedLimit),
-        verificationStatus: meta.verificationStatus || 'NONE',
-        paymentStatus: meta.paymentStatus || 'UNPAID',
-        isSetupComplete: meta.isSetupComplete === true || meta.isSetupComplete === 'true',
-        status: (meta.status || 'APPROVED') as ApprovalStatus,
-        avatar: meta.avatar,
-        bio: meta.bio,
-        phoneNumber: meta.phoneNumber,
-        storeName: meta.storeName,
-        address: meta.address
+        verificationStatus: data.verificationStatus || meta.verificationStatus || 'NONE',
+        paymentStatus: data.paymentStatus || meta.paymentStatus || 'UNPAID',
+        isSetupComplete: data.isSetupComplete === true || data.isSetupComplete === 'true' || meta.isSetupComplete === true,
+        status: status,
+        avatar: data.avatar || meta.avatar,
+        bio: data.bio || meta.bio,
+        phoneNumber: data.phoneNumber || meta.phoneNumber,
+        storeName: data.storeName || meta.storeName,
+        address: data.address || meta.address,
+        rejectionReason: data.rejectionReason || meta.rejectionReason
     };
 };
 
 export const api = {
+    notifications: {
+        subscribe: (cb: NotificationCallback) => {
+            notificationListeners.add(cb);
+            return () => notificationListeners.delete(cb);
+        },
+        send: (notif: PushNotification) => {
+            notificationListeners.forEach(cb => cb(notif));
+        }
+    },
     auth: {
         getSession: async () => {
             try {
+                // Primary check: getSession restores token from storage
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError) throw sessionError;
-                if (!session) return null;
-                
+                if (sessionError || !session) return null;
+
+                // Secondary check: verify JWT with server
                 const { data: { user: sessionUser }, error: fetchError } = await supabase.auth.getUser();
-                if (fetchError) return null;
-                return mapUserMetadata(sessionUser);
-            } catch (e: any) {
-                console.warn("[Auth] Session failed:", e.message);
-                return null;
-            }
-        },
-        signUp: async (email, password, name, role) => {
-            try {
-                const initialStatus = (role === 'VENDOR' || role === 'PROVIDER' || role === 'RIDER') ? 'PENDING' : 'APPROVED';
+                if (fetchError || !sessionUser) return null;
+
+                // Final check: Fetch database profile
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
                 
-                // Use current location without complex logic
-                const redirectUrl = window.location.origin;
-
-                const { data, error } = await supabase.auth.signUp({ 
-                    email, 
-                    password, 
-                    options: { 
-                        emailRedirectTo: redirectUrl,
-                        data: { 
-                            name: name, 
-                            full_name: name,
-                            role: role, 
-                            isSetupComplete: false, 
-                            status: initialStatus, 
-                            tier: 'FREE', 
-                            productLimit: role === 'VENDOR' ? 4 : 999, 
-                            paymentStatus: 'UNPAID',
-                            verificationStatus: 'NONE'
-                        } 
-                    } 
-                });
-
-                if (error) {
-                    return { error: error.message };
-                }
-
-                return { 
-                    user: data?.user ? mapUserMetadata(data.user) : null, 
-                    requiresVerification: !!data?.user && !data?.session 
-                };
+                return mapUserData(sessionUser, profile);
             } catch (e: any) {
-                console.error("[Auth] Fatal Exception:", e);
-                // Specifically detect the 'Failed to fetch' TypeError
-                if (e instanceof TypeError || e.message?.toLowerCase().includes('fetch')) {
-                    return { error: "Network Error: The request was blocked by your browser or network. Please check for Adblockers (uBlock, Brave Shields) or restrictive VPNs." };
-                }
-                return { error: e.message || "An unexpected authentication error occurred." };
+                console.warn("[Auth] getSession failed:", e);
+                return null;
             }
         },
         signIn: async (email, password) => {
             try {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) return { error: error.message };
-                if (!data?.user) return { error: "Login failed." };
-                return { user: mapUserMetadata(data.user) };
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+                return { user: mapUserData(data.user, profile) };
             } catch (e: any) {
-                if (e instanceof TypeError || e.message?.toLowerCase().includes('fetch')) {
-                    return { error: "Network Error: Could not reach the authentication server." };
+                return { error: e.message };
+            }
+        },
+        signUp: async (email, password, name, role) => {
+            try {
+                const needsApproval = role === 'VENDOR' || role === 'PROVIDER' || role === 'RIDER';
+                const initialStatus = needsApproval ? 'PENDING' : 'APPROVED';
+                const { data, error } = await supabase.auth.signUp({ 
+                    email, password, 
+                    options: { data: { name, role, status: initialStatus, tier: 'FREE' } } 
+                });
+                if (error) return { error: error.message };
+                if (data?.user) {
+                    await supabase.from('profiles').insert([{ id: data.user.id, email, fullName: name, role, status: initialStatus }]);
                 }
-                return { error: `Sign-in failed: ${e.message}` };
+                return { user: data?.user ? mapUserData(data.user) : null, requiresVerification: !!data?.user && !data?.session };
+            } catch (e: any) {
+                return { error: e.message };
             }
         },
         signOut: async () => { 
-            try {
-                await supabase.auth.signOut();
-            } finally {
-                localStorage.removeItem('kubwa_cart');
-                localStorage.removeItem('kubwa-auth-storage');
-            }
+            await supabase.auth.signOut();
+            localStorage.removeItem('kubwa_cart');
+            localStorage.removeItem('kubwa-auth-storage');
         },
         resetPassword: async (email: string) => {
             const { error } = await supabase.auth.resetPasswordForEmail(email);
@@ -136,14 +126,35 @@ export const api = {
             return { success: !error, error: error?.message };
         },
         resendVerification: async (email: string) => {
-            const { error } = await supabase.auth.resend({ type: 'signup', email });
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: email,
+            });
             return { success: !error, error: error?.message };
         }
     },
     orders: {
         placeOrder: async (orderData: Partial<MartOrder>) => {
-            const { data, error } = await supabase.from('orders').insert([orderData]).select();
+            const { data, error } = await supabase.from('orders').insert([{ ...orderData, date: new Date().toISOString() }]).select();
+            if (!error && data?.[0]) {
+                // TRIGGER NOTIFICATION FOR VENDOR
+                api.notifications.send({
+                    title: "New Order Received! 🛍️",
+                    body: `A new order (#${data[0].id.slice(0, 5)}) has been placed. Head to your dashboard to confirm.`
+                });
+            }
             return { success: !error, orderId: data?.[0]?.id };
+        },
+        updateStatus: async (orderId: string, status: OrderStatus) => {
+            const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
+            if (!error) {
+                // TRIGGER NOTIFICATION FOR BUYER
+                api.notifications.send({
+                    title: "Order Update! 🚚",
+                    body: `Your order #${orderId.slice(0, 5)} is now ${status.replace('_', ' ').toLowerCase()}.`
+                });
+            }
+            return !error;
         },
         getMyOrders: async (userId: string): Promise<MartOrder[]> => {
             const { data } = await supabase.from('orders').select('*').eq('userId', userId);
@@ -152,23 +163,10 @@ export const api = {
     },
     users: {
         completeSetup: async (userId: string, data: any) => {
-            try {
-                const { data: { user }, error } = await supabase.auth.updateUser({ 
-                    data: { ...data, isSetupComplete: true } 
-                });
-                if (error) return null;
-
-                const { error: profileError } = await supabase.from('profiles').update({ 
-                    ...data, 
-                    isSetupComplete: true 
-                }).eq('id', userId);
-
-                if (profileError) console.warn("Profile sync error:", profileError.message);
-
-                return mapUserMetadata(user);
-            } catch (err) { 
-                return null; 
-            }
+            await supabase.from('profiles').upsert({ id: userId, ...data, isSetupComplete: true });
+            const { data: { user } } = await supabase.auth.updateUser({ data: { ...data, isSetupComplete: true } });
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+            return mapUserData(user, profile);
         },
         getFeaturedVendors: async () => {
             const { data } = await supabase.from('profiles').select('*').eq('tier', 'FEATURED');
@@ -186,45 +184,84 @@ export const api = {
             return {
                 id: data.id,
                 userId: data.id,
-                name: data.name || data.fullName,
+                name: data.fullName || data.name,
                 category: (data as any).category || 'Service',
                 rate: (data as any).rate || 0,
                 rating: (data as any).rating || 0,
                 reviews: (data as any).reviews || 0,
                 image: data.avatar || '',
                 available: (data as any).available ?? true,
-                isVerified: data.verificationStatus === 'VERIFIED'
+                isVerified: data.verificationStatus === 'VERIFIED',
+                bio: data.bio || '',
+                skills: (data as any).skills || []
             };
         },
         updateStatus: async (providerId: string, available: boolean): Promise<boolean> => {
             const { error } = await supabase.from('profiles').update({ available }).eq('id', providerId);
             return !error;
         },
+        updateProviderProfile: async (userId: string, updates: Partial<ServiceProvider>): Promise<boolean> => {
+            const { error } = await supabase.from('profiles').update({
+                category: updates.category,
+                rate: updates.rate,
+                bio: updates.bio,
+                skills: updates.skills
+            }).eq('id', userId);
+            return !error;
+        }
     },
     getProducts: async (): Promise<Product[]> => {
-        const { data } = await supabase.from('products').select('*').eq('status', 'APPROVED');
+        const { data } = await supabase.from('products').select('*');
         return (data as Product[]) || [];
     },
+    saveProduct: async (product: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> => {
+        try {
+            // SECURITY: Every vendor-initiated save resets status to PENDING
+            // Note: 'approvedBy' and 'approvedAt' columns are not present in the database schema.
+            const payload: any = {
+                name: product.name?.trim(),
+                price: Number(product.price),
+                category: product.category,
+                image: product.image?.trim(),
+                description: product.description?.trim(),
+                vendorId: product.vendorId,
+                status: 'PENDING',
+                submittedAt: new Date().toISOString(),
+                rejectionNote: null,
+                stock: product.stock ?? 10,
+                variants: product.variants || []
+            };
+
+            let result;
+            if (product.id) {
+                result = await supabase.from('products').update(payload).eq('id', product.id).select();
+            } else {
+                result = await supabase.from('products').insert([payload]).select();
+            }
+
+            if (result.error) throw result.error;
+            return { success: true, data: result.data?.[0] };
+        } catch (e: any) {
+            return { success: false, error: e.message || "Failed to save to database" };
+        }
+    },
     getProviders: async (): Promise<ServiceProvider[]> => {
-        const { data } = await supabase.from('profiles').select('*').in('role', ['PROVIDER', 'VENDOR']).eq('status', 'APPROVED');
-        return (data?.map(d => ({
+        const { data } = await supabase.from('profiles').select('*').eq('role', 'PROVIDER');
+        return (data || []).map(d => ({
             id: d.id,
             userId: d.id,
             name: d.fullName || d.name,
-            category: (d as any).category || 'General',
+            category: (d as any).category || 'Service',
             rate: (d as any).rate || 0,
             rating: (d as any).rating || 0,
             reviews: (d as any).reviews || 0,
             image: d.avatar || '',
             available: (d as any).available ?? true,
-            isVerified: d.verificationStatus === 'VERIFIED',
-            location: d.address
-        })) as any) || [];
-    },
-    getMockContext: async () => {
-        const products = await api.getProducts();
-        const providers = await api.getProviders();
-        return { products, providers };
+            isVerified: data.verificationStatus === 'VERIFIED',
+            bio: d.bio || '',
+            skills: (d as any).skills || [],
+            location: d.address || ''
+        }));
     },
     getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => {
         let query = supabase.from('deliveries').select('*');
@@ -232,74 +269,85 @@ export const api = {
         const { data } = await query;
         return (data as any) || [];
     },
-    requestDelivery: async (data: any): Promise<boolean> => {
-        const { error } = await supabase.from('deliveries').insert([{
-            userId: data.userId,
-            pickup: data.pickup,
-            dropoff: data.dropoff,
-            itemType: data.itemType,
-            phoneNumber: data.phoneNumber,
-            status: 'PENDING',
-            price: 1000
-        }]);
+    requestDelivery: async (payload: any): Promise<boolean> => {
+        const { error } = await supabase.from('deliveries').insert([{ ...payload, status: 'PENDING', price: 1000, date: new Date().toISOString() }]);
         return !error;
+    },
+    getMockContext: async () => {
+        const [products, providers] = await Promise.all([api.getProducts(), api.getProviders()]);
+        return { products, providers };
+    },
+    admin: {
+        getAnnouncements: async (): Promise<Announcement[]> => {
+            const { data } = await supabase.from('announcements').select('*').eq('isActive', true);
+            return (data as any) || [];
+        },
+        getPlatformStats: async (): Promise<AnalyticsData> => {
+            return { dau: 1250, revenue: 450000, retention: 85, conversion: 12, revenueSplit: [], userStats: { pending: 5 } };
+        },
+        getPendingEntities: async (): Promise<User[]> => {
+            const { data } = await supabase.from('profiles').select('*').eq('status', 'PENDING');
+            return (data || []).map(d => mapUserData({ id: d.id, user_metadata: d }, d));
+        },
+        getPendingProducts: async (): Promise<Product[]> => {
+            const { data } = await supabase.from('products').select('*').eq('status', 'PENDING');
+            return (data as any) || [];
+        },
+        getAllOrders: async (): Promise<MartOrder[]> => {
+            const { data } = await supabase.from('orders').select('*');
+            return (data as any) || [];
+        },
+        getAllTransactions: async (): Promise<Transaction[]> => {
+            const { data } = await supabase.from('transactions').select('*');
+            return (data as any) || [];
+        },
+        getAllUsers: async (): Promise<User[]> => {
+            const { data } = await supabase.from('profiles').select('*');
+            return (data || []).map(d => mapUserData({ id: d.id, user_metadata: d }, d));
+        },
+        updateUserStatus: async (userId: string, status: ApprovalStatus) => {
+            const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
+            return !error;
+        },
+        updateProductStatus: async (productId: string, status: ApprovalStatus, adminId?: string, note?: string) => {
+            const updates: any = { 
+                status,
+                rejectionNote: note || null 
+            };
+            
+            // Note: Admin columns 'approvedBy' and 'approvedAt' were removed from the payload
+            // as they are missing from the current database schema.
+
+            const { error } = await supabase.from('products').update(updates).eq('id', productId);
+            return !error;
+        },
+        updateUser: async (userId: string, updates: any) => {
+            const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+            return !error;
+        },
+        deleteUser: async (userId: string) => {
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            return !error;
+        }
+    },
+    reviews: {
+        getByTarget: async (targetId: string): Promise<Review[]> => {
+            const { data } = await supabase.from('reviews').select('*').eq('targetId', targetId);
+            return (data as any) || [];
+        }
     },
     deliveries: {
         getAvailableJobs: async (): Promise<DeliveryRequest[]> => {
             const { data } = await supabase.from('deliveries').select('*').eq('status', 'PENDING');
             return (data as any) || [];
         },
-        acceptDelivery: async (jobId: string, riderId: string): Promise<boolean> => {
-            const { error } = await supabase.from('deliveries').update({ riderId: riderId, status: 'ACCEPTED' }).eq('id', jobId);
+        acceptDelivery: async (id: string, riderId: string): Promise<boolean> => {
+            const { error } = await supabase.from('deliveries').update({ riderId, status: 'ACCEPTED' }).eq('id', id);
             return !error;
         },
-        updateStatus: async (jobId: string, status: string): Promise<boolean> => {
-            const { error } = await supabase.from('deliveries').update({ status }).eq('id', jobId);
-            return !error;
-        }
-    },
-    payments: { 
-        fulfillIntent: async (userId, intent, ref) => {
-            const tier = intent.includes('FEATURED') ? 'FEATURED' : 'VERIFIED';
-            const { error } = await supabase.from('profiles').update({ 
-                tier, 
-                paymentStatus: 'PAID',
-                verificationStatus: 'VERIFIED',
-                productLimit: 999 
-            }).eq('id', userId);
-            return !error;
-        } 
-    },
-    admin: { 
-        getAnnouncements: async () => {
-            const { data } = await supabase.from('announcements').select('*').eq('isActive', true);
-            return (data as any) || [];
-        },
-        getPendingEntities: async () => {
-            const { data } = await supabase.from('profiles').select('*').eq('status', 'PENDING');
-            return (data as any) || [];
-        },
-        getPendingProducts: async () => {
-            const { data } = await supabase.from('products').select('*').eq('status', 'PENDING');
-            return (data as any) || [];
-        },
-        updateUserStatus: async (userId: string, status: ApprovalStatus) => {
-            const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
-            return !error;
-        },
-        updateProductStatus: async (productId: string, status: ApprovalStatus) => {
-            const { error } = await supabase.from('products').update({ status }).eq('id', productId);
-            return !error;
-        },
-        toggleFeatureUser: async (userId: string, isFeatured: boolean) => {
-            const { error } = await supabase.from('profiles').update({ tier: isFeatured ? 'FEATURED' : 'VERIFIED' }).eq('id', userId);
+        updateStatus: async (id: string, status: string): Promise<boolean> => {
+            const { error } = await supabase.from('deliveries').update({ status }).eq('id', id);
             return !error;
         }
-    },
-    reviews: { 
-        getByTarget: async (id) => {
-            const { data } = await supabase.from('reviews').select('*').eq('targetId', id);
-            return (data as any) || [];
-        } 
     }
 };
