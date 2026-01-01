@@ -69,7 +69,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     try {
       const [orderData, deliveryData] = await Promise.all([
         api.orders.getMyOrders(user.id),
-        api.getDeliveries(user.id)
+        api.deliveries.getDeliveries(user.id)
       ]);
       setOrders(orderData);
       setDeliveries(deliveryData);
@@ -97,7 +97,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
         
         <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter mb-4 leading-none">Connect to Kubwa</h2>
         <p className="text-gray-500 font-bold text-sm max-w-xs mb-12 leading-relaxed opacity-70">
-          The heart of your community. Join thousands of residents shopping and earning in Kubwa.
+          The community super app. Join thousands of residents shopping and growing in Kubwa.
         </p>
 
         <div className="w-full space-y-4 max-w-sm">
@@ -155,11 +155,6 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
              <div className="flex justify-between items-start mb-8">
                 <div className="w-24 h-24 rounded-[2rem] bg-white/10 flex items-center justify-center text-4xl font-black border border-white/20 shadow-2xl backdrop-blur-md overflow-hidden relative">
                   {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : user.name.charAt(0)}
-                  {user.tier === 'FEATURED' && (
-                    <div className="absolute top-0 right-0 bg-yellow-500 p-1 rounded-bl-xl border-b border-l border-white/20">
-                      <Crown size={12} className="text-white" />
-                    </div>
-                  )}
                 </div>
                 <div className="flex gap-2">
                    <button className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
@@ -176,7 +171,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                   <h2 className="text-2xl font-black tracking-tight uppercase leading-none truncate max-w-[220px]">
                     {isVendor && user.storeName ? user.storeName : user.name}
                   </h2>
-                  {(user.verificationStatus === 'VERIFIED' || user.tier === 'VERIFIED') && <ShieldCheck size={24} className="text-blue-400 shrink-0" />}
+                  {user.verificationStatus === 'VERIFIED' && <ShieldCheck size={24} className="text-blue-400 shrink-0" />}
                 </div>
                 <p className="text-white/50 text-xs font-bold mb-6">{user.email}</p>
                 <div className="flex flex-wrap gap-2">
@@ -212,13 +207,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                     <div className="flex-1">
                        <h4 className="font-black text-sm uppercase mb-1">Account Under Review</h4>
                        <p className="text-xs font-medium leading-relaxed opacity-80 mb-4">
-                         Admins are currently vetting your {user.role.toLowerCase()} profile. You'll receive full access to platform tools once approved.
+                         Admins are vetting your {user.role.toLowerCase()} profile. Access to all Phase 1 tools will be granted upon approval.
                        </p>
-                       <div className="flex gap-2">
-                          <button className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1 hover:underline">
-                             Check Guidelines <ExternalLink size={12}/>
-                          </button>
-                       </div>
                     </div>
                 </div>
             </Card>
@@ -231,10 +221,10 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                     <div className="flex-1">
                        <h4 className="font-black text-sm uppercase mb-1">Application Rejected</h4>
                        <p className="text-xs font-medium leading-relaxed opacity-80 mb-4">
-                         Your application for {user.role.toLowerCase()} status was not approved. This usually happens due to incomplete profile data.
+                         Your application was not approved. Please contact support to resolve any profile issues.
                        </p>
                        <Button variant="danger" className="h-10 text-[10px] px-6" onClick={() => setSection(AppSection.CONTACT)}>
-                          APPEAL REJECTION
+                          CONTACT SUPPORT
                        </Button>
                     </div>
                 </div>
@@ -292,23 +282,17 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
             </Card>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-              <Card className="p-6 text-center border-none shadow-sm rounded-[2rem] bg-white">
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
-                 <Badge color={isApproved ? 'bg-green-50 text-green-600' : isRejected ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'} className="mx-auto">
-                    {user.status}
-                 </Badge>
-              </Card>
-              <Card className="p-6 text-center border-none shadow-sm rounded-[2rem] bg-white">
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Wallet</p>
-                 <p className="font-black text-gray-900">₦0.00</p>
-              </Card>
-          </div>
+          <Card className="p-6 text-center border-none shadow-sm rounded-[2rem] bg-white">
+             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Account Status</p>
+             <Badge color={isApproved ? 'bg-green-50 text-green-600' : isRejected ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'} className="mx-auto">
+                {user.status}
+             </Badge>
+          </Card>
 
           <Card className="rounded-[2.5rem] p-4 border-none shadow-sm bg-white divide-y divide-gray-50">
              {[
-                { icon: ShieldCheck, label: 'Privacy', sub: 'Security settings', color: 'text-blue-500', bg: 'bg-blue-50' },
-                { icon: Bell, label: 'Alerts', sub: 'Smart notifications', color: 'text-orange-500', bg: 'bg-orange-50' }
+                { icon: ShieldCheck, label: 'Security', sub: 'Privacy settings', color: 'text-blue-500', bg: 'bg-blue-50' },
+                { icon: Bell, label: 'Notifications', sub: 'App alerts', color: 'text-orange-500', bg: 'bg-orange-50' }
              ].map((link, idx) => (
                <div key={idx} className="flex items-center gap-5 py-4 px-4 hover:bg-gray-50 rounded-2xl transition-all cursor-pointer">
                   <div className={`p-3 rounded-xl ${link.bg} ${link.color}`}><link.icon size={20} /></div>

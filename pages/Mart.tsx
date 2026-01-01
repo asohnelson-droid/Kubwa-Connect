@@ -37,8 +37,6 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     variants: []
   });
   const [savingProduct, setSavingProduct] = useState(false);
-  
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
 
   useEffect(() => {
@@ -48,6 +46,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const loadData = async () => {
     setLoading(true);
     const data = await api.getProducts();
+    // Phase 1: Promoted items can still exist but are manually set by Admin, not paid.
     const sorted = [...data].sort((a, b) => (b.isPromoted ? 1 : 0) - (a.isPromoted ? 1 : 0));
     setProducts(sorted);
     setLoading(false);
@@ -62,9 +61,6 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     });
   }, [products, selectedParentCategory, searchTerm]);
 
-  /**
-   * DYNAMIC PRICE CALCULATION
-   */
   const getSelectedPrice = (product: Product, selections: Record<string, string>) => {
     let price = product.price;
     if (!product.variants) return price;
@@ -79,8 +75,6 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
   const handleAddToCart = () => {
     if (!selectedProduct) return;
-    
-    // Check if all variants are selected
     if (selectedProduct.variants) {
       const missing = selectedProduct.variants.some(v => !selectedVariants[v.name]);
       if (missing) {
@@ -98,18 +92,15 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     setSelectedVariants({});
   };
 
-  /**
-   * VENDOR: ADD/EDIT PRODUCT LOGIC
-   */
   const handleOpenProductForm = (product?: Product) => {
     if (!user) { onRequireAuth(); return; }
     if (user.role !== 'VENDOR') return;
 
     if (!product) {
         const myProductsCount = products.filter(p => p.vendorId === user.id).length;
-        const limit = user.productLimit || 6; 
+        const limit = user.productLimit || 4; 
         if (myProductsCount >= limit) {
-          setShowUpgradeModal(true);
+          alert("Phase 1 Limit: Vendors can list up to 4 products during this period.");
           return;
         }
     }
@@ -118,7 +109,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         name: '',
         price: 0,
         category: PRODUCT_CATEGORIES[0].id,
-        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500', // Default placeholder
+        image: '',
         description: '',
         variants: []
     });
@@ -134,7 +125,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         setIsProductFormOpen(false);
         loadData();
     } else {
-        alert("Failed to save product.");
+        alert(`Failed to save product: ${result.error}`);
     }
     setSavingProduct(false);
   };
@@ -144,7 +135,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         ...prev,
         variants: [
             ...(prev.variants || []),
-            { id: Math.random().toString(), name: 'New Attribute', options: [] }
+            { id: Math.random().toString(), name: 'Attribute', options: [] }
         ]
     }));
   };
@@ -154,7 +145,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         ...prev,
         variants: prev.variants?.map(v => v.id === variantId ? {
             ...v,
-            options: [...v.options, { id: Math.random().toString(), label: 'New Option', priceModifier: 0 }]
+            options: [...v.options, { id: Math.random().toString(), label: 'Option', priceModifier: 0 }]
         } : v)
     }));
   };
@@ -268,11 +259,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
              <div className="h-48 rounded-3xl overflow-hidden mb-6 relative">
                 <img src={selectedProduct.image} className="w-full h-full object-cover" alt=""/>
              </div>
-             <p className="font-black text-3xl text-kubwa-green mb-4">
-                ₦{getSelectedPrice(selectedProduct, selectedVariants).toLocaleString()}
-             </p>
+             <div className="mb-4">
+               <p className="font-black text-3xl text-kubwa-green leading-none">
+                  ₦{getSelectedPrice(selectedProduct, selectedVariants).toLocaleString()}
+               </p>
+               <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Phase 1: Payment on Delivery Supported</p>
+             </div>
              
-             {/* Variant Selectors */}
              {selectedProduct.variants && selectedProduct.variants.map(variant => (
                <div key={variant.id} className="mb-6">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 block">Select {variant.name}</label>
@@ -296,8 +289,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         )}
       </Sheet>
 
-      {/* Vendor: Product Management Form Sheet */}
-      <Sheet isOpen={isProductFormOpen} onClose={() => setIsProductFormOpen(false)} title={formProduct.id ? "Edit Product" : "List New Item"}>
+      {/* Product Form Sheet */}
+      <Sheet isOpen={isProductFormOpen} onClose={() => setIsProductFormOpen(false)} title={formProduct.id ? "Edit Item" : "New Item"}>
          <div className="p-6 space-y-6 pb-24">
             <div className="space-y-4">
                 <Input placeholder="Product Name" value={formProduct.name} onChange={e => setFormProduct({ ...formProduct, name: e.target.value })} />
@@ -320,7 +313,6 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                 />
             </div>
 
-            {/* Variants Section */}
             <div className="pt-4 border-t">
                <div className="flex justify-between items-center mb-4">
                   <h4 className="text-xs font-black uppercase tracking-widest text-gray-900">Product Variants</h4>
@@ -378,7 +370,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                                }} className="text-gray-300"><X size={14}/></button>
                             </div>
                           ))}
-                          <button onClick={() => addOptionToVariant(variant.id)} className="text-[9px] font-black uppercase text-gray-400 flex items-center gap-1 hover:text-gray-900 transition-colors">
+                          <button onClick={() => addOptionToVariant(variant.id)} className="text-[9px] font-black uppercase text-gray-400 flex items-center gap-1">
                             <Plus size={10} /> Add Option
                           </button>
                        </div>
@@ -415,7 +407,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                    </div>
                  ))}
                  <div className="pt-6 flex justify-between items-center">
-                    <span className="font-black uppercase text-[10px] text-gray-400 tracking-widest">Grand Total</span>
+                    <span className="font-black uppercase text-[10px] text-gray-400 tracking-widest">Total to Pay (Delivery Extra)</span>
                     <span className="font-black text-2xl text-kubwa-green">₦{calculateTotal().toLocaleString()}</span>
                  </div>
                  <Button className="w-full h-16 mt-8 shadow-xl shadow-kubwa-green/10" onClick={handleCheckout} disabled={placingOrder}>
@@ -425,22 +417,6 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
             )}
          </div>
       </Sheet>
-
-      {/* Upgrade Modal */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 z-[150] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-           <Card className="w-full max-w-sm p-10 text-center animate-zoom-in rounded-[3rem] border-none shadow-2xl relative overflow-hidden">
-              <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
-                 <ArrowUpCircle size={40} strokeWidth={2.5}/>
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Limit Reached</h3>
-              <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest mb-8">Free Tier Cap: 6 Products</p>
-              <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full h-16 text-xs font-black">
-                UPGRADE SHOP NOW
-              </Button>
-           </Card>
-        </div>
-      )}
     </div>
   );
 };

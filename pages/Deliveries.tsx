@@ -74,13 +74,15 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
 
   const loadDeliveries = async () => {
     setLoading(true);
-    const data = await api.getDeliveries(user?.id);
+    // Fix: Updated to use consolidated deliveries object
+    const data = await api.deliveries.getDeliveries(user?.id);
     setDeliveries(data);
     setLoading(false);
   };
   
   const loadJobs = async () => {
     setLoading(true);
+    // Fix: Using consolidated deliveries object
     const jobs = await api.deliveries.getAvailableJobs();
     setAvailableJobs(jobs);
     setLoading(false);
@@ -103,7 +105,8 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
     if (!pickup || !dropoff) { alert("Enter locations."); return; }
     if (!phoneNumber) { alert("Please enter a phone number."); return; }
     setIsSearching(true);
-    const success = await api.requestDelivery({ userId: user.id, pickup, dropoff, itemType: itemType.split(' (')[0], phoneNumber });
+    // Fix: Updated to use consolidated deliveries object
+    const success = await api.deliveries.requestDelivery({ userId: user.id, pickup, dropoff, itemType: itemType.split(' (')[0], phoneNumber });
     if (success) {
        setRiderFound(true);
        setTimeout(() => { setIsSearching(false); setRiderFound(false); setPickup(''); setDropoff(''); setPhoneNumber(''); setActiveTab('track'); }, 2000);
@@ -114,6 +117,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   const handleAcceptJob = async (jobId: string) => {
     if (!user) return;
     setAcceptingJob(jobId);
+    // Fix: Using consolidated deliveries object
     const success = await api.deliveries.acceptDelivery(jobId, user.id);
     if (success) {
        alert("Job Accepted! Head to the pickup location.");
@@ -125,6 +129,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   };
 
   const handleUpdateStatus = async (jobId: string, status: 'IN_TRANSIT' | 'DELIVERED') => {
+    // Fix: Using consolidated deliveries object
     const success = await api.deliveries.updateStatus(jobId, status);
     if (success) {
       loadDeliveries(); // Refresh list

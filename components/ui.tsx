@@ -27,8 +27,9 @@ export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ children,
   </div>
 );
 
-export const Badge: React.FC<{ children: React.ReactNode; color?: string }> = ({ children, color = 'bg-gray-100 text-gray-600' }) => (
-  <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-transparent shadow-sm flex items-center gap-1.5 w-fit ${color}`}>
+// Modified Badge to accept className to allow positioning/styling overrides (fixes type error in Account.tsx)
+export const Badge: React.FC<{ children: React.ReactNode; color?: string; className?: string }> = ({ children, color = 'bg-gray-100 text-gray-600', className = '' }) => (
+  <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-transparent shadow-sm flex items-center gap-1.5 w-fit ${color} ${className}`}>
     {children}
   </span>
 );

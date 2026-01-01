@@ -5,17 +5,14 @@ import { createClient } from '@supabase/supabase-js';
  * Robust Environment Variable Loader
  */
 const getEnvValue = (key: string, fallback: string): string => {
-  // Vite's standard way to access env variables
   const value = (import.meta as any).env?.[key] || (process as any).env?.[key];
   
   if (!value || value === 'undefined' || value === 'null' || value === '') {
     return fallback.trim();
   }
   
-  // Clean potential quotes from string
   let cleanVal = value.trim().replace(/^["']|["']$/g, '');
   
-  // Enforce HTTPS for Supabase URLs
   if (key.includes('URL') && cleanVal.startsWith('http://')) {
     cleanVal = cleanVal.replace('http://', 'https://');
   }
@@ -29,9 +26,44 @@ const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabaseUrl = getEnvValue('VITE_SUPABASE_URL', FALLBACK_URL);
 const supabaseKey = getEnvValue('VITE_SUPABASE_ANON_KEY', FALLBACK_KEY);
 
+const STORAGE_KEY = 'kubwa-connect-auth';
+
+/**
+ * SESSION MINIMIZER
+ * Aggressively strips non-essential metadata from the auth session before it hits localStorage.
+ * This prevents QuotaExceededError by keeping the auth entry lean.
+ * Full user details are retrieved from the 'profiles' table via the API.
+ */
+const minimizeSession = (value: string): string => {
+  try {
+    const session = JSON.parse(value);
+    if (session && session.user) {
+      // Remove bulky metadata that might contain base64 images or long bios
+      if (session.user.user_metadata) {
+        const { 
+          avatar, 
+          bio, 
+          description, 
+          storeName, 
+          address, 
+          ...essentialMetadata 
+        } = session.user.user_metadata;
+        session.user.user_metadata = essentialMetadata;
+      }
+      
+      // identities can grow quite large over time
+      delete (session.user as any).identities;
+      
+      // We only strictly need the access_token, refresh_token, and basic user ID/email for re-auth
+    }
+    return JSON.stringify(session);
+  } catch (e) {
+    return value;
+  }
+};
+
 /**
  * FAULT-TOLERANT STORAGE HANDLER
- * Ensures auth tokens are saved even when localStorage is near its limit.
  */
 const customStorage = {
   getItem: (key: string): string | null => {
@@ -42,20 +74,28 @@ const customStorage = {
     }
   },
   setItem: (key: string, value: string): void => {
+    let finalValue = value;
+    
+    // Minimize auth session specifically
+    if (key === STORAGE_KEY) {
+      finalValue = minimizeSession(value);
+    }
+
     try {
-      localStorage.setItem(key, value);
+      localStorage.setItem(key, finalValue);
     } catch (e: any) {
+      // Handle QuotaExceededError (code 22)
       if (e.name === 'QuotaExceededError' || e.code === 22) {
-        console.warn("[Supabase] Storage quota exceeded. Purging cache to prioritize auth session.");
-        // Emergency cleanup: Clear non-essential data to make room for auth tokens
+        console.warn("[Supabase] Storage quota reached. Purging non-essential data...");
+        
+        // Remove cart and onboarding flags to make room for critical auth tokens
         localStorage.removeItem('kubwa_cart');
         localStorage.removeItem('kubwa_onboarding_seen');
+
         try {
-          localStorage.setItem(key, value);
+          localStorage.setItem(key, finalValue);
         } catch {
-          // Final fallback: clear everything if absolutely necessary
-          localStorage.clear();
-          localStorage.setItem(key, value);
+          console.error("[Supabase] Critical Storage Failure: No room even after purge.");
         }
       }
     }
@@ -69,16 +109,15 @@ const customStorage = {
 
 /**
  * CLIENT SINGLETON
- * persistSession: true keeps the user logged in across refreshes.
- * autoRefreshToken: true handles token lifecycle automatically.
+ * Configuration strictly follows requirements for Phase 1 stability.
  */
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
+    persistSession: true,      // Required: Keeps users logged in across refreshes
+    autoRefreshToken: true,    // Required: Smooth transition when tokens expire
+    detectSessionInUrl: true,  // Required: For email verification/magic link redirects
     storage: customStorage,
-    storageKey: 'kubwa-connect-auth'
+    storageKey: STORAGE_KEY
   }
 });
 
