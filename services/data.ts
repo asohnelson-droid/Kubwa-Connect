@@ -247,7 +247,12 @@ export const api = {
     },
     getProducts: async (): Promise<Product[]> => {
         const { data } = await supabase.from('products').select('*');
-        return (data as Product[]) || [];
+        return (data || []).map((p: any) => ({
+            ...p,
+            // AUTO-MAP: Handle any database column naming convention automatically
+            vendorId: p.merchant_id || p.vendorId || p.vendor_id, 
+            isPromoted: p.isPromoted || p.ispromoted
+        })) as Product[];
     },
     saveProduct: async (product: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> => {
         try {
@@ -260,7 +265,6 @@ export const api = {
             const currentUserId = authUser.id;
 
             // STEP 2: PROFILE EXISTENCE VALIDATION
-            // The products_vendorId_fkey requires a matching ID in the profiles table.
             const { data: profileCheck, error: profileCheckError } = await supabase
                 .from('profiles')
                 .select('id')
@@ -271,9 +275,7 @@ export const api = {
                 throw new Error(`Profile check failed: ${profileCheckError.message}`);
             }
 
-            // If the profile record is missing, we attempt a "silent repair" or block
             if (!profileCheck) {
-                console.warn("[Data] Profile record missing for vendor. Attempting repair...");
                 const { error: repairError } = await supabase.from('profiles').insert([{ 
                     id: currentUserId, 
                     email: authUser.email,
@@ -281,7 +283,6 @@ export const api = {
                 }]);
 
                 if (repairError) {
-                    console.error("[Data] Profile repair failed:", repairError.message);
                     throw new Error("Unable to link product to your merchant profile. Please go to Account and complete your setup first.");
                 }
             }
@@ -293,7 +294,8 @@ export const api = {
                     price: Math.max(0, Number(product.price)),
                     category: product.category,
                     image: product.image?.trim(),
-                    vendorId: currentUserId, // ENSURE CURRENT USER ID IS USED
+                    // USE STANDARD COLUMN NAME FOR DB
+                    merchant_id: currentUserId, 
                     status: product.status || 'PENDING',
                     stock: product.stock !== undefined ? Math.max(0, Number(product.stock)) : 0,
                     isPromoted: product.isPromoted ?? false
@@ -309,14 +311,12 @@ export const api = {
             const primaryPayload = buildPayload(true);
             
             if (product.id) {
-                // UPDATE
                 result = await supabase.from('products').update(primaryPayload).eq('id', product.id).select();
             } else {
-                // INSERT
                 result = await supabase.from('products').insert([primaryPayload]).select();
             }
 
-            // Handle schema variations (e.g., if description column is missing in a specific environment)
+            // Retry without description if schema varies
             if (result.error && getErrorMessage(result.error).includes('column "description"')) {
                 const secondaryPayload = buildPayload(false);
                 if (product.id) {
@@ -334,7 +334,14 @@ export const api = {
                 throw new Error(errStr);
             }
             
-            return { success: true, data: result.data?.[0] };
+            // Map return data back to Frontend format
+            const savedItem = result.data?.[0];
+            const mappedItem = savedItem ? {
+                ...savedItem,
+                vendorId: savedItem.merchant_id || savedItem.vendorId || savedItem.vendor_id
+            } : undefined;
+
+            return { success: true, data: mappedItem };
 
         } catch (e: any) {
             console.error("[Data] saveProduct Error:", e.message);
@@ -407,7 +414,10 @@ export const api = {
         },
         getPendingProducts: async (): Promise<Product[]> => {
             const { data } = await supabase.from('products').select('*').eq('status', 'PENDING');
-            return (data as any) || [];
+            return (data || []).map((p: any) => ({
+                ...p,
+                vendorId: p.merchant_id || p.vendorId
+            }));
         },
         getAllOrders: async (): Promise<MartOrder[]> => {
             const { data } = await supabase.from('orders').select('*');
