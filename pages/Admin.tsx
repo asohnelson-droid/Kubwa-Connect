@@ -21,7 +21,7 @@ import {
 import { api } from '../services/data';
 import { User, ApprovalStatus, Product, AnalyticsData } from '../types';
 
-type AdminTab = 'overview' | 'approvals' | 'products' | 'orders';
+type AdminTab = 'overview' | 'approvals' | 'products';
 
 const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
@@ -63,6 +63,10 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
     const success = await api.admin.updateUserStatus(userId, newStatus);
     if (success) {
         setPendingEntities(prev => prev.filter(u => u.id !== userId));
+        api.notifications.send({
+          title: newStatus === 'APPROVED' ? "Verification Successful! ✅" : "Verification Rejected ❌",
+          body: newStatus === 'APPROVED' ? "Your profile has been approved. You now have full access." : "Your application was not approved. Check your profile for details."
+        });
     }
     setActionLoading(null);
   };
@@ -152,7 +156,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                 <Badge color="bg-gray-900 text-white">{pendingEntities.length} Pending</Badge>
             </div>
             
-            {loading ? <Loader2 className="animate-spin mx-auto text-kubwa-green" /> : 
+            {loading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-green" /></div> : 
              pendingEntities.length === 0 ? (
                <Card className="py-20 flex flex-col items-center justify-center border-dashed border-2 rounded-[3rem]">
                   <CheckCircle size={40} className="text-green-500 mb-4 opacity-20" />
@@ -203,7 +207,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
               <Badge color="bg-gray-900 text-white">{pendingProducts.length} Pending</Badge>
            </div>
 
-           {loading ? <Loader2 className="animate-spin mx-auto text-kubwa-green" /> : 
+           {loading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-green" /></div> : 
             pendingProducts.length === 0 ? (
               <Card className="py-20 flex flex-col items-center justify-center border-dashed border-2 rounded-[3rem]">
                  <CheckCircle size={40} className="text-green-500 mb-4 opacity-20" />
@@ -215,7 +219,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                   const vendor = allUsers.find(u => u.id === p.vendorId);
                   return (
                     <Card key={p.id} className="p-6 border-none shadow-sm rounded-[2.5rem] flex items-center justify-between bg-white hover:shadow-xl transition-all border border-gray-50 overflow-hidden relative">
-                       <div className="flex items-center gap-6">
+                       <div className="flex items-center gap-6 w-full">
                           <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0">
                              <img src={p.image} className="w-full h-full object-cover" alt="" />
                           </div>

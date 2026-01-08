@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Package, 
   Plus, 
@@ -26,7 +26,8 @@ import {
   ChevronRight,
   ClipboardList,
   Truck,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Star
 } from 'lucide-react';
 import { Card, Badge, Button, Sheet, Input, Breadcrumbs } from '../components/ui';
 import { api, PRODUCT_CATEGORIES } from '../services/data';
@@ -44,6 +45,9 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
+  const hasLoadedInitial = useRef(false);
+  const currentUserId = currentUser?.id;
+
   // Form & Submission State
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -53,29 +57,33 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Stable data loader
-  const loadData = useCallback(async () => {
-    if (!currentUser?.id) return;
-    setLoading(true);
+  const loadData = useCallback(async (forceSilent = false) => {
+    if (!currentUserId) return;
+    
+    if (!hasLoadedInitial.current && !forceSilent) {
+      setLoading(true);
+    }
+
     try {
       if (activeTab === 'inventory') {
         const all = await api.getProducts();
-        const vendorItems = all.filter(p => p.vendorId === currentUser.id);
+        const vendorItems = all.filter(p => p.vendorId === currentUserId);
         setProducts(vendorItems);
       } else {
-        const vendorOrders = await api.orders.getVendorOrders(currentUser.id);
+        const vendorOrders = await api.orders.getVendorOrders(currentUserId);
         setOrders(vendorOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       }
+      hasLoadedInitial.current = true;
     } catch (err) {
       console.error("[VendorDashboard] Load Error:", err);
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.id, activeTab]);
+  }, [currentUserId, activeTab]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [currentUserId, activeTab, loadData]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -94,9 +102,16 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
     if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!currentUser) return;
 
-    const limit = 4; // Flat limit for Phase 1
+    // PRE-CHECK: Block if the profile is not marked as setup in the UI state
+    if (!currentUser.isSetupComplete) {
+       alert("Shop Setup Required: You must complete your merchant profile in the Account section before adding items.");
+       setSection(AppSection.ACCOUNT);
+       return;
+    }
+
+    const limit = currentUser.productLimit || 4; 
     if (products.length >= limit) {
-      alert("Phase 1: Listing limit reached (Max 4 items).");
+      alert(`Limit Reached: Phase 1 merchants can list up to ${limit} items.`);
       return;
     }
 
@@ -107,7 +122,8 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
       image: '',
       description: '',
       variants: [],
-      status: 'PENDING'
+      status: 'PENDING',
+      isPromoted: false
     });
     setSubmitError(null);
     setSubmitMessage(null);
@@ -122,6 +138,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
   };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const success = await api.orders.updateStatus(orderId, newStatus);
@@ -133,58 +150,95 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
     }
   };
 
+  /**
+   * RELIABLE PRODUCT SUBMISSION HANDLER
+   * - Enforces PENDING status for admin review
+   * - Prevents duplicate clicks via isSubmitting guard
+   * - Provides clear visual success/error states
+   */
   const handleSaveProduct = async () => {
-    if (isSubmitting || !currentUser?.id || !editingProduct) return;
+    // 1. DUPLICATE PREVENTION: Immediately exit if already processing
+    if (isSubmitting || !editingProduct) return;
     
+    // 2. SECURITY CHECK: Verify merchant identity
+    if (!currentUserId) {
+        setSubmitError("Session Expired: Please log out and sign in again to verify your identity.");
+        return;
+    }
+
+    // 3. INPUT VALIDATION: Ensure minimum viable product data
     const nameTrimmed = editingProduct.name?.trim();
     const imageTrimmed = editingProduct.image?.trim();
     const priceVal = Number(editingProduct.price);
     
-    if (!nameTrimmed || isNaN(priceVal) || priceVal <= 0 || !imageTrimmed) {
-      setSubmitError("Please provide a valid Name, Price, and Image URL.");
+    if (!nameTrimmed || nameTrimmed.length < 3) {
+      setSubmitError("Product Title is too short. Please provide a descriptive name.");
+      return;
+    }
+    if (isNaN(priceVal) || priceVal <= 0) {
+      setSubmitError("Valid Price Required: Please enter a selling price greater than 0.");
+      return;
+    }
+    if (!imageTrimmed || !imageTrimmed.startsWith('http')) {
+      setSubmitError("Valid Image URL Required: Please provide a working link to your product photo.");
       return;
     }
 
+    // 4. PREPARE SUBMISSION STATE
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitMessage(null);
 
     try {
+      // 5. CONSTRUCT SECURE PAYLOAD
+      // Force status to 'PENDING' even for updates to ensure quality control
       const payload: Partial<Product> = {
         ...editingProduct,
         name: nameTrimmed,
         image: imageTrimmed,
         price: priceVal,
-        vendorId: currentUser.id,
+        vendorId: currentUserId,
         status: 'PENDING' 
       };
 
+      // 6. EXECUTE DATABASE SYNC
       const result = await api.saveProduct(payload);
 
-      if (result.success && result.data) {
-        const savedProduct = result.data as Product;
+      if (result.success) {
+        // 7. SUCCESS FEEDBACK
+        setSubmitMessage(editingProduct.id ? "Updates submitted for review! 🚀" : "New listing submitted for review! 🎉");
         
-        setProducts(prev => {
-          const exists = prev.find(p => p.id === savedProduct.id);
-          if (exists) {
-            return prev.map(p => p.id === savedProduct.id ? savedProduct : p);
-          }
-          return [savedProduct, ...prev];
-        });
+        // 8. OPTIMISTIC UI UPDATE: Refresh local state immediately
+        if (result.data) {
+            const saved = result.data;
+            setProducts(prev => {
+                const idx = prev.findIndex(p => p.id === saved.id);
+                if (idx > -1) return prev.map(p => p.id === saved.id ? saved : p);
+                return [saved, ...prev];
+            });
+        }
 
-        setSubmitMessage("Success! Your item has been submitted for approval.");
-        
+        // 9. DELAYED CLOSE: Allow user to see the success message
         setTimeout(() => {
           setIsProductFormOpen(false);
           setEditingProduct(null);
           setIsSubmitting(false);
-        }, 1500);
+        }, 1800);
       } else {
-        throw new Error(result.error || "Submission failed. Please check your connection.");
+        throw new Error(result.error);
       }
     } catch (err: any) {
-      console.error("[VendorDashboard] Save Failed:", err.message);
-      setSubmitError(err.message || "An unexpected error occurred. Please try again.");
+      console.error("[VendorDashboard] Submission Failure:", err.message);
+      
+      // 10. ERROR FEEDBACK: Map cryptic database errors to merchant-friendly alerts
+      let friendlyError = err.message || "Something went wrong on our end. Please try again.";
+      if (friendlyError.includes('foreign key')) {
+          friendlyError = "Merchant Identity Error: We couldn't link this item to your profile. Please visit your Account page to complete your setup.";
+      } else if (friendlyError.includes('duplicate key')) {
+          friendlyError = "An item with this exact name already exists in your shop.";
+      }
+      
+      setSubmitError(friendlyError);
       setIsSubmitting(false);
     }
   };
@@ -195,8 +249,10 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mb-6">
             <AlertCircle size={40} />
          </div>
-         <h2 className="text-xl font-black uppercase tracking-tighter text-gray-900">Merchant Restricted</h2>
-         <p className="text-gray-400 text-[10px] mt-2 font-black uppercase tracking-widest leading-relaxed">Only verified vendors can access this console.</p>
+         <h2 className="text-xl font-black uppercase tracking-tighter text-gray-900">Access Restricted</h2>
+         <p className="text-gray-400 text-[10px] mt-2 font-black uppercase tracking-widest leading-loose max-w-xs">
+           Only verified merchants can access the console. If you are a vendor, ensure your application is approved.
+         </p>
          <Button onClick={() => setSection(AppSection.ACCOUNT)} className="mt-8 px-10 h-14">Return to Account</Button>
       </div>
     );
@@ -247,7 +303,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
             <Card className="p-6 bg-gray-900 text-white border-none rounded-[2.5rem] shadow-xl relative overflow-hidden">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-white/10 rounded-xl"><Package size={16} /></div>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/50">Listings</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/50">Total Listings</span>
                 </div>
                 <p className="text-2xl font-black tracking-tighter">{products.length}</p>
             </Card>
@@ -273,6 +329,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
           {loading ? (
              <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <Loader2 className="animate-spin text-kubwa-green" size={32} />
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Refreshing...</p>
              </div>
           ) : filteredProducts.length === 0 ? (
              <div className="text-center py-20 bg-gray-50/50 rounded-[3rem] border-2 border-dashed border-gray-100">
@@ -283,14 +340,22 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
               {filteredProducts.map(product => (
                 <Card key={product.id} className="p-4 border-none shadow-sm rounded-[2.5rem] flex items-center justify-between bg-white hover:shadow-lg transition-all">
                   <div className="flex items-center gap-4">
-                    <img src={product.image} className="w-16 h-16 rounded-2xl object-cover bg-gray-100" />
+                    <div className="relative w-16 h-16 shrink-0">
+                      <img src={product.image} className="w-full h-full rounded-2xl object-cover bg-gray-100" />
+                      {product.isPromoted && (
+                        <div className="absolute -top-2 -left-2 bg-yellow-400 text-white p-1 rounded-lg shadow-lg">
+                          <Star size={12} className="fill-white" />
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <p className="text-xs font-black text-gray-900 uppercase tracking-tight">{product.name}</p>
                       <p className="text-[10px] font-black text-kubwa-green mt-1">₦{product.price.toLocaleString()}</p>
-                      <div className="mt-2">
+                      <div className="mt-2 flex gap-2">
                         {product.status === 'PENDING' && <Badge color="bg-orange-50 text-orange-600">Pending</Badge>}
                         {product.status === 'APPROVED' && <Badge color="bg-green-50 text-green-600">Live</Badge>}
-                        {product.status === 'REJECTED' && <Badge color="bg-red-50 text-red-600">Needs Edit</Badge>}
+                        {product.status === 'REJECTED' && <Badge color="bg-red-50 text-red-600">Rejected</Badge>}
+                        {product.isPromoted && <Badge color="bg-yellow-50 text-yellow-600">Featured</Badge>}
                       </div>
                     </div>
                   </div>
@@ -308,7 +373,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
              <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-green" size={32} /></div>
           ) : orders.length === 0 ? (
              <div className="text-center py-20 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100">
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No active orders</p>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No live orders</p>
              </div>
           ) : (
             <div className="space-y-4">
@@ -332,7 +397,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
                         </div>
                       ))}
                       <div className="pt-2 border-t flex justify-between items-center text-xs font-black text-gray-900">
-                        <span className="uppercase">Total Earnings</span>
+                        <span className="uppercase">Merchant Earnings</span>
                         <span className="text-kubwa-green">₦{order.total.toLocaleString()}</span>
                       </div>
                    </div>
@@ -353,7 +418,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
                           className="flex-1 h-12 text-[10px] font-black bg-blue-600"
                           disabled={isSubmitting}
                         >
-                          MARK AS READY / SHIPPED
+                          DISPATCH RIDER
                         </Button>
                       )}
                       {order.status === 'IN_TRANSIT' && (
@@ -362,7 +427,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
                           className="flex-1 h-12 text-[10px] font-black bg-green-600"
                           disabled={isSubmitting}
                         >
-                          MARK AS DELIVERED
+                          COMPLETE ORDER
                         </Button>
                       )}
                       <Button variant="outline" className="h-12 w-12 p-0 rounded-2xl">
@@ -377,16 +442,16 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
       )}
 
       {/* Product Form Modal */}
-      <Sheet isOpen={isProductFormOpen} onClose={closeForm} title={editingProduct?.id ? "Edit Item" : "New Item"}>
+      <Sheet isOpen={isProductFormOpen} onClose={closeForm} title={editingProduct?.id ? "Update Listing" : "New Listing"}>
          <div className="p-2 space-y-8 pb-24">
             <fieldset disabled={isSubmitting} className="space-y-6">
                 <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Name</label>
+                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Product Title</label>
                    <Input value={editingProduct?.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Price (₦)</label>
+                       <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Selling Price (₦)</label>
                        <Input type="number" value={editingProduct?.price} onChange={e => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })} />
                     </div>
                     <div className="space-y-1">
@@ -402,30 +467,44 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
                 </div>
                 
                 <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Showcase Image (URL)</label>
-                   <Input placeholder="https://example.com/product.jpg" value={editingProduct?.image} onChange={e => setEditingProduct({ ...editingProduct, image: e.target.value })} />
+                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">High-Res Image (URL)</label>
+                   <Input placeholder="https://image-hosting.com/item.jpg" value={editingProduct?.image} onChange={e => setEditingProduct({ ...editingProduct, image: e.target.value })} />
                 </div>
 
                 <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Product Story / Details</label>
+                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Product Story / Specs</label>
                    <textarea 
                      className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-bold h-24 resize-none outline-none" 
-                     placeholder="Tell residents why they should buy this..."
+                     placeholder="Tell residents what makes this item special..."
                      value={editingProduct?.description}
                      onChange={e => setEditingProduct({ ...editingProduct, description: e.target.value })}
                    />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                   <div>
+                      <p className="text-[10px] font-black uppercase tracking-tight text-gray-900">Featured Listing</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Prioritize this item on the Mart</p>
+                   </div>
+                   <button 
+                     type="button"
+                     onClick={() => setEditingProduct({ ...editingProduct, isPromoted: !editingProduct?.isPromoted })}
+                     className={`w-12 h-6 rounded-full transition-colors relative ${editingProduct?.isPromoted ? 'bg-kubwa-green' : 'bg-gray-300'}`}
+                   >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${editingProduct?.isPromoted ? 'left-7' : 'left-1'}`} />
+                   </button>
                 </div>
             </fieldset>
 
             <div className="space-y-4">
               {submitError && (
-                <div className="p-4 bg-red-50 text-red-700 rounded-2xl text-[10px] font-black flex items-center gap-3 animate-fade-in border border-red-100">
+                <div className="p-4 bg-red-50 text-red-700 rounded-2xl text-[10px] font-black flex items-center gap-3 animate-fade-in border border-red-100 shadow-sm">
                   <AlertCircle size={16} className="shrink-0" />
-                  <span>{submitError}</span>
+                  <span className="leading-tight">{submitError}</span>
                 </div>
               )}
               {submitMessage && (
-                <div className="p-4 bg-green-50 text-green-700 rounded-2xl text-[10px] font-black flex items-center gap-3 animate-fade-in border border-green-100">
+                <div className="p-4 bg-green-50 text-green-700 rounded-2xl text-[10px] font-black flex items-center gap-3 animate-fade-in border border-green-100 shadow-sm">
                   <CheckCircle size={16} className="shrink-0" />
                   <span>{submitMessage}</span>
                 </div>
@@ -438,6 +517,10 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
               >
                  {isSubmitting ? <Loader2 className="animate-spin" /> : 'SUBMIT FOR APPROVAL'}
               </Button>
+              
+              <p className="text-[8px] font-black text-gray-300 text-center uppercase tracking-widest mt-2">
+                Approvals typically take 2-4 business hours.
+              </p>
             </div>
          </div>
       </Sheet>

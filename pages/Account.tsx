@@ -48,14 +48,14 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   });
 
   useEffect(() => {
-    if (authIntent) {
+    if (authIntent && !user) {
       setAuthConfig({
         role: authIntent.role,
         mode: 'SIGNUP'
       });
       setIsAuthModalOpen(true);
     }
-  }, [authIntent]);
+  }, [authIntent, user]);
 
   useEffect(() => {
     if (user && activeTab === 'activity') {
@@ -82,9 +82,20 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
 
   const handleAuthSuccess = async (u: User) => {
     setIsAuthModalOpen(false);
-    const target = authIntent?.section || (u.role === 'ADMIN' ? AppSection.ADMIN : undefined);
+    
+    // Determine the next logical destination
+    // If there was a specific intent (e.g. going to Vendor Dashboard), prioritize it.
+    // Otherwise, redirect admins to Admin suite and regular users to Profile.
+    const target = authIntent?.section || (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN' ? AppSection.ADMIN : AppSection.ACCOUNT);
+    
     clearAuthIntent();
     await refreshUser(target); 
+  };
+
+  const handleSignOut = async () => {
+    await api.auth.signOut();
+    setUser(null);
+    setSection(AppSection.HOME);
   };
 
   if (!user) {
@@ -160,7 +171,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                    <button className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
                       <Settings size={22} />
                    </button>
-                   <button onClick={async () => { await api.auth.signOut(); }} className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all group">
+                   <button onClick={handleSignOut} className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all group">
                       <LogOut size={22} />
                    </button>
                 </div>
@@ -203,11 +214,11 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
           {isPending && (
             <Card className="p-8 border-none rounded-[2.5rem] bg-orange-50 text-orange-900 shadow-sm">
                 <div className="flex items-start gap-4">
-                    <div className="p-3 bg-orange-100 rounded-2xl text-orange-600"><Clock size={24} /></div>
+                    <div className="p-3 bg-orange-100 rounded-2xl text-orange-600 h-fit"><Clock size={24} /></div>
                     <div className="flex-1">
                        <h4 className="font-black text-sm uppercase mb-1">Account Under Review</h4>
                        <p className="text-xs font-medium leading-relaxed opacity-80 mb-4">
-                         Admins are vetting your {user.role.toLowerCase()} profile. Access to all Phase 1 tools will be granted upon approval.
+                         Admins are vetting your profile. Access to advanced merchant and service tools will be granted once verification is complete.
                        </p>
                     </div>
                 </div>
@@ -221,7 +232,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                     <div className="flex-1">
                        <h4 className="font-black text-sm uppercase mb-1">Application Rejected</h4>
                        <p className="text-xs font-medium leading-relaxed opacity-80 mb-4">
-                         Your application was not approved. Please contact support to resolve any profile issues.
+                         Your application was not approved. This could be due to incomplete documentation or mismatch in details.
                        </p>
                        <Button variant="danger" className="h-10 text-[10px] px-6" onClick={() => setSection(AppSection.CONTACT)}>
                           CONTACT SUPPORT

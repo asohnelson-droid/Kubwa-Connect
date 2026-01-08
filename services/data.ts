@@ -18,7 +18,6 @@ export const getParentCategory = (category: string) => {
 
 /**
  * HELPER: Robust Error Extraction
- * Prevents the dreaded "[object Object]" in logs and UI.
  */
 const getErrorMessage = (error: any): string => {
     if (!error) return "Unknown error occurred.";
@@ -45,11 +44,9 @@ const mapUserData = (sessionUser: any, profile: any = null): User => {
     const name = data.fullName || data.full_name || data.name || meta.full_name || meta.name || 'Kubwa Resident';
     const role = (data.role || meta.role || 'USER') as UserRole;
     
-    // Phase 1: Default all users to FREE tier
     const tier = 'FREE' as MonetisationTier;
     const status = (data.status || data.approval_status || meta.status || meta.approval_status || 'APPROVED') as ApprovalStatus;
 
-    // Phase 1: Standard 4 product limit for all vendors
     const defaultLimit = role === 'VENDOR' ? 4 : 999;
     const calculatedLimit = data.productLimit ?? meta.productLimit ?? defaultLimit;
 
@@ -94,18 +91,13 @@ export const api = {
                 const { data: { user: sessionUser }, error: fetchError } = await supabase.auth.getUser();
                 if (fetchError || !sessionUser) return null;
 
-                let { data: profile } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
+                let { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
                 
-                if (!profile && sessionUser) {
-                    const initialRole = (sessionUser.user_metadata?.role || 'USER') as UserRole;
-                    const initialStatus = ['VENDOR', 'PROVIDER', 'RIDER'].includes(initialRole) ? 'PENDING' : 'APPROVED';
-                    
+                if (!profile && sessionUser && !profileError) {
                     const { data: newProfile, error: repairError } = await supabase.from('profiles').insert([{ 
                         id: sessionUser.id, 
                         email: sessionUser.email, 
-                        fullName: sessionUser.user_metadata?.name || 'Kubwa Resident',
-                        role: initialRole,
-                        status: initialStatus
+                        fullName: sessionUser.user_metadata?.name || 'Kubwa Resident'
                     }]).select().maybeSingle();
                     
                     if (!repairError && newProfile) profile = newProfile;
@@ -138,12 +130,11 @@ export const api = {
                 if (error) return { error: getErrorMessage(error) };
                 
                 if (data?.user) {
-                    await supabase.from('profiles').upsert([{ 
+                    await supabase.from('profiles').insert([{ 
                         id: data.user.id, 
                         email: email, 
-                        fullName: name, 
-                        role: role, 
-                        status: initialStatus 
+                        fullName: name,
+                        status: initialStatus
                     }]);
                 }
                 
@@ -260,61 +251,85 @@ export const api = {
     },
     saveProduct: async (product: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> => {
         try {
-            if (!product.vendorId) throw new Error("Missing Merchant ID. Please log in again.");
+            // STEP 1: AUTHENTICATION CHECK
+            const { data: { user: authUser }, error: authUserError } = await supabase.auth.getUser();
+            if (authUserError || !authUser) {
+                throw new Error("Your login session has expired. Please sign in again.");
+            }
 
-            // 1. ROBUST PRE-FLIGHT IDENTITY CHECK (Fixes FK violation)
-            const { data: profile, error: profileFetchError } = await supabase
+            const currentUserId = authUser.id;
+
+            // STEP 2: PROFILE EXISTENCE VALIDATION
+            // The products_vendorId_fkey requires a matching ID in the profiles table.
+            const { data: profileCheck, error: profileCheckError } = await supabase
                 .from('profiles')
                 .select('id')
-                .eq('id', product.vendorId)
+                .eq('id', currentUserId)
                 .maybeSingle();
-
-            if (!profile || profileFetchError) {
-                console.warn("[Data] Merchant record missing from DB. Repairing...");
-                const { data: { user }, error: authError } = await supabase.auth.getUser();
-                if (authError || !user || user.id !== product.vendorId) {
-                    throw new Error("Merchant identity cannot be verified. Please log out and back in.");
-                }
-                const { error: upsertError } = await supabase.from('profiles').upsert([{ 
-                    id: user.id, 
-                    email: user.email, 
-                    fullName: user.user_metadata?.name || 'Kubwa Merchant',
-                    role: (user.user_metadata?.role || 'VENDOR') as UserRole,
-                    status: (user.user_metadata?.status || 'PENDING') as ApprovalStatus
-                }]);
-                if (upsertError) throw new Error(`Merchant synchronization failed: ${getErrorMessage(upsertError)}`);
+            
+            if (profileCheckError) {
+                throw new Error(`Profile check failed: ${profileCheckError.message}`);
             }
 
-            // 2. CONSTRUCT PAYLOAD DEFENSIVELY (Addresses schema cache issues)
-            const payload: any = {
-                name: product.name?.trim(),
-                price: Number(product.price),
-                category: product.category,
-                image: product.image?.trim(),
-                vendorId: product.vendorId,
-                status: product.status || 'PENDING',
-                stock: product.stock !== undefined ? Number(product.stock) : 0
+            // If the profile record is missing, we attempt a "silent repair" or block
+            if (!profileCheck) {
+                console.warn("[Data] Profile record missing for vendor. Attempting repair...");
+                const { error: repairError } = await supabase.from('profiles').insert([{ 
+                    id: currentUserId, 
+                    email: authUser.email,
+                    fullName: authUser.user_metadata?.name || 'Kubwa Merchant'
+                }]);
+
+                if (repairError) {
+                    console.error("[Data] Profile repair failed:", repairError.message);
+                    throw new Error("Unable to link product to your merchant profile. Please go to Account and complete your setup first.");
+                }
+            }
+
+            // STEP 3: PREPARE PAYLOAD
+            const buildPayload = (includeDescription: boolean) => {
+                const p: any = {
+                    name: product.name?.trim(),
+                    price: Math.max(0, Number(product.price)),
+                    category: product.category,
+                    image: product.image?.trim(),
+                    vendorId: currentUserId, // ENSURE CURRENT USER ID IS USED
+                    status: product.status || 'PENDING',
+                    stock: product.stock !== undefined ? Math.max(0, Number(product.stock)) : 0,
+                    isPromoted: product.isPromoted ?? false
+                };
+                if (includeDescription && product.description !== undefined) {
+                    p.description = product.description?.trim();
+                }
+                return p;
             };
 
-            // If the user hasn't added the 'description' column yet, this would fail.
-            // We include it but ensure it's not empty if present.
-            if (product.description !== undefined) {
-                payload.description = product.description?.trim();
+            // STEP 4: DATABASE OPERATION
+            let result;
+            const primaryPayload = buildPayload(true);
+            
+            if (product.id) {
+                // UPDATE
+                result = await supabase.from('products').update(primaryPayload).eq('id', product.id).select();
+            } else {
+                // INSERT
+                result = await supabase.from('products').insert([primaryPayload]).select();
             }
 
-            // 3. EXECUTE SAVE
-            let result;
-            if (product.id) {
-                result = await supabase.from('products').update(payload).eq('id', product.id).select();
-            } else {
-                result = await supabase.from('products').insert([payload]).select();
+            // Handle schema variations (e.g., if description column is missing in a specific environment)
+            if (result.error && getErrorMessage(result.error).includes('column "description"')) {
+                const secondaryPayload = buildPayload(false);
+                if (product.id) {
+                    result = await supabase.from('products').update(secondaryPayload).eq('id', product.id).select();
+                } else {
+                    result = await supabase.from('products').insert([secondaryPayload]).select();
+                }
             }
 
             if (result.error) {
                 const errStr = getErrorMessage(result.error);
-                // Special check for schema cache errors
-                if (errStr.includes("column \"description\" of relation \"products\" does not exist")) {
-                    throw new Error("Missing database column. Please add a 'description' (TEXT) column to your 'products' table in the Supabase Dashboard.");
+                if (errStr.includes('foreign key constraint')) {
+                    throw new Error("Database Sync Error: Your merchant profile is not recognized. Please visit your Account page to refresh your status.");
                 }
                 throw new Error(errStr);
             }
@@ -322,9 +337,8 @@ export const api = {
             return { success: true, data: result.data?.[0] };
 
         } catch (e: any) {
-            const errorMessage = getErrorMessage(e);
-            console.error("[Data] saveProduct Fatal Error:", errorMessage);
-            return { success: false, error: errorMessage };
+            console.error("[Data] saveProduct Error:", e.message);
+            return { success: false, error: e.message };
         }
     },
     getProviders: async (): Promise<ServiceProvider[]> => {

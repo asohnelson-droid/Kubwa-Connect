@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity } from 'lucide-react';
 import { Button, Card, Input } from './ui';
 import { api } from '../services/data';
-import { testSupabaseConnection } from '../services/supabase';
 import { User as UserType, UserRole } from '../types';
 
 interface AuthModalProps {
@@ -28,7 +27,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   
-  // Resend Timer State
   const [resendTimer, setResendTimer] = useState(0);
 
   useEffect(() => {
@@ -41,6 +39,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setError('');
     setSuccessMsg('');
     setLoading(true);
@@ -49,37 +49,50 @@ const AuthModal: React.FC<AuthModalProps> = ({
       if (mode === 'LOGIN') {
           const result = await api.auth.signIn(email, password);
           if (result.user) {
-             if (onSuccess) onSuccess(result.user);
+             // Fetch full profile to ensure all metadata is present
+             const fullUser = await api.auth.getSession();
+             if (fullUser && onSuccess) onSuccess(fullUser);
           } else {
-             setError(result.error || "Invalid credentials.");
+             setError(result.error || "Invalid email or password. Please try again.");
           }
       } else if (mode === 'SIGNUP') {
+          if (name.trim().length < 3) {
+            setError("Please enter your full name.");
+            setLoading(false);
+            return;
+          }
           const result = await api.auth.signUp(email, password, name, initialRole);
           if (result.error) {
               setError(result.error);
           } else if (result.requiresVerification) {
               setVerificationSent(true);
           } else if (result.user) {
-              if (onSuccess) onSuccess(result.user);
+              const fullUser = await api.auth.getSession();
+              if (fullUser && onSuccess) onSuccess(fullUser);
           }
       } else if (mode === 'FORGOT') {
           const result = await api.auth.resetPassword(email);
           if (result.success) {
-              setSuccessMsg("Reset link sent! Please check your inbox.");
+              setSuccessMsg("Reset link sent! Please check your email inbox.");
+              setTimeout(() => {
+                setMode('LOGIN');
+                setSuccessMsg('');
+              }, 4000);
           } else {
-              setError(result.error || "Request failed.");
+              setError(result.error || "Could not process request. Verify your email.");
           }
       } else if (mode === 'UPDATE_PASSWORD') {
           const result = await api.auth.updatePassword(password);
           if (result.success) {
-              setSuccessMsg("Password updated!");
+              setSuccessMsg("Password updated successfully!");
               setTimeout(() => setMode('LOGIN'), 1500);
           } else {
-              setError(result.error || "Update failed.");
+              setError(result.error || "Update failed. Use a stronger password.");
           }
       }
     } catch (e: any) {
-      setError("An unexpected error occurred. Please try again.");
+      console.error("[AuthModal] Error:", e);
+      setError("A connection error occurred. Check your internet and try again.");
     } finally {
       setLoading(false);
     }
@@ -88,12 +101,16 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const handleResend = async () => {
     if (resendTimer > 0 || !email) return;
     setLoading(true);
-    const result = await api.auth.resendVerification(email);
-    if (result.success) {
-      setResendTimer(60);
-      setSuccessMsg("Resent!");
-    } else {
-      setError(result.error || "Resend failed.");
+    try {
+      const result = await api.auth.resendVerification(email);
+      if (result.success) {
+        setResendTimer(60);
+        setSuccessMsg("Verification email resent!");
+      } else {
+        setError(result.error || "Failed to resend. Please try again later.");
+      }
+    } catch (e) {
+      setError("Network error. Try again.");
     }
     setLoading(false);
   };
@@ -107,13 +124,13 @@ const AuthModal: React.FC<AuthModalProps> = ({
           </div>
           <h3 className="font-black text-2xl mb-2 uppercase tracking-tight">Verify Email</h3>
           <p className="text-gray-500 mb-8 text-xs font-bold leading-relaxed">
-            Check <span className="text-gray-900 font-black">{email}</span> for an activation link.
+            We sent an activation link to <span className="text-gray-900 font-black">{email}</span>. Please click it to confirm your account.
           </p>
           <div className="space-y-3">
             <Button onClick={handleResend} disabled={loading || resendTimer > 0} variant="outline" className="w-full h-14 text-[10px] font-black">
               {resendTimer > 0 ? `Try again in ${resendTimer}s` : 'Resend Link'}
             </Button>
-            <Button onClick={onClose} className="w-full h-14 text-xs font-black">Done</Button>
+            <Button onClick={onClose} className="w-full h-14 text-xs font-black">Close</Button>
           </div>
         </Card>
       </div>
@@ -132,9 +149,11 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 {mode === 'SIGNUP' ? <UserPlus size={36} /> : mode === 'FORGOT' ? <KeyRound size={36} /> : <span className="text-3xl font-black">⚡</span>}
              </div>
              <h3 className="text-3xl font-black text-gray-900 mb-1 uppercase tracking-tight">
-               {mode === 'LOGIN' ? 'Sign In' : mode === 'SIGNUP' ? 'Register' : 'Recovery'}
+               {mode === 'LOGIN' ? 'Sign In' : mode === 'SIGNUP' ? 'Join KC' : mode === 'FORGOT' ? 'Recovery' : 'Update'}
              </h3>
-             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Kubwa Connect Portal</p>
+             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+               {mode === 'SIGNUP' && initialRole !== 'USER' ? `New ${initialRole} Account` : 'Kubwa Connect Portal'}
+             </p>
           </div>
 
           <div className="space-y-4">
@@ -155,7 +174,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
               {mode !== 'FORGOT' && (
                 <div className="relative">
                   <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required />
+                  <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'LOGIN' ? "Password" : "Create Password"} required />
                 </div>
               )}
 
@@ -167,24 +186,28 @@ const AuthModal: React.FC<AuthModalProps> = ({
               )}
 
               {successMsg && (
-                <div className="p-4 bg-green-50 text-green-700 rounded-2xl flex gap-3 items-center animate-fade-in">
+                <div className="p-4 bg-green-50 text-green-700 rounded-2xl flex gap-3 items-center animate-fade-in border border-green-100">
                   <CheckCircle size={18} className="shrink-0" />
                   <p className="text-[10px] font-black leading-tight">{successMsg}</p>
                 </div>
               )}
 
               <Button type="submit" disabled={loading} className="w-full h-16 text-xs font-black mt-4">
-                  {loading ? <Loader2 size={24} className="animate-spin" /> : 'Continue'}
+                  {loading ? <Loader2 size={24} className="animate-spin" /> : mode === 'LOGIN' ? 'CONTINUE' : mode === 'SIGNUP' ? 'GET STARTED' : 'SEND LINK'}
               </Button>
               
               <div className="text-center mt-6 flex flex-col gap-3">
                   {mode === 'LOGIN' && (
-                    <button type="button" onClick={() => setMode('FORGOT')} className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest">
+                    <button type="button" onClick={() => setMode('FORGOT')} className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest hover:underline">
                       Forgot Password?
                     </button>
                   )}
                   
-                  <button type="button" onClick={() => setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN')} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">
+                  <button type="button" onClick={() => {
+                    setError('');
+                    setSuccessMsg('');
+                    setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
+                  }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">
                       {mode === 'LOGIN' ? "Create New Profile" : "Back to Sign In"}
                   </button>
               </div>

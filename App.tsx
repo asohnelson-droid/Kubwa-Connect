@@ -110,58 +110,78 @@ function App() {
       }
     }
 
-    // 3. Success: Perform Navigation
+    // 3. Setup Guard: Redirect to Profile if setup isn't done but trying to access biz tools
+    if (section === AppSection.VENDOR_DASHBOARD || section === AppSection.PROVIDER_DASHBOARD) {
+       if (activeUser && !activeUser.isSetupComplete) {
+         setCurrentSection(AppSection.ACCOUNT);
+         return;
+       }
+    }
+
+    // 4. Success: Perform Navigation
     setCurrentSection(section);
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (targetSection?: AppSection) => {
     try {
       const currentUser = await api.auth.getSession();
       setUser(currentUser);
+      userRef.current = currentUser;
+      
+      if (targetSection) {
+        navigateTo(targetSection, currentUser);
+      }
       return currentUser;
     } catch (err) {
       console.error("[Auth] Refresh failed:", err);
       setUser(null);
       return null;
     }
-  }, []);
+  }, [navigateTo]);
 
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
-      const currentUser = await refreshUser();
-      if (!mounted) return;
-
-      let hasSeenOnboarding = false;
+      // safe timeout to avoid splash hang
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 3500));
+      
       try {
-        hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
-      } catch (e) {}
+        const result = await Promise.race([refreshUser(), timeoutPromise]);
+        
+        if (!mounted) return;
 
-      if (!currentUser && !hasSeenOnboarding) {
-        setShowOnboarding(true);
+        let hasSeenOnboarding = false;
+        try {
+          hasSeenOnboarding = localStorage.getItem('kubwa_onboarding_seen') === 'true';
+        } catch (e) {}
+
+        const currentUser = userRef.current;
+        if (!currentUser && !hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
+      } catch (e) {
+        console.error("[App] Init Error:", e);
+      } finally {
+        if (mounted) setIsInitializing(false);
       }
-
-      setIsInitializing(false);
     };
 
     init();
 
-    // Subscribe to internal notifications
     const unsubscribeNotifications = api.notifications.subscribe((notif) => {
       setActiveNotification(notif);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+      
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
         await refreshUser();
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
-        setCurrentSection(prev => {
-          const protectedSections = [AppSection.ACCOUNT, AppSection.ADMIN, AppSection.VENDOR_DASHBOARD, AppSection.PROVIDER_DASHBOARD];
-          return protectedSections.includes(prev) ? AppSection.HOME : prev;
-        });
+        userRef.current = null;
+        setCurrentSection(AppSection.HOME);
       }
     });
 
