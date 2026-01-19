@@ -2,7 +2,25 @@
 import { supabase } from './supabase';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, ProductVariant, Announcement, PushNotification } from '../types';
 
-export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
+export const KUBWA_AREAS = [
+    'Phase 1', 
+    'Phase 2', 
+    'Phase 3', 
+    'Phase 4', 
+    'Gwarinpa', 
+    'Dawaki', 
+    'Dutse', 
+    'Arab Road', 
+    'Byazhin',
+    'Army Quarters',
+    'Kubwa Village',
+    'Army Estate',
+    'Brick City Estate',
+    'Gado Nasco Road',
+    'NYSC Camp',
+    'FO1',
+    'FCDA'
+];
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
 export const PRODUCT_CATEGORIES = [
@@ -15,6 +33,113 @@ export const PRODUCT_CATEGORIES = [
 export const getParentCategory = (category: string) => {
     return category; 
 };
+
+const DUMMY_PRODUCTS: Product[] = [
+    {
+        id: 'prod_food_1',
+        vendorId: 'mock_vendor_food',
+        name: 'Jollof Rice & Chicken Combo',
+        price: 2500,
+        category: 'Food',
+        image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&q=80&w=500',
+        stock: 50,
+        rating: 4.8,
+        status: 'APPROVED',
+        description: 'Smoky party jollof rice served with fried chicken and plantain.',
+        isPromoted: true
+    },
+    {
+        id: 'prod_food_2',
+        vendorId: 'mock_vendor_food',
+        name: 'Fresh Yam Tuber (Large)',
+        price: 1800,
+        category: 'Food',
+        image: 'https://images.unsplash.com/photo-1593456868233-a26245347253?auto=format&fit=crop&q=80&w=500',
+        stock: 25,
+        rating: 4.5,
+        status: 'APPROVED',
+        description: 'Fresh large tuber of yam, perfect for pounding or boiling.',
+        isPromoted: false
+    },
+    {
+        id: 'prod_fash_1',
+        vendorId: 'mock_vendor_fashion',
+        name: 'Ankara Fabric (6 Yards)',
+        price: 8500,
+        category: 'Fashion',
+        image: 'https://images.unsplash.com/photo-1622695676346-6468d6c761b0?auto=format&fit=crop&q=80&w=500',
+        stock: 10,
+        rating: 4.9,
+        status: 'APPROVED',
+        description: 'High quality cotton Ankara fabric with vibrant, lasting colors.',
+        isPromoted: true
+    },
+    {
+        id: 'prod_fash_2',
+        vendorId: 'mock_vendor_fashion',
+        name: 'Men\'s Leather Slides',
+        price: 5000,
+        category: 'Fashion',
+        image: 'https://images.unsplash.com/photo-1605763240004-7e93b172d754?auto=format&fit=crop&q=80&w=500',
+        stock: 15,
+        rating: 4.2,
+        status: 'APPROVED',
+        description: 'Handcrafted leather slides for casual wear.',
+        isPromoted: false
+    },
+    {
+        id: 'prod_tech_1',
+        vendorId: 'mock_vendor_tech',
+        name: 'Oraimo FreePods 3',
+        price: 19000,
+        category: 'Electronics',
+        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&q=80&w=500',
+        stock: 20,
+        rating: 4.7,
+        status: 'APPROVED',
+        description: 'Wireless earbuds with heavy bass and noise cancellation.',
+        isPromoted: true
+    },
+    {
+        id: 'prod_tech_2',
+        vendorId: 'mock_vendor_tech',
+        name: 'Power Bank 20000mAh',
+        price: 12000,
+        category: 'Electronics',
+        image: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?auto=format&fit=crop&q=80&w=500',
+        stock: 30,
+        rating: 4.6,
+        status: 'APPROVED',
+        description: 'Fast charging power bank with dual USB output.',
+        isPromoted: false
+    },
+    {
+        id: 'prod_home_1',
+        vendorId: 'mock_vendor_home',
+        name: 'Non-Stick Frying Pan',
+        price: 8000,
+        category: 'Home',
+        image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&q=80&w=500',
+        stock: 12,
+        rating: 4.4,
+        status: 'APPROVED',
+        description: 'Durable non-stick frying pan, easy to clean.',
+        isPromoted: false
+    },
+    {
+        id: 'prod_home_2',
+        vendorId: 'mock_vendor_home',
+        name: 'Rechargeable Fan 18"',
+        price: 42000,
+        category: 'Home',
+        image: 'https://images.unsplash.com/photo-1618941716939-553df0c690b8?auto=format&fit=crop&q=80&w=500',
+        stock: 5,
+        rating: 4.8,
+        status: 'APPROVED',
+        description: 'Standing rechargeable fan with solar panel support.',
+        isPromoted: true
+    }
+];
 
 /**
  * HELPER: Robust Error Extraction
@@ -85,12 +210,37 @@ export const api = {
     auth: {
         getSession: async () => {
             try {
+                // 1. Attempt to retrieve session from local storage/Supabase client
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError || !session) return null;
+                
+                // CRITICAL FIX: Handle Invalid/Stale Refresh Token Errors
+                // If the refresh token is not found or invalid, we must clear the session to prevent a crash loop.
+                if (sessionError) {
+                    const msg = sessionError.message || '';
+                    if (msg.includes("Refresh Token") || msg.includes("Invalid Refresh Token")) {
+                        console.warn("[Auth] Stale refresh token detected. Cleaning up session.");
+                        await supabase.auth.signOut(); 
+                        localStorage.removeItem('kubwa-connect-auth'); // Force clear storage key
+                    }
+                    return null;
+                }
 
+                if (!session) return null;
+
+                // 2. Validate session with a getUser call (ensures token is active on server)
                 const { data: { user: sessionUser }, error: fetchError } = await supabase.auth.getUser();
-                if (fetchError || !sessionUser) return null;
+                
+                if (fetchError || !sessionUser) {
+                     // If getUser fails (e.g. user deleted or token revoked), force logout
+                     if (fetchError?.message?.includes("Refresh Token")) {
+                        console.warn("[Auth] Token validation failed. Signing out.");
+                        await supabase.auth.signOut();
+                        localStorage.removeItem('kubwa-connect-auth');
+                     }
+                     return null;
+                }
 
+                // 3. Fetch/Repair Profile Data
                 let { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
                 
                 if (!profile && sessionUser && !profileError) {
@@ -106,6 +256,10 @@ export const api = {
                 return mapUserData(sessionUser, profile);
             } catch (e: any) {
                 console.error("[Data] getSession Error:", getErrorMessage(e));
+                // Fallback: If any critical auth error occurs, assume logged out
+                if (e.message && (e.message.includes("Refresh Token") || e.message.includes("json"))) {
+                    localStorage.removeItem('kubwa-connect-auth');
+                }
                 return null;
             }
         },
@@ -162,6 +316,11 @@ export const api = {
     },
     orders: {
         placeOrder: async (orderData: Partial<MartOrder>) => {
+            // MOCK HANDLING: If vendor is a dummy vendor, succeed without database interaction
+            if (orderData.vendorId?.startsWith('mock_')) {
+                 return { success: true, orderId: `mock_${Date.now()}` };
+            }
+
             const { data, error } = await supabase.from('orders').insert([{ ...orderData, date: new Date().toISOString() }]).select();
             if (!error && data?.[0]) {
                 api.notifications.send({
@@ -201,6 +360,17 @@ export const api = {
             } catch (e) {
                 console.error("[Data] completeSetup Error:", getErrorMessage(e));
                 return null;
+            }
+        },
+        updateProfile: async (userId: string, updates: Partial<any>): Promise<boolean> => {
+            try {
+                const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+                if (error) throw error;
+                await supabase.auth.updateUser({ data: updates });
+                return true;
+            } catch (e) {
+                console.error("Update Profile Error", e);
+                return false;
             }
         },
         getFeaturedVendors: async () => {
@@ -247,12 +417,15 @@ export const api = {
     },
     getProducts: async (): Promise<Product[]> => {
         const { data } = await supabase.from('products').select('*');
-        return (data || []).map((p: any) => ({
+        const dbProducts = (data || []).map((p: any) => ({
             ...p,
             // AUTO-MAP: Handle any database column naming convention automatically
             vendorId: p.merchant_id || p.vendorId || p.vendor_id, 
             isPromoted: p.isPromoted || p.ispromoted
         })) as Product[];
+        
+        // Merge DB products with Dummy products to ensure Mart is populated
+        return [...dbProducts, ...DUMMY_PRODUCTS];
     },
     saveProduct: async (product: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> => {
         try {
@@ -264,28 +437,27 @@ export const api = {
 
             const currentUserId = authUser.id;
 
-            // STEP 2: PROFILE EXISTENCE VALIDATION
-            const { data: profileCheck, error: profileCheckError } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('id', currentUserId)
-                .maybeSingle();
-            
-            if (profileCheckError) {
-                throw new Error(`Profile check failed: ${profileCheckError.message}`);
-            }
+            // STEP 2: PROFILE EXISTENCE VALIDATION (Aggressive Repair)
+            // Try to fetch profile ID, if not found or error, attempt upsert to repair foreign key relationship
+            const ensureProfile = async () => {
+                const { data: profileCheck } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('id', currentUserId)
+                    .maybeSingle();
 
-            if (!profileCheck) {
-                const { error: repairError } = await supabase.from('profiles').insert([{ 
-                    id: currentUserId, 
-                    email: authUser.email,
-                    fullName: authUser.user_metadata?.name || 'Kubwa Merchant'
-                }]);
-
-                if (repairError) {
-                    throw new Error("Unable to link product to your merchant profile. Please go to Account and complete your setup first.");
+                if (!profileCheck) {
+                     // Auto-repair profile
+                     await supabase.from('profiles').upsert({
+                         id: currentUserId,
+                         email: authUser.email,
+                         fullName: authUser.user_metadata?.name || 'Kubwa Merchant',
+                         role: 'VENDOR'
+                     }, { onConflict: 'id', ignoreDuplicates: true });
                 }
-            }
+            };
+
+            await ensureProfile();
 
             // STEP 3: PREPARE PAYLOAD
             const buildPayload = (includeDescription: boolean) => {
@@ -294,7 +466,6 @@ export const api = {
                     price: Math.max(0, Number(product.price)),
                     category: product.category,
                     image: product.image?.trim(),
-                    // USE STANDARD COLUMN NAME FOR DB
                     merchant_id: currentUserId, 
                     status: product.status || 'PENDING',
                     stock: product.stock !== undefined ? Math.max(0, Number(product.stock)) : 0,
@@ -310,20 +481,32 @@ export const api = {
             let result;
             const primaryPayload = buildPayload(true);
             
-            if (product.id) {
-                result = await supabase.from('products').update(primaryPayload).eq('id', product.id).select();
-            } else {
-                result = await supabase.from('products').insert([primaryPayload]).select();
+            const performOperation = async (payload: any) => {
+                 if (product.id) {
+                    return await supabase.from('products').update(payload).eq('id', product.id).select();
+                 } else {
+                    return await supabase.from('products').insert([payload]).select();
+                 }
+            };
+
+            result = await performOperation(primaryPayload);
+
+            // Retry logic for schema mismatch (description column)
+            if (result.error && getErrorMessage(result.error).includes('column "description"')) {
+                 result = await performOperation(buildPayload(false));
             }
 
-            // Retry without description if schema varies
-            if (result.error && getErrorMessage(result.error).includes('column "description"')) {
-                const secondaryPayload = buildPayload(false);
-                if (product.id) {
-                    result = await supabase.from('products').update(secondaryPayload).eq('id', product.id).select();
-                } else {
-                    result = await supabase.from('products').insert([secondaryPayload]).select();
-                }
+            // Retry logic for Foreign Key Constraint (Missing Profile despite check)
+            if (result.error && getErrorMessage(result.error).includes('foreign key constraint')) {
+                 // Force upsert profile again, potentially overwriting to ensure consistency
+                 await supabase.from('profiles').upsert({
+                     id: currentUserId,
+                     email: authUser.email,
+                     fullName: authUser.user_metadata?.name || 'Kubwa Merchant',
+                     role: 'VENDOR'
+                 });
+                 // Retry operation one last time
+                 result = await performOperation(primaryPayload);
             }
 
             if (result.error) {

@@ -16,7 +16,8 @@ import {
   Store,
   Briefcase,
   Bike,
-  Loader2
+  Loader2,
+  LogOut
 } from 'lucide-react';
 import { api } from '../services/data';
 import { User, ApprovalStatus, Product, AnalyticsData } from '../types';
@@ -79,6 +80,10 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
     }
     setActionLoading(null);
   };
+  
+  const handleLogout = async () => {
+    await api.auth.signOut();
+  };
 
   if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'SUPER_ADMIN') return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-12 text-center animate-fade-in">
@@ -100,9 +105,14 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             </div>
             <h2 className="text-4xl font-black text-gray-900 tracking-tighter leading-none uppercase text-nowrap">Admin Console</h2>
          </div>
-         <button onClick={loadData} className="p-4 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors">
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-         </button>
+         <div className="flex gap-2">
+            <button onClick={loadData} className="p-4 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors">
+                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <button onClick={handleLogout} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-colors">
+                <LogOut size={20} />
+            </button>
+         </div>
       </div>
 
       <div className="flex gap-2 mb-10 bg-gray-100 p-1.5 rounded-[2rem] overflow-x-auto no-scrollbar shadow-inner">

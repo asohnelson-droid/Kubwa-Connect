@@ -176,6 +176,29 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
          ))}
       </div>
 
+      {/* Trending Products (REARRANGED: Now above "Start Earning") */}
+      <div className="px-6 mt-12">
+         <div className="flex justify-between items-end mb-6">
+            <div>
+               <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">MART DEALS</h3>
+               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fresh Today</p>
+            </div>
+            <button onClick={() => setSection(AppSection.MART)} className="text-[10px] font-black text-kubwa-green uppercase tracking-widest flex items-center gap-1">View All <ChevronRight size={14}/></button>
+         </div>
+         
+         <div className="grid grid-cols-2 gap-4">
+            {recentProducts.map(product => (
+               <div key={product.id} onClick={() => setSection(AppSection.MART)} className="cursor-pointer group">
+                  <div className="h-40 bg-gray-100 rounded-3xl overflow-hidden mb-3">
+                     <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt=""/>
+                  </div>
+                  <h4 className="text-xs font-black text-gray-900 px-1">{product.name}</h4>
+                  <p className="text-sm font-black text-kubwa-green px-1 mt-1">₦{product.price.toLocaleString()}</p>
+               </div>
+            ))}
+         </div>
+      </div>
+
       {/* Role CTA Section */}
       <div className="px-6 mt-12">
          <div className="flex items-center justify-between mb-4">
@@ -216,29 +239,6 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
                   <ChevronRight size={16} />
                </div>
             </div>
-         </div>
-      </div>
-
-      {/* Trending Products */}
-      <div className="px-6 mt-12">
-         <div className="flex justify-between items-end mb-6">
-            <div>
-               <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">MART DEALS</h3>
-               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fresh Today</p>
-            </div>
-            <button onClick={() => setSection(AppSection.MART)} className="text-[10px] font-black text-kubwa-green uppercase tracking-widest flex items-center gap-1">View All <ChevronRight size={14}/></button>
-         </div>
-         
-         <div className="grid grid-cols-2 gap-4">
-            {recentProducts.map(product => (
-               <div key={product.id} onClick={() => setSection(AppSection.MART)} className="cursor-pointer group">
-                  <div className="h-40 bg-gray-100 rounded-3xl overflow-hidden mb-3">
-                     <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt=""/>
-                  </div>
-                  <h4 className="text-xs font-black text-gray-900 px-1">{product.name}</h4>
-                  <p className="text-sm font-black text-kubwa-green px-1 mt-1">₦{product.price.toLocaleString()}</p>
-               </div>
-            ))}
          </div>
       </div>
     </div>

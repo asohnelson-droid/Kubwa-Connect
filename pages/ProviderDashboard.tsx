@@ -18,7 +18,8 @@ import {
   Settings,
   Edit2,
   Trash2,
-  Plus
+  Plus,
+  LogOut
 } from 'lucide-react';
 import { Card, Badge, Button, Input, Breadcrumbs, Sheet } from '../components/ui';
 import { api, FIXIT_SERVICES } from '../services/data';
@@ -27,9 +28,10 @@ import { User, ServiceProvider, AppSection, Review } from '../types';
 interface ProviderDashboardProps {
   currentUser: User | null;
   setSection: (section: AppSection) => void;
+  refreshUser?: () => Promise<User | null>;
 }
 
-const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ currentUser, setSection }) => {
+const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ currentUser, setSection, refreshUser }) => {
   const [profile, setProfile] = useState<ServiceProvider | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,7 @@ const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ currentUser, setS
       if (success) {
         setIsEditModalOpen(false);
         await loadData();
+        if (refreshUser) await refreshUser();
         alert("Profile updated successfully!");
       }
     } catch (err) {
@@ -91,6 +94,10 @@ const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ currentUser, setS
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await api.auth.signOut();
   };
 
   if (loading) {
@@ -257,9 +264,15 @@ const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ currentUser, setS
                </div>
             </div>
 
-            <Button onClick={handleSaveProfile} disabled={saving} className="w-full h-16 shadow-xl shadow-kubwa-orange/20 bg-kubwa-orange">
-               {saving ? <Loader2 className="animate-spin" /> : 'SAVE CHANGES'}
-            </Button>
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+               <Button onClick={handleSaveProfile} disabled={saving} className="w-full h-16 shadow-xl shadow-kubwa-orange/20 bg-kubwa-orange">
+                  {saving ? <Loader2 className="animate-spin" /> : 'SAVE CHANGES'}
+               </Button>
+               
+               <button onClick={handleLogout} className="w-full py-4 text-xs font-black text-red-500 uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 rounded-2xl transition-colors">
+                  <LogOut size={16} /> Log Out
+               </button>
+            </div>
          </div>
       </Sheet>
     </div>

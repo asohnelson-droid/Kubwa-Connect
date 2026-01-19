@@ -252,9 +252,9 @@ function App() {
       case AppSection.ADMIN: 
         return isAdmin ? <Admin currentUser={user} /> : <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
       case AppSection.VENDOR_DASHBOARD: 
-        return isVendor ? <VendorDashboard currentUser={user} setSection={navigateTo} /> : <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
+        return isVendor ? <VendorDashboard currentUser={user} setSection={navigateTo} refreshUser={refreshUser} /> : <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
       case AppSection.PROVIDER_DASHBOARD: 
-        return isProvider ? <ProviderDashboard currentUser={user} setSection={navigateTo} /> : <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
+        return isProvider ? <ProviderDashboard currentUser={user} setSection={navigateTo} refreshUser={refreshUser} /> : <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
       case AppSection.ACCOUNT: 
         return <Account user={user} setUser={setUser} setSection={navigateTo} authIntent={authIntent} clearAuthIntent={() => setAuthIntent(null)} refreshUser={refreshUser} />;
       case AppSection.ABOUT:

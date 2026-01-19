@@ -27,7 +27,11 @@ import {
   ClipboardList,
   Truck,
   Image as ImageIcon,
-  Star
+  Star,
+  UploadCloud,
+  X as CloseIcon,
+  Settings,
+  LogOut
 } from 'lucide-react';
 import { Card, Badge, Button, Sheet, Input, Breadcrumbs } from '../components/ui';
 import { api, PRODUCT_CATEGORIES } from '../services/data';
@@ -36,9 +40,10 @@ import { User, Product, AppSection, MartOrder, OrderStatus } from '../types';
 interface VendorDashboardProps {
   currentUser: User | null;
   setSection: (section: AppSection) => void;
+  refreshUser?: () => Promise<User | null>;
 }
 
-const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSection }) => {
+const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSection, refreshUser }) => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders'>('inventory');
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<MartOrder[]>([]);
@@ -48,9 +53,16 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
   const hasLoadedInitial = useRef(false);
   const currentUserId = currentUser?.id;
 
-  // Form & Submission State
+  // Product Form State
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  
+  // Settings Form State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsForm, setSettingsForm] = useState<{ storeName: string; bio: string; address: string; phoneNumber: string }>({
+    storeName: '', bio: '', address: '', phoneNumber: ''
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   
   // Submission States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,7 +114,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
     if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!currentUser) return;
 
-    // PRE-CHECK: Block if the profile is not marked as setup in the UI state
     if (!currentUser.isSetupComplete) {
        alert("Shop Setup Required: You must complete your merchant profile in the Account section before adding items.");
        setSection(AppSection.ACCOUNT);
@@ -150,23 +161,31 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
     }
   };
 
-  /**
-   * RELIABLE PRODUCT SUBMISSION HANDLER
-   * - Enforces PENDING status for admin review
-   * - Prevents duplicate clicks via isSubmitting guard
-   * - Provides clear visual success/error states
-   */
+  const handleImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 1024 * 1024) {
+        alert("Image is too large! Please select a photo under 1MB.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (editingProduct) {
+            setEditingProduct({ ...editingProduct, image: reader.result as string });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProduct = async () => {
-    // 1. DUPLICATE PREVENTION: Immediately exit if already processing
     if (isSubmitting || !editingProduct) return;
-    
-    // 2. SECURITY CHECK: Verify merchant identity
     if (!currentUserId) {
         setSubmitError("Session Expired: Please log out and sign in again to verify your identity.");
         return;
     }
 
-    // 3. INPUT VALIDATION: Ensure minimum viable product data
     const nameTrimmed = editingProduct.name?.trim();
     const imageTrimmed = editingProduct.image?.trim();
     const priceVal = Number(editingProduct.price);
@@ -179,19 +198,16 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
       setSubmitError("Valid Price Required: Please enter a selling price greater than 0.");
       return;
     }
-    if (!imageTrimmed || !imageTrimmed.startsWith('http')) {
-      setSubmitError("Valid Image URL Required: Please provide a working link to your product photo.");
+    if (!imageTrimmed || !imageTrimmed.startsWith('data:image') && !imageTrimmed.startsWith('http')) {
+      setSubmitError("Valid Image Required: Please upload a photo or provide a valid URL.");
       return;
     }
 
-    // 4. PREPARE SUBMISSION STATE
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitMessage(null);
 
     try {
-      // 5. CONSTRUCT SECURE PAYLOAD
-      // Force status to 'PENDING' even for updates to ensure quality control
       const payload: Partial<Product> = {
         ...editingProduct,
         name: nameTrimmed,
@@ -201,14 +217,10 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
         status: 'PENDING' 
       };
 
-      // 6. EXECUTE DATABASE SYNC
       const result = await api.saveProduct(payload);
 
       if (result.success) {
-        // 7. SUCCESS FEEDBACK
         setSubmitMessage(editingProduct.id ? "Updates submitted for review! 🚀" : "New listing submitted for review! 🎉");
-        
-        // 8. OPTIMISTIC UI UPDATE: Refresh local state immediately
         if (result.data) {
             const saved = result.data;
             setProducts(prev => {
@@ -217,8 +229,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
                 return [saved, ...prev];
             });
         }
-
-        // 9. DELAYED CLOSE: Allow user to see the success message
         setTimeout(() => {
           setIsProductFormOpen(false);
           setEditingProduct(null);
@@ -229,18 +239,50 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
       }
     } catch (err: any) {
       console.error("[VendorDashboard] Submission Failure:", err.message);
-      
-      // 10. ERROR FEEDBACK: Map cryptic database errors to merchant-friendly alerts
       let friendlyError = err.message || "Something went wrong on our end. Please try again.";
       if (friendlyError.includes('foreign key')) {
           friendlyError = "Merchant Identity Error: We couldn't link this item to your profile. Please visit your Account page to complete your setup.";
       } else if (friendlyError.includes('duplicate key')) {
           friendlyError = "An item with this exact name already exists in your shop.";
       }
-      
       setSubmitError(friendlyError);
       setIsSubmitting(false);
     }
+  };
+
+  // --- SETTINGS LOGIC ---
+  const openSettings = () => {
+    if (!currentUser) return;
+    setSettingsForm({
+      storeName: currentUser.storeName || '',
+      bio: currentUser.bio || '',
+      address: currentUser.address || '',
+      phoneNumber: currentUser.phoneNumber || ''
+    });
+    setIsSettingsOpen(true);
+  };
+
+  const handleSaveSettings = async () => {
+    if (!currentUser) return;
+    setIsSavingSettings(true);
+    try {
+      const success = await api.users.updateProfile(currentUser.id, settingsForm);
+      if (success) {
+        if (refreshUser) await refreshUser();
+        setIsSettingsOpen(false);
+        alert("Store settings updated successfully!");
+      } else {
+        alert("Failed to update settings.");
+      }
+    } catch (e) {
+      alert("Error saving settings.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await api.auth.signOut();
   };
 
   if (!currentUser || currentUser.role !== 'VENDOR') {
@@ -270,13 +312,21 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
             <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase leading-none">Merchant Console</h2>
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Managing: {currentUser.storeName || currentUser.name}</p>
          </div>
-         <Button 
-            onClick={handleOpenAddProduct} 
-            className="p-4 shadow-xl shadow-kubwa-green/20"
-            disabled={currentUser.status === 'SUSPENDED' || isSubmitting}
-         >
-            <Plus size={20} strokeWidth={3} />
-         </Button>
+         <div className="flex gap-2">
+           <Button 
+              onClick={openSettings}
+              className="p-4 bg-gray-100 text-gray-900 shadow-none hover:bg-gray-200 w-12 h-12 flex items-center justify-center"
+           >
+              <Settings size={20} />
+           </Button>
+           <Button 
+              onClick={handleOpenAddProduct} 
+              className="p-4 shadow-xl shadow-kubwa-green/20 w-12 h-12 flex items-center justify-center"
+              disabled={currentUser.status === 'SUSPENDED' || isSubmitting}
+           >
+              <Plus size={20} strokeWidth={3} />
+           </Button>
+         </div>
       </div>
 
       <div className="flex bg-gray-100 p-1.5 rounded-[2rem] mb-8">
@@ -466,9 +516,70 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
                     </div>
                 </div>
                 
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">High-Res Image (URL)</label>
-                   <Input placeholder="https://image-hosting.com/item.jpg" value={editingProduct?.image} onChange={e => setEditingProduct({ ...editingProduct, image: e.target.value })} />
+                {/* IMPROVED IMAGE SECTION */}
+                <div className="space-y-3">
+                   <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Product Image</label>
+                   
+                   {/* Instructional Note */}
+                   <div className="bg-blue-50 p-3 rounded-2xl flex gap-3 items-start border border-blue-100">
+                      <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                      <div>
+                         <p className="text-[10px] font-bold text-blue-700 leading-tight">
+                            How to add an image:
+                         </p>
+                         <ul className="text-[10px] text-blue-600 list-disc ml-4 mt-1 leading-relaxed">
+                            <li>Tap the box below to upload directly from your device.</li>
+                            <li>Or paste a direct URL (link) if you have one.</li>
+                            <li>Use square images (1:1) for best results.</li>
+                         </ul>
+                      </div>
+                   </div>
+
+                   <div className="flex gap-4 items-start">
+                      {/* Visual Uploader */}
+                      <div className="relative w-24 h-24 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 group cursor-pointer hover:border-kubwa-green hover:bg-green-50 transition-all">
+                         {editingProduct?.image ? (
+                           <>
+                             <img src={editingProduct.image} className="w-full h-full object-cover" />
+                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Edit3 size={16} className="text-white" />
+                             </div>
+                           </>
+                         ) : (
+                           <UploadCloud className="text-gray-300 group-hover:text-kubwa-green transition-colors" />
+                         )}
+                         <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            onChange={handleImageFileSelect}
+                         />
+                      </div>
+
+                      {/* URL Fallback Input */}
+                      <div className="flex-1 space-y-2">
+                         <div className="relative">
+                            <Input 
+                               placeholder="Or paste image link here..." 
+                               value={editingProduct?.image?.startsWith('data:') ? '' : editingProduct?.image} 
+                               onChange={e => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                               className="text-[10px] h-10 pr-8"
+                            />
+                            {editingProduct?.image && (
+                              <button 
+                                onClick={() => setEditingProduct({ ...editingProduct, image: '' })}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                              >
+                                <CloseIcon size={14} />
+                              </button>
+                            )}
+                         </div>
+                         <p className="text-[9px] font-bold text-gray-400 flex items-center gap-1">
+                           {editingProduct?.image ? <CheckCircle size={10} className="text-green-500"/> : <XCircle size={10} />}
+                           {editingProduct?.image ? 'Image selected successfully' : 'No image selected'}
+                         </p>
+                      </div>
+                   </div>
                 </div>
 
                 <div className="space-y-1">
@@ -517,12 +628,46 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ currentUser, setSecti
               >
                  {isSubmitting ? <Loader2 className="animate-spin" /> : 'SUBMIT FOR APPROVAL'}
               </Button>
-              
-              <p className="text-[8px] font-black text-gray-300 text-center uppercase tracking-widest mt-2">
-                Approvals typically take 2-4 business hours.
-              </p>
             </div>
          </div>
+      </Sheet>
+
+      {/* Settings Sheet */}
+      <Sheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Store Settings">
+        <div className="p-2 space-y-6 pb-24">
+           <div className="space-y-4">
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Store Name</label>
+                 <Input value={settingsForm.storeName} onChange={e => setSettingsForm({ ...settingsForm, storeName: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Contact Phone</label>
+                 <Input value={settingsForm.phoneNumber} onChange={e => setSettingsForm({ ...settingsForm, phoneNumber: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Shop Address</label>
+                 <Input value={settingsForm.address} onChange={e => setSettingsForm({ ...settingsForm, address: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black uppercase text-gray-400 ml-2">About Your Store</label>
+                 <textarea 
+                    className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-bold h-24 resize-none outline-none"
+                    value={settingsForm.bio}
+                    onChange={e => setSettingsForm({ ...settingsForm, bio: e.target.value })}
+                 />
+              </div>
+           </div>
+           
+           <div className="space-y-4 pt-4 border-t border-gray-100">
+             <Button onClick={handleSaveSettings} disabled={isSavingSettings} className="w-full h-14 bg-gray-900 shadow-none">
+                {isSavingSettings ? <Loader2 className="animate-spin" /> : 'SAVE SETTINGS'}
+             </Button>
+             
+             <button onClick={handleLogout} className="w-full py-4 text-xs font-black text-red-500 uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 rounded-2xl transition-colors">
+                <LogOut size={16} /> Log Out
+             </button>
+           </div>
+        </div>
       </Sheet>
     </div>
   );
