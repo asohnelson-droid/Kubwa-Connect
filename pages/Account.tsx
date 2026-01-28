@@ -4,6 +4,7 @@ import { User, AppSection, MonetisationTier, UserRole, PaymentIntent, MartOrder,
 import { api } from '../services/data';
 import { Button, Card, Badge } from '../components/ui';
 import AuthModal from '../components/AuthModal';
+import VendorDashboard from '../components/VendorDashboard';
 import { 
   LogOut, 
   ShieldCheck, 
@@ -19,11 +20,7 @@ import {
   ChevronRight,
   PackageCheck,
   ShieldAlert,
-  AlertTriangle,
-  Clock,
-  ExternalLink,
-  Store,
-  Wrench
+  Store
 } from 'lucide-react';
 
 interface AccountProps {
@@ -36,26 +33,27 @@ interface AccountProps {
 }
 
 const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUser, authIntent, clearAuthIntent }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'activity'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'dashboard'>('profile');
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   
+  // Local state for modal configuration, initialized from intent
   const [authConfig, setAuthConfig] = useState<{ role: UserRole; mode: 'LOGIN' | 'SIGNUP' }>({
-    role: 'USER',
-    mode: 'LOGIN'
+    role: authIntent?.role || 'USER',
+    mode: authIntent ? 'SIGNUP' : 'LOGIN'
   });
 
   useEffect(() => {
-    if (authIntent && !user) {
+    if (authIntent) {
       setAuthConfig({
         role: authIntent.role,
         mode: 'SIGNUP'
       });
       setIsAuthModalOpen(true);
     }
-  }, [authIntent, user]);
+  }, [authIntent]);
 
   useEffect(() => {
     if (user && activeTab === 'activity') {
@@ -69,7 +67,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     try {
       const [orderData, deliveryData] = await Promise.all([
         api.orders.getMyOrders(user.id),
-        api.deliveries.getDeliveries(user.id)
+        api.getDeliveries(user.id)
       ]);
       setOrders(orderData);
       setDeliveries(deliveryData);
@@ -82,33 +80,22 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
 
   const handleAuthSuccess = async (u: User) => {
     setIsAuthModalOpen(false);
-    
-    // Determine the next logical destination
-    // If there was a specific intent (e.g. going to Vendor Dashboard), prioritize it.
-    // Otherwise, redirect admins to Admin suite and regular users to Profile.
-    const target = authIntent?.section || (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN' ? AppSection.ADMIN : AppSection.ACCOUNT);
-    
+    const target = authIntent?.section || (u.role === 'ADMIN' ? AppSection.ADMIN : undefined);
     clearAuthIntent();
     await refreshUser(target); 
   };
 
-  const handleSignOut = async () => {
-    await api.auth.signOut();
-    setUser(null);
-    setSection(AppSection.HOME);
-  };
-
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center animate-fade-in pb-32 bg-white">
-        <div className="w-28 h-28 bg-kubwa-green/10 rounded-[3rem] flex items-center justify-center mb-10 shadow-inner relative">
-          <div className="absolute inset-0 bg-kubwa-green/5 rounded-[3rem] animate-pulse scale-110 opacity-50"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center animate-fade-in pb-32">
+        <div className="w-28 h-28 bg-kubwa-green/10 rounded-[3rem] flex items-center justify-center mb-10 shadow-inner relative group">
+          <div className="absolute inset-0 bg-kubwa-green/5 rounded-[3rem] animate-ping scale-110 opacity-50"></div>
           <UserIcon size={56} className="text-kubwa-green relative z-10" />
         </div>
         
         <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter mb-4 leading-none">Connect to Kubwa</h2>
         <p className="text-gray-500 font-bold text-sm max-w-xs mb-12 leading-relaxed opacity-70">
-          The community super app. Join thousands of residents shopping and growing in Kubwa.
+          The heart of your community. Join thousands of residents shopping and earning in Kubwa.
         </p>
 
         <div className="w-full space-y-4 max-w-sm">
@@ -151,14 +138,12 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   }
 
   const isVendor = user.role === 'VENDOR';
-  const isProvider = user.role === 'PROVIDER';
   const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
   const isApproved = user.status === 'APPROVED';
-  const isPending = user.status === 'PENDING';
-  const isRejected = user.status === 'REJECTED';
 
   return (
     <div className="pb-32 pt-8 px-6 max-w-2xl mx-auto animate-fade-in">
+      {/* Profile Header */}
       <div className="mb-6 relative">
         <Card className="bg-gray-900 text-white border-none shadow-2xl rounded-[3rem] p-0 overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl" />
@@ -166,12 +151,17 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
              <div className="flex justify-between items-start mb-8">
                 <div className="w-24 h-24 rounded-[2rem] bg-white/10 flex items-center justify-center text-4xl font-black border border-white/20 shadow-2xl backdrop-blur-md overflow-hidden relative">
                   {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : user.name.charAt(0)}
+                  {user.tier === 'FEATURED' && (
+                    <div className="absolute top-0 right-0 bg-yellow-500 p-1 rounded-bl-xl border-b border-l border-white/20">
+                      <Crown size={12} className="text-white" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                    <button className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
                       <Settings size={22} />
                    </button>
-                   <button onClick={handleSignOut} className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all group">
+                   <button onClick={async () => { await api.auth.signOut(); }} className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all group">
                       <LogOut size={22} />
                    </button>
                 </div>
@@ -182,74 +172,54 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                   <h2 className="text-2xl font-black tracking-tight uppercase leading-none truncate max-w-[220px]">
                     {isVendor && user.storeName ? user.storeName : user.name}
                   </h2>
-                  {user.verificationStatus === 'VERIFIED' && <ShieldCheck size={24} className="text-blue-400 shrink-0" />}
+                  {(user.verificationStatus === 'VERIFIED' || user.tier === 'VERIFIED') && <ShieldCheck size={24} className="text-blue-400 shrink-0" />}
+                  {user.tier === 'FEATURED' && <Star size={24} className="text-yellow-400 fill-yellow-400 shrink-0" />}
                 </div>
                 <p className="text-white/50 text-xs font-bold mb-6">{user.email}</p>
                 <div className="flex flex-wrap gap-2">
                    <Badge color="bg-kubwa-green text-white border-none px-3 py-1.5">{user.role}</Badge>
-                   {isPending && <Badge color="bg-orange-500 text-white border-none px-3 py-1.5 animate-pulse">Pending Review</Badge>}
                 </div>
              </div>
           </div>
         </Card>
       </div>
 
-      <div className="flex bg-gray-100 p-1.5 rounded-[2rem] mb-8">
+      {/* Tabs */}
+      <div className="flex bg-gray-100 p-1.5 rounded-[2rem] mb-8 overflow-x-auto no-scrollbar gap-1">
         <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all ${activeTab === 'profile' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all whitespace-nowrap px-4 ${activeTab === 'profile' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
         >
-          Overview
+          Profile
         </button>
+        {isVendor && (
+          <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all whitespace-nowrap px-4 flex items-center justify-center gap-2 ${activeTab === 'dashboard' ? 'bg-white shadow-sm text-kubwa-green' : 'text-gray-400'}`}
+          >
+            <Store size={14}/> Dashboard
+          </button>
+        )}
         <button 
           onClick={() => setActiveTab('activity')}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all ${activeTab === 'activity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all whitespace-nowrap px-4 ${activeTab === 'activity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
         >
-          Activity
+          History
         </button>
       </div>
 
-      {activeTab === 'profile' ? (
+      {activeTab === 'dashboard' && isVendor ? (
+         <VendorDashboard user={user} />
+      ) : activeTab === 'profile' ? (
         <div className="space-y-6 animate-fade-in">
-          {isPending && (
-            <Card className="p-8 border-none rounded-[2.5rem] bg-orange-50 text-orange-900 shadow-sm">
-                <div className="flex items-start gap-4">
-                    <div className="p-3 bg-orange-100 rounded-2xl text-orange-600 h-fit"><Clock size={24} /></div>
-                    <div className="flex-1">
-                       <h4 className="font-black text-sm uppercase mb-1">Account Under Review</h4>
-                       <p className="text-xs font-medium leading-relaxed opacity-80 mb-4">
-                         Admins are vetting your profile. Access to advanced merchant and service tools will be granted once verification is complete.
-                       </p>
-                    </div>
-                </div>
-            </Card>
-          )}
-
-          {isRejected && (
-            <Card className="p-8 border-none rounded-[2.5rem] bg-red-50 text-red-900 shadow-sm">
-                <div className="flex items-start gap-4">
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600"><AlertTriangle size={24} /></div>
-                    <div className="flex-1">
-                       <h4 className="font-black text-sm uppercase mb-1">Application Rejected</h4>
-                       <p className="text-xs font-medium leading-relaxed opacity-80 mb-4">
-                         Your application was not approved. This could be due to incomplete documentation or mismatch in details.
-                       </p>
-                       <Button variant="danger" className="h-10 text-[10px] px-6" onClick={() => setSection(AppSection.CONTACT)}>
-                          CONTACT SUPPORT
-                       </Button>
-                    </div>
-                </div>
-            </Card>
-          )}
-
           {isAdmin && (
-            <Card className="p-8 bg-indigo-600 text-white border-none rounded-[2.5rem] shadow-xl shadow-indigo-500/20">
+            <Card className="p-8 bg-indigo-600 text-white border-none rounded-[2.5rem] shadow-xl shadow-indigo-500/20 group">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-white/20 rounded-2xl"><ShieldCheck size={24} /></div>
                         <div>
                            <h4 className="font-black text-sm uppercase">Site Admin</h4>
-                           <p className="text-[10px] opacity-60 font-bold uppercase">Governance Suite</p>
+                           <p className="text-[10px] opacity-60 font-bold uppercase">Central Control Panel</p>
                         </div>
                     </div>
                     <Button variant="outline" className="bg-white/10 border-white/20 text-white h-10 px-4" onClick={() => setSection(AppSection.ADMIN)}>
@@ -259,51 +229,23 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
             </Card>
           )}
 
-          {isVendor && (
-            <Card className="p-8 bg-kubwa-green text-white border-none rounded-[2.5rem] shadow-xl shadow-kubwa-green/20">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-2xl"><Store size={24} /></div>
-                        <div>
-                           <h4 className="font-black text-sm uppercase">Merchant Dashboard</h4>
-                           <p className="text-[10px] opacity-60 font-bold uppercase">Manage Your Shop</p>
-                        </div>
-                    </div>
-                    <Button variant="outline" className="bg-white/10 border-white/20 text-white h-10 px-4" onClick={() => setSection(AppSection.VENDOR_DASHBOARD)}>
-                        Open Tools
-                    </Button>
-                </div>
-            </Card>
-          )}
-
-          {isProvider && (
-            <Card className="p-8 bg-kubwa-orange text-white border-none rounded-[2.5rem] shadow-xl shadow-kubwa-orange/20">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-2xl"><Wrench size={24} /></div>
-                        <div>
-                           <h4 className="font-black text-sm uppercase">Pro Console</h4>
-                           <p className="text-[10px] opacity-60 font-bold uppercase">Manage Skills & Jobs</p>
-                        </div>
-                    </div>
-                    <Button variant="outline" className="bg-white/10 border-white/20 text-white h-10 px-4" onClick={() => setSection(AppSection.PROVIDER_DASHBOARD)}>
-                        Dashboard
-                    </Button>
-                </div>
-            </Card>
-          )}
-
-          <Card className="p-6 text-center border-none shadow-sm rounded-[2rem] bg-white">
-             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Account Status</p>
-             <Badge color={isApproved ? 'bg-green-50 text-green-600' : isRejected ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'} className="mx-auto">
-                {user.status}
-             </Badge>
-          </Card>
+          <div className="grid grid-cols-2 gap-4">
+              <Card className="p-6 text-center border-none shadow-sm rounded-[2rem]">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                 <Badge color={isApproved ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'} className="mx-auto">
+                    {isApproved ? 'Verified' : 'Pending'}
+                 </Badge>
+              </Card>
+              <Card className="p-6 text-center border-none shadow-sm rounded-[2rem]">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Wallet</p>
+                 <p className="font-black text-gray-900">₦0.00</p>
+              </Card>
+          </div>
 
           <Card className="rounded-[2.5rem] p-4 border-none shadow-sm bg-white divide-y divide-gray-50">
              {[
-                { icon: ShieldCheck, label: 'Security', sub: 'Privacy settings', color: 'text-blue-500', bg: 'bg-blue-50' },
-                { icon: Bell, label: 'Notifications', sub: 'App alerts', color: 'text-orange-500', bg: 'bg-orange-50' }
+                { icon: ShieldCheck, label: 'Privacy', sub: 'Security settings', color: 'text-blue-500', bg: 'bg-blue-50' },
+                { icon: Bell, label: 'Alerts', sub: 'Smart notifications', color: 'text-orange-500', bg: 'bg-orange-50' }
              ].map((link, idx) => (
                <div key={idx} className="flex items-center gap-5 py-4 px-4 hover:bg-gray-50 rounded-2xl transition-all cursor-pointer">
                   <div className={`p-3 rounded-xl ${link.bg} ${link.color}`}><link.icon size={20} /></div>
@@ -322,13 +264,13 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
              <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-green" /></div>
            ) : (
              <>
-               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2">Recent Orders</h3>
+               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2">Recent Mart Orders</h3>
                {orders.length === 0 ? (
-                 <div className="text-center py-10 text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] bg-gray-50 rounded-[2rem] border border-dashed">No recent mart orders</div>
+                 <div className="text-center py-10 text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] bg-gray-50 rounded-[2rem] border border-dashed">No orders yet</div>
                ) : (
                  <div className="space-y-3">
                     {orders.map(order => (
-                      <Card key={order.id} className="p-6 border-none shadow-sm rounded-[2rem] flex justify-between items-center bg-white">
+                      <Card key={order.id} className="p-6 border-none shadow-sm rounded-[2rem] flex justify-between items-center">
                          <div className="flex items-center gap-4">
                             <div className="p-3 bg-green-50 text-green-600 rounded-xl"><PackageCheck size={20} /></div>
                             <div>
@@ -339,6 +281,30 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                          <div className="text-right">
                             <p className="font-black text-kubwa-green">₦{order.total.toLocaleString()}</p>
                             <Badge color="bg-gray-100 text-gray-600 mt-1">{order.status}</Badge>
+                         </div>
+                      </Card>
+                    ))}
+                 </div>
+               )}
+
+               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2 mt-8">Delivery History</h3>
+               {deliveries.length === 0 ? (
+                 <div className="text-center py-10 text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] bg-gray-50 rounded-[2rem] border border-dashed">No deliveries yet</div>
+               ) : (
+                 <div className="space-y-3">
+                    {deliveries.map(delivery => (
+                      <Card key={delivery.id} className="p-6 border-none shadow-sm rounded-[2rem] flex justify-between items-center">
+                         <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Truck size={20} /></div>
+                            <div>
+                               <p className="text-sm font-black text-gray-900 uppercase">{delivery.pickup} → {delivery.dropoff}</p>
+                               <p className="text-[10px] font-bold text-gray-400">{delivery.itemType}</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <Badge color={delivery.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
+                               {delivery.status}
+                            </Badge>
                          </div>
                       </Card>
                     ))}

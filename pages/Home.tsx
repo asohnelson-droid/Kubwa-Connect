@@ -33,6 +33,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
   useEffect(() => {
     api.admin.getAnnouncements().then(data => data.length && setVisibleAnnouncement(data[0]));
     
+    // For demo/mock purposes, we simulate some featured vendors if the list is empty
     api.users.getFeaturedVendors().then(data => {
       if (data.length === 0) {
         setFeaturedVendors([
@@ -56,11 +57,8 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
   };
 
   const handleRoleAction = (section: AppSection, role: UserRole) => {
-    // If user already has this role, jump to dashboard. 
-    // Otherwise, redirect to account with intent to signup as this role.
-    if (user?.role === role) {
-      setSection(section);
-    } else {
+    if (user?.role === role) setSection(section);
+    else {
       setAuthIntent({ section, role });
       setSection(AppSection.ACCOUNT);
     }
@@ -176,7 +174,32 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
          ))}
       </div>
 
-      {/* Trending Products (REARRANGED: Now above "Start Earning") */}
+      {/* Role CTA Section */}
+      <div className="px-6 mt-12">
+         <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">Start Earning</h3>
+         </div>
+         <div className="grid grid-cols-2 gap-4">
+            <div 
+              onClick={() => handleRoleAction(AppSection.MART, 'VENDOR')}
+              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
+            >
+               <Store size={28} className="text-kubwa-green mb-3 group-hover:scale-110 transition-transform" />
+               <h4 className="font-black text-xs uppercase tracking-tight">Become a Vendor</h4>
+               <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Sell to Kubwa</p>
+            </div>
+            <div 
+              onClick={() => handleRoleAction(AppSection.FIXIT, 'PROVIDER')}
+              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
+            >
+               <Briefcase size={28} className="text-kubwa-orange mb-3 group-hover:scale-110 transition-transform" />
+               <h4 className="font-black text-xs uppercase tracking-tight">Hire out Skills</h4>
+               <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Find fixit jobs</p>
+            </div>
+         </div>
+      </div>
+
+      {/* Trending Products */}
       <div className="px-6 mt-12">
          <div className="flex justify-between items-end mb-6">
             <div>
@@ -196,49 +219,6 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
                   <p className="text-sm font-black text-kubwa-green px-1 mt-1">₦{product.price.toLocaleString()}</p>
                </div>
             ))}
-         </div>
-      </div>
-
-      {/* Role CTA Section */}
-      <div className="px-6 mt-12">
-         <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">START EARNING</h3>
-         </div>
-         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-                <div 
-                  onClick={() => handleRoleAction(AppSection.VENDOR_DASHBOARD, 'VENDOR')}
-                  className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
-                >
-                   <Store size={28} className="text-kubwa-green mb-3 group-hover:scale-110 transition-transform" />
-                   <h4 className="font-black text-xs uppercase tracking-tight">Become a Vendor</h4>
-                   <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Sell on the Mart</p>
-                </div>
-                <div 
-                  onClick={() => handleRoleAction(AppSection.PROVIDER_DASHBOARD, 'PROVIDER')}
-                  className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
-                >
-                   <Wrench size={28} className="text-kubwa-orange mb-3 group-hover:scale-110 transition-transform" />
-                   <h4 className="font-black text-xs uppercase tracking-tight">Become a Provider</h4>
-                   <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Hire out your skills</p>
-                </div>
-            </div>
-            
-            <div 
-              onClick={() => handleRoleAction(AppSection.RIDE, 'RIDER')}
-              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all flex items-center gap-6"
-            >
-               <div className="bg-blue-100 p-3 rounded-2xl">
-                 <Bike size={32} className="text-blue-600 group-hover:scale-110 transition-transform" />
-               </div>
-               <div>
-                  <h4 className="font-black text-xs uppercase tracking-tight">Become a Rider</h4>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Earn by delivering packages in Kubwa</p>
-               </div>
-               <div className="ml-auto p-2 bg-gray-100 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <ChevronRight size={16} />
-               </div>
-            </div>
          </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { api, KUBWA_AREAS, FIXIT_SERVICES } from '../services/data';
 import { ServiceProvider, User as UserType, Review, AppSection } from '../types';
 import { Button, Card, Badge, Breadcrumbs, Input } from '../components/ui';
 import AuthModal from '../components/AuthModal';
+import { useData } from '../contexts/DataContext';
 
 interface FixItProps {
   user: UserType | null;
@@ -18,6 +19,9 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
+  // Use DataContext for providers
+  const { services: providers, loading: contextLoading, fetchServices } = useData();
+
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null); 
   const [providerReviews, setProviderReviews] = useState<Review[]>([]);
   const [bookingConfirmation, setBookingConfirmation] = useState(false); 
@@ -30,8 +34,6 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, 
   
   const [estimatedDuration, setEstimatedDuration] = useState(1);
   const [isBooking, setIsBooking] = useState(false);
-  const [providers, setProviders] = useState<ServiceProvider[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const [filterRate, setFilterRate] = useState<'any'|'low'|'high'>('any');
   const [filterAvailable, setFilterAvailable] = useState(false);
@@ -47,18 +49,17 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, 
   const [pendingIntent, setPendingIntent] = useState<'chat' | 'hire' | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      const data = await api.getProviders();
-      setProviders(data);
+    fetchServices();
+  }, [fetchServices]);
 
+  useEffect(() => {
+    const loadMyProfile = async () => {
       if (user && user.role === 'PROVIDER') {
         const profile = await api.providers.getMyProfile(user.id);
         setMyProfile(profile);
       }
-      setLoading(false);
     };
-    loadData();
+    loadMyProfile();
   }, [user]);
 
   useEffect(() => {
@@ -86,7 +87,8 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, 
     const success = await api.providers.updateStatus(myProfile.id, newStatus);
     if (success) {
       setMyProfile({ ...myProfile, available: newStatus });
-      setProviders(prev => prev.map(p => p.id === myProfile.id ? { ...p, available: newStatus } : p));
+      // We should ideally refresh services list too, but user is local so we wait or trigger re-fetch
+      fetchServices();
     }
     setTogglingStatus(false);
   };
@@ -152,7 +154,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, 
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {loading ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-kubwa-green" /></div> : 
+        {contextLoading && providers.length === 0 ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-kubwa-green" /></div> : 
           filteredProviders.length === 0 ? <div className="text-center py-20 text-gray-400 font-bold uppercase tracking-widest text-sm">No providers found</div> :
           filteredProviders.map(provider => (
             <Card key={provider.id} className="p-4 flex gap-4 hover:shadow-lg transition-all cursor-pointer border-none shadow-sm" onClick={() => setSelectedProvider(provider)}>

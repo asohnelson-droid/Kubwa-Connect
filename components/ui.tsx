@@ -1,8 +1,7 @@
-
 import React from 'react';
 
 export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' }> = ({ 
-  children, variant = 'primary', className = '', type = 'button', ...props 
+  children, variant = 'primary', className = '', ...props 
 }) => {
   const baseStyle = "px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 select-none";
   
@@ -15,7 +14,7 @@ export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
   };
 
   return (
-    <button type={type} className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
+    <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
       {children}
     </button>
   );
@@ -27,7 +26,6 @@ export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ children,
   </div>
 );
 
-// Modified Badge to accept className to allow positioning/styling overrides (fixes type error in Account.tsx)
 export const Badge: React.FC<{ children: React.ReactNode; color?: string; className?: string }> = ({ children, color = 'bg-gray-100 text-gray-600', className = '' }) => (
   <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-transparent shadow-sm flex items-center gap-1.5 w-fit ${color} ${className}`}>
     {children}

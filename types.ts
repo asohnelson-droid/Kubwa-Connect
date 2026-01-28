@@ -7,6 +7,7 @@ export type PaymentStatus = 'UNPAID' | 'PAID' | 'EXPIRED' | 'PROCESSING';
 
 // Order Management Lifecycle
 export type OrderStatus = 'CREATED' | 'VENDOR_CONFIRMED' | 'RIDER_ASSIGNED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+export type DeliveryStatus = 'PENDING' | 'ACCEPTED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
 
 export interface Transaction {
   id: string;
@@ -52,18 +53,6 @@ export interface User {
   };
 }
 
-export interface ProductOption {
-  id: string;
-  label: string;
-  priceModifier: number;
-}
-
-export interface ProductVariant {
-  id: string;
-  name: string; // e.g. "Size"
-  options: ProductOption[];
-}
-
 export interface Product {
   id: string;
   vendorId: string;
@@ -75,13 +64,8 @@ export interface Product {
   rating: number;
   status: ApprovalStatus;
   rejectionReason?: string;
-  rejectionNote?: string; // Admin feedback for products
-  approvedBy?: string;    // Admin ID who approved
-  approvedAt?: string;    // Timestamp of approval
-  submittedAt?: string;   // Timestamp of vendor submission
   description?: string;
   isPromoted?: boolean; 
-  variants?: ProductVariant[];
 }
 
 export enum AppSection {
@@ -91,8 +75,6 @@ export enum AppSection {
   RIDE = 'RIDE',
   ACCOUNT = 'ACCOUNT',
   ADMIN = 'ADMIN',
-  VENDOR_DASHBOARD = 'VENDOR_DASHBOARD',
-  PROVIDER_DASHBOARD = 'PROVIDER_DASHBOARD',
   ABOUT = 'ABOUT',
   PRIVACY = 'PRIVACY',
   TERMS = 'TERMS',
@@ -110,19 +92,17 @@ export interface MartOrder {
   date: string;
   deliveryOption: 'PICKUP' | 'DISPATCH';
   riderId?: string;
+  deliveryAddress?: string;
+  contactPhone?: string;
 }
 
 export type ActivityItem = any;
-export type CartItem = Product & { 
-  quantity: number; 
-  selectedVariants?: Record<string, string>; // Maps variant group name to option label
-};
-
+export type CartItem = Product & { quantity: number };
 export interface Address { id: string; userId: string; title: string; details: string; }
 export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; date: string; }
 export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; userStats?: any; }
 export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolean; allowAdminPromotions: boolean; supportEmail: string; supportPhone: string; minVersion: string; }
 export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; }
 export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; date: string; }
-export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: string; price: number; date: string; phoneNumber?: string; }
+export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; date: string; phoneNumber?: string; }
 export interface PushNotification { title: string; body: string; }

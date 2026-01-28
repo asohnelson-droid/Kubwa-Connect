@@ -33,9 +33,9 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
-      // Strict 50KB limit to ensure we don't hit localStorage limits
-      if (file.size > 50 * 1024) { 
-        setImageError("This photo is too large for your passport. Use a smaller file (< 50KB).");
+      // Increased limit to 500KB
+      if (file.size > 500 * 1024) { 
+        setImageError("This photo is too large. Please use a file smaller than 500KB.");
         return;
       }
       
@@ -92,8 +92,8 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                  </div>
                )}
 
-               <h3 className="text-xl font-black mb-2 uppercase">Your Passport</h3>
-               <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-8">Upload a small photo for identification.</p>
+               <h3 className="text-xl font-black mb-2 uppercase">Your Passport <span className="text-gray-400 text-sm normal-case font-medium">(Optional)</span></h3>
+               <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-8">Upload a photo for identification.</p>
                <textarea className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-bold h-32 resize-none outline-none focus:ring-2 focus:ring-kubwa-green" placeholder="A short bio about you or your business..." value={bio} onChange={e => setBio(e.target.value)} />
             </div>
           ) : (

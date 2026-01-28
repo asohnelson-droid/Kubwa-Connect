@@ -3,10 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity } from 'lucide-react';
 import { Button, Card, Input } from './ui';
 import { api } from '../services/data';
+import { testSupabaseConnection } from '../services/supabase';
 import { User as UserType, UserRole } from '../types';
 
 interface AuthModalProps {
   onClose: () => void;
+  providerName?: string;
   onSuccess?: (user: UserType) => void;
   initialRole?: UserRole;
   initialMode?: 'LOGIN' | 'SIGNUP' | 'FORGOT' | 'UPDATE_PASSWORD';
@@ -27,6 +29,12 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   
+  // Connection Testing State
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Resend/Timer State
+  const [resending, setResending] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
   useEffect(() => {
@@ -39,98 +47,107 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
-    
     setError('');
     setSuccessMsg('');
+    setConnectionResult(null);
     setLoading(true);
     
     try {
       if (mode === 'LOGIN') {
           const result = await api.auth.signIn(email, password);
           if (result.user) {
-             // Fetch full profile to ensure all metadata is present
-             const fullUser = await api.auth.getSession();
-             if (fullUser && onSuccess) onSuccess(fullUser);
+             if (onSuccess) onSuccess(result.user);
+             onClose(); 
           } else {
-             setError(result.error || "Invalid email or password. Please try again.");
+             setError(result.error || "Login failed.");
           }
       } else if (mode === 'SIGNUP') {
-          if (name.trim().length < 3) {
-            setError("Please enter your full name.");
-            setLoading(false);
-            return;
-          }
           const result = await api.auth.signUp(email, password, name, initialRole);
           if (result.error) {
               setError(result.error);
           } else if (result.requiresVerification) {
               setVerificationSent(true);
           } else if (result.user) {
-              const fullUser = await api.auth.getSession();
-              if (fullUser && onSuccess) onSuccess(fullUser);
+              if (onSuccess) onSuccess(result.user);
+              onClose();
           }
       } else if (mode === 'FORGOT') {
           const result = await api.auth.resetPassword(email);
           if (result.success) {
-              setSuccessMsg("Reset link sent! Please check your email inbox.");
-              setTimeout(() => {
-                setMode('LOGIN');
-                setSuccessMsg('');
-              }, 4000);
+              setSuccessMsg("Reset link sent! Please check your inbox.");
           } else {
-              setError(result.error || "Could not process request. Verify your email.");
+              setError(result.error || "Failed to send reset link.");
           }
       } else if (mode === 'UPDATE_PASSWORD') {
           const result = await api.auth.updatePassword(password);
           if (result.success) {
-              setSuccessMsg("Password updated successfully!");
-              setTimeout(() => setMode('LOGIN'), 1500);
+              setSuccessMsg("Password updated successfully! You can now sign in.");
+              setTimeout(() => {
+                setMode('LOGIN');
+                setSuccessMsg('');
+              }, 2000);
           } else {
-              setError(result.error || "Update failed. Use a stronger password.");
+              setError(result.error || "Failed to update password.");
           }
       }
     } catch (e: any) {
-      console.error("[AuthModal] Error:", e);
-      setError("A connection error occurred. Check your internet and try again.");
+      setError(e.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRunDiagnostics = async () => {
+    setTestingConnection(true);
+    const result = await testSupabaseConnection();
+    setConnectionResult(result);
+    setTestingConnection(false);
+  };
+
   const handleResend = async () => {
     if (resendTimer > 0 || !email) return;
-    setLoading(true);
-    try {
-      const result = await api.auth.resendVerification(email);
-      if (result.success) {
-        setResendTimer(60);
-        setSuccessMsg("Verification email resent!");
-      } else {
-        setError(result.error || "Failed to resend. Please try again later.");
+    setResending(true);
+    setError('');
+    const result = await api.auth.resendVerification(email);
+    if (result.success) {
+      setResendTimer(60); 
+      setSuccessMsg("Verification link resent! Check your inbox.");
+      if (mode === 'LOGIN') {
+        setTimeout(() => setVerificationSent(true), 1500);
       }
-    } catch (e) {
-      setError("Network error. Try again.");
+    } else {
+      setError(result.error || "Failed to resend.");
     }
-    setLoading(false);
+    setResending(false);
   };
+
+  const isNetworkError = error.toLowerCase().includes("failed to fetch") || 
+                        error.toLowerCase().includes("network error") || 
+                        error.toLowerCase().includes("blocked");
 
   if (verificationSent) {
     return (
       <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-        <Card className="w-full max-w-sm relative p-8 text-center animate-zoom-in rounded-[3rem] border-none shadow-2xl bg-white">
+        <Card className="w-full max-w-sm relative p-8 text-center animate-zoom-in rounded-[3rem] border-none shadow-2xl">
           <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
              <Mail size={36} />
           </div>
-          <h3 className="font-black text-2xl mb-2 uppercase tracking-tight">Verify Email</h3>
-          <p className="text-gray-500 mb-8 text-xs font-bold leading-relaxed">
-            We sent an activation link to <span className="text-gray-900 font-black">{email}</span>. Please click it to confirm your account.
+          <h3 className="font-black text-2xl mb-2 uppercase tracking-tight">Check your email</h3>
+          <p className="text-gray-500 mb-6 text-xs font-bold leading-relaxed">
+            We've sent a secure activation link to:<br/>
+            <span className="text-gray-900 font-black">{email}</span>
           </p>
+          <div className="bg-gray-50 p-4 rounded-2xl mb-8 flex gap-3 text-left">
+             <Info size={16} className="text-kubwa-green shrink-0 mt-1" />
+             <p className="text-[10px] font-bold text-gray-500 leading-tight">
+                Can't find it? Please check your <span className="text-gray-900">Spam</span> or <span className="text-gray-900">Promotions</span> folder. 
+             </p>
+          </div>
           <div className="space-y-3">
-            <Button onClick={handleResend} disabled={loading || resendTimer > 0} variant="outline" className="w-full h-14 text-[10px] font-black">
-              {resendTimer > 0 ? `Try again in ${resendTimer}s` : 'Resend Link'}
+            <Button onClick={handleResend} disabled={resending || resendTimer > 0} variant="outline" className="w-full h-14 text-[10px] font-black">
+              {resending ? <Loader2 size={16} className="animate-spin" /> : (resendTimer > 0 ? `Try again in ${resendTimer}s` : 'Resend Activation Link')}
             </Button>
-            <Button onClick={onClose} className="w-full h-14 text-xs font-black">Close</Button>
+            <Button onClick={onClose} className="w-full h-14 text-xs font-black">Close & Check Inbox</Button>
           </div>
         </Card>
       </div>
@@ -139,20 +156,20 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-      <Card className="w-full max-w-sm relative animate-zoom-in rounded-[3rem] border-none shadow-2xl overflow-hidden p-0 bg-white">
+      <Card className="w-full max-w-sm relative animate-zoom-in rounded-[3rem] border-none shadow-2xl overflow-hidden p-0">
         <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors z-10">
           <X size={24} strokeWidth={3} />
         </button>
-        <form onSubmit={handleSubmit} className="p-10">
+        <form onSubmit={handleSubmit} className="p-10 max-h-[90vh] overflow-y-auto no-scrollbar">
           <div className="text-center mb-10">
              <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
-                {mode === 'SIGNUP' ? <UserPlus size={36} /> : mode === 'FORGOT' ? <KeyRound size={36} /> : <span className="text-3xl font-black">⚡</span>}
+                {mode === 'SIGNUP' ? <UserPlus size={36} /> : mode === 'FORGOT' || mode === 'UPDATE_PASSWORD' ? <KeyRound size={36} /> : <span className="text-3xl">⚡</span>}
              </div>
-             <h3 className="text-3xl font-black text-gray-900 mb-1 uppercase tracking-tight">
-               {mode === 'LOGIN' ? 'Sign In' : mode === 'SIGNUP' ? 'Join KC' : mode === 'FORGOT' ? 'Recovery' : 'Update'}
+             <h3 className="text-3xl font-black text-gray-900 mb-1 uppercase tracking-tight leading-none">
+               {mode === 'LOGIN' ? 'Welcome' : mode === 'SIGNUP' ? 'Join Us' : mode === 'FORGOT' ? 'Recovery' : 'New Pass'}
              </h3>
              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-               {mode === 'SIGNUP' && initialRole !== 'USER' ? `New ${initialRole} Account` : 'Kubwa Connect Portal'}
+               {mode === 'FORGOT' ? 'Reset your password' : mode === 'UPDATE_PASSWORD' ? 'Set your new password' : 'Kubwa Connect Community'}
              </p>
           </div>
 
@@ -174,26 +191,69 @@ const AuthModal: React.FC<AuthModalProps> = ({
               {mode !== 'FORGOT' && (
                 <div className="relative">
                   <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'LOGIN' ? "Password" : "Create Password"} required />
+                  <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'UPDATE_PASSWORD' ? "New Password" : "Password"} required />
                 </div>
               )}
 
               {error && (
-                <div className="p-4 bg-red-50 text-red-700 rounded-2xl flex gap-3 items-center animate-fade-in border border-red-100">
-                  <AlertCircle size={18} className="shrink-0" />
-                  <p className="text-[10px] font-bold leading-tight">{error}</p>
+                <div className="p-5 bg-red-50 text-red-700 rounded-[2rem] flex flex-col gap-4 animate-fade-in border border-red-100 shadow-sm">
+                  <div className="flex gap-3 items-start">
+                    {isNetworkError ? <WifiOff size={20} className="shrink-0 text-red-600" /> : <AlertCircle size={20} className="shrink-0" />}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-black leading-tight uppercase tracking-wide">Connection Failure</p>
+                      <p className="text-[10px] font-medium leading-relaxed opacity-80">
+                        {error}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {isNetworkError && (
+                    <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-red-100/50">
+                       <div className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-400">
+                         <HelpCircle size={12} /> Diagnostic Tools
+                       </div>
+                       
+                       <Button 
+                         type="button" 
+                         variant="outline" 
+                         className="w-full h-10 text-[9px] font-black border-red-100 bg-white"
+                         onClick={handleRunDiagnostics}
+                         disabled={testingConnection}
+                       >
+                         {testingConnection ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} TEST PROJECT CONNECTION
+                       </Button>
+
+                       {connectionResult && (
+                         <div className={`p-2 rounded-xl text-[9px] font-bold ${connectionResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                           {connectionResult.ok ? '✅ ' : '❌ '}{connectionResult.message}
+                         </div>
+                       )}
+
+                       {!connectionResult?.ok && (
+                         <ul className="text-[9px] font-bold text-gray-600 space-y-1.5 list-disc pl-4 mt-2">
+                            <li>Check for <b>Adblockers</b> (uBlock, Ghostery).</li>
+                            <li>Brave users: Turn off <b>Brave Shields</b> for this site.</li>
+                            <li>Ensure you are not on a restricted Office or Public Wi-Fi.</li>
+                            <li>Open this app in <b>Incognito Mode</b>.</li>
+                         </ul>
+                       )}
+                    </div>
+                  )}
                 </div>
               )}
 
               {successMsg && (
-                <div className="p-4 bg-green-50 text-green-700 rounded-2xl flex gap-3 items-center animate-fade-in border border-green-100">
+                <div className="p-4 bg-green-50 text-green-700 rounded-2xl flex gap-3 items-center animate-fade-in">
                   <CheckCircle size={18} className="shrink-0" />
                   <p className="text-[10px] font-black leading-tight">{successMsg}</p>
                 </div>
               )}
 
-              <Button type="submit" disabled={loading} className="w-full h-16 text-xs font-black mt-4">
-                  {loading ? <Loader2 size={24} className="animate-spin" /> : mode === 'LOGIN' ? 'CONTINUE' : mode === 'SIGNUP' ? 'GET STARTED' : 'SEND LINK'}
+              <Button type="submit" disabled={loading} className="w-full h-16 text-xs font-black shadow-xl mt-4">
+                  {loading ? <Loader2 size={24} className="animate-spin" /> : 
+                   mode === 'LOGIN' ? 'SIGN IN' : 
+                   mode === 'SIGNUP' ? 'CREATE ACCOUNT' : 
+                   mode === 'FORGOT' ? 'SEND RESET LINK' : 'UPDATE PASSWORD'}
               </Button>
               
               <div className="text-center mt-6 flex flex-col gap-3">
@@ -206,9 +266,11 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   <button type="button" onClick={() => {
                     setError('');
                     setSuccessMsg('');
-                    setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
+                    setConnectionResult(null);
+                    if (mode === 'LOGIN') setMode('SIGNUP');
+                    else setMode('LOGIN');
                   }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">
-                      {mode === 'LOGIN' ? "Create New Profile" : "Back to Sign In"}
+                      {mode === 'LOGIN' ? "New here? Create Account" : "Back to Sign In"}
                   </button>
               </div>
           </div>
