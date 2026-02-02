@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Search, Star, Loader2, Power, X, Briefcase, MapPin, MessageCircle, Shield, Wrench, Edit2, Plus, Minus, ChevronRight } from 'lucide-react';
 import { api, KUBWA_AREAS, FIXIT_SERVICES } from '../services/data';
 import { ServiceProvider, User as UserType, Review, AppSection } from '../types';
-import { Button, Card, Badge, Breadcrumbs, Input } from '../components/ui';
+import { Button, Card, Badge, Breadcrumbs, Input, BackButton } from '../components/ui';
 import AuthModal from '../components/AuthModal';
 import { useData } from '../contexts/DataContext';
 
@@ -13,9 +14,10 @@ interface FixItProps {
   onChat?: (orderId: string) => void;
   setSection: (section: AppSection) => void;
   refreshUser: () => void;
+  goBack?: () => void;
 }
 
-const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, refreshUser }) => {
+const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, refreshUser, goBack }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
@@ -112,10 +114,14 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, onChat, setSection, 
 
   return (
     <div className="pb-24 pt-4 px-4">
-      <Breadcrumbs items={[
-        { label: 'Home', onClick: () => setSection(AppSection.HOME) },
-        { label: 'FixIt' }
-      ]} />
+      {user && goBack ? (
+        <BackButton onClick={goBack} />
+      ) : (
+        <Breadcrumbs items={[
+          { label: 'Home', onClick: () => setSection(AppSection.HOME) },
+          { label: 'FixIt' }
+        ]} />
+      )}
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">FIXIT SERVICES</h2>

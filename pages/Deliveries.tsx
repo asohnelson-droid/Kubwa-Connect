@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Truck, Package, MapPin, Clock, Navigation, Loader2, Crown, CheckCircle, Search, Bookmark, Phone, Power, User as UserIcon, Minus, Plus, RefreshCw } from 'lucide-react';
 import { api } from '../services/data';
-import { Button, Card, Input, Badge, Breadcrumbs } from '../components/ui';
+import { Button, Card, Input, Badge, Breadcrumbs, BackButton } from '../components/ui';
 import { User, DeliveryRequest, Address, AppSection, DeliveryStatus } from '../types';
 
 interface DeliveriesProps {
@@ -10,9 +11,10 @@ interface DeliveriesProps {
   onRequireAuth: () => void;
   setSection: (section: AppSection) => void;
   refreshUser: () => void;
+  goBack?: () => void;
 }
 
-const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection, refreshUser }) => {
+const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection, refreshUser, goBack }) => {
   const [activeTab, setActiveTab] = useState<'request' | 'track' | 'jobs' | 'orders'>('request');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
@@ -145,10 +147,14 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
 
   return (
     <div className="pb-24 pt-4 px-4 relative">
-      <Breadcrumbs items={[
-        { label: 'Home', onClick: () => setSection(AppSection.HOME) },
-        { label: 'Ride' }
-      ]} />
+      {user && goBack ? (
+        <BackButton onClick={goBack} />
+      ) : (
+        <Breadcrumbs items={[
+          { label: 'Home', onClick: () => setSection(AppSection.HOME) },
+          { label: 'Ride' }
+        ]} />
+      )}
 
       {isSearching && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6 text-center animate-fade-in backdrop-blur-sm">

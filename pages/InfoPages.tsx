@@ -1,14 +1,18 @@
 
+
 import React, { useState } from 'react';
-import { AppSection } from '../types';
+import { AppSection, User } from '../types';
 import { ArrowLeft, Mail, MapPin, Phone, ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { BackButton } from '../components/ui';
 
 interface InfoPagesProps {
   section: AppSection;
   setSection: (section: AppSection) => void;
+  goBack?: () => void;
+  user?: User | null;
 }
 
-const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection }) => {
+const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
@@ -169,12 +173,16 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection }) => {
 
   return (
     <div className="pb-24 pt-4 px-4 min-h-screen bg-gray-50">
-      <button 
-        onClick={() => setSection(AppSection.HOME)}
-        className="flex items-center gap-2 text-gray-600 mb-6 hover:text-kubwa-green transition-colors"
-      >
-        <ArrowLeft size={20} /> Back to Home
-      </button>
+      {user && goBack ? (
+        <BackButton onClick={goBack} />
+      ) : (
+        <button 
+          onClick={() => setSection(AppSection.HOME)}
+          className="flex items-center gap-2 text-gray-600 mb-6 hover:text-kubwa-green transition-colors"
+        >
+          <ArrowLeft size={20} /> Back to Home
+        </button>
+      )}
 
       {renderContent()}
 

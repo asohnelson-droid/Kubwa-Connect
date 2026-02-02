@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { User, AppSection, MonetisationTier, UserRole, PaymentIntent, MartOrder, DeliveryRequest } from '../types';
 import { api } from '../services/data';
-import { Button, Card, Badge } from '../components/ui';
+import { Button, Card, Badge, BackButton } from '../components/ui';
 import AuthModal from '../components/AuthModal';
 import VendorDashboard from '../components/VendorDashboard';
 import { 
@@ -30,9 +31,10 @@ interface AccountProps {
   refreshUser: (targetSection?: AppSection) => void;
   authIntent: { section: AppSection; role: UserRole } | null;
   clearAuthIntent: () => void;
+  goBack?: () => void;
 }
 
-const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUser, authIntent, clearAuthIntent }) => {
+const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUser, authIntent, clearAuthIntent, goBack }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'dashboard'>('profile');
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
@@ -143,6 +145,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
 
   return (
     <div className="pb-32 pt-8 px-6 max-w-2xl mx-auto animate-fade-in">
+      {goBack && <BackButton onClick={goBack} />}
+      
       {/* Profile Header */}
       <div className="mb-6 relative">
         <Card className="bg-gray-900 text-white border-none shadow-2xl rounded-[3rem] p-0 overflow-hidden">

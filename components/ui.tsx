@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowLeft } from 'lucide-react';
 
 export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' }> = ({ 
   children, variant = 'primary', className = '', ...props 
@@ -74,4 +75,16 @@ export const Breadcrumbs: React.FC<{ items: { label: string; onClick?: () => voi
       </React.Fragment>
     ))}
   </nav>
+);
+
+export const BackButton: React.FC<{ onClick: () => void; label?: string }> = ({ onClick, label = "Back" }) => (
+  <button 
+    onClick={onClick} 
+    className="flex items-center gap-2 text-gray-500 hover:text-kubwa-green transition-colors mb-6 font-bold text-xs uppercase tracking-widest group w-fit"
+  >
+    <div className="p-2 rounded-full bg-gray-100 group-hover:bg-kubwa-green/10 transition-colors">
+        <ArrowLeft size={16} />
+    </div>
+    {label}
+  </button>
 );

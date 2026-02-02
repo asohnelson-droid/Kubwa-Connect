@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabase';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus } from '../types';
 
@@ -19,7 +20,7 @@ export const getParentCategory = (category: string) => {
 /**
  * MAPS SUPABASE AUTH METADATA TO APP USER TYPE
  * 
- * Strict Enforcement: Free vendors are capped at 6 products.
+ * Strict Enforcement: Free vendors are capped at 4 products.
  */
 const mapUserMetadata = (sessionUser: any): User => {
     if (!sessionUser) return null as any;
@@ -33,8 +34,8 @@ const mapUserMetadata = (sessionUser: any): User => {
     const tier = (meta.tier || 'FREE') as MonetisationTier;
     const isPremiumTier = tier === 'VERIFIED' || tier === 'FEATURED' || meta.subscription?.tier === 'ELITE';
     
-    // STRICT LIMIT: 6 for Free Vendors, 999 for Premium/Other
-    const defaultLimit = role === 'VENDOR' ? (isPremiumTier ? 999 : 6) : 999;
+    // STRICT LIMIT: 4 for Free Vendors, 999 for Premium/Other
+    const defaultLimit = role === 'VENDOR' ? (isPremiumTier ? 999 : 4) : 999;
     const calculatedLimit = meta.productLimit ?? defaultLimit;
 
     return {
@@ -124,7 +125,7 @@ export const api = {
                             isSetupComplete: false, 
                             status: initialStatus, 
                             tier: 'FREE', 
-                            productLimit: role === 'VENDOR' ? 6 : 999, 
+                            productLimit: role === 'VENDOR' ? 4 : 999, 
                             paymentStatus: 'UNPAID',
                             verificationStatus: 'NONE'
                         } 

@@ -1,23 +1,27 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
-import Home from './pages/Home';
-import Mart from './pages/Mart';
-import FixIt from './pages/FixIt';
-import Deliveries from './pages/Deliveries';
-import Admin from './pages/Admin';
-import Account from './pages/Account';
-import InfoPages from './pages/InfoPages';
-import Onboarding from './pages/Onboarding';
 import SetupWizard from './components/SetupWizard';
 import { askKubwaAssistant } from './services/ai';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
 import { useData } from './contexts/DataContext';
 
+// Lazy Load Pages for Performance Optimization
+const Home = React.lazy(() => import('./pages/Home'));
+const Mart = React.lazy(() => import('./pages/Mart'));
+const FixIt = React.lazy(() => import('./pages/FixIt'));
+const Deliveries = React.lazy(() => import('./pages/Deliveries'));
+const Admin = React.lazy(() => import('./pages/Admin'));
+const Account = React.lazy(() => import('./pages/Account'));
+const InfoPages = React.lazy(() => import('./pages/InfoPages'));
+const Onboarding = React.lazy(() => import('./pages/Onboarding'));
+
 function App() {
   const [currentSection, setCurrentSection] = useState<AppSection>(AppSection.HOME);
+  const [history, setHistory] = useState<AppSection[]>([]); // Navigation History Stack
   const [user, setUser] = useState<UserType | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -30,6 +34,27 @@ function App() {
   const [authIntent, setAuthIntent] = useState<{ section: AppSection; role: UserRole } | null>(null);
 
   /**
+   * NAVIGATION LOGIC
+   * Manages history stack to allow standardized "Back" functionality
+   */
+  const navigateTo = useCallback((section: AppSection) => {
+    if (section === currentSection) return;
+    setHistory(prev => [...prev, currentSection]);
+    setCurrentSection(section);
+  }, [currentSection]);
+
+  const goBack = useCallback(() => {
+    if (history.length === 0) {
+      setCurrentSection(AppSection.HOME);
+      return;
+    }
+    const newHistory = [...history];
+    const prev = newHistory.pop();
+    setHistory(newHistory);
+    if (prev) setCurrentSection(prev);
+  }, [history]);
+
+  /**
    * STABLE USER REFRESH
    */
   const refreshUser = useCallback(async (targetSection?: AppSection) => {
@@ -39,7 +64,7 @@ function App() {
       const currentUser = await api.auth.getSession();
       setUser(currentUser);
       if (currentUser && targetSection) {
-        setCurrentSection(targetSection);
+        navigateTo(targetSection);
       }
       return currentUser;
     } catch (err) {
@@ -48,7 +73,7 @@ function App() {
     } finally {
       isRefreshingRef.current = false;
     }
-  }, []);
+  }, [navigateTo]);
 
   /**
    * APP LIFECYCLE
@@ -88,6 +113,7 @@ function App() {
         if (mounted) {
           setUser(null);
           setCurrentSection(AppSection.HOME);
+          setHistory([]);
         }
       }
     });
@@ -112,22 +138,22 @@ function App() {
 
   const renderContent = () => {
     if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-        return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
+        return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
     }
 
     switch (currentSection) {
-      case AppSection.HOME: return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
-      case AppSection.MART: return <Mart addToCart={addToCart} cart={cart} setCart={setCart} user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
-      case AppSection.FIXIT: return <FixIt user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
-      case AppSection.RIDE: return <Deliveries user={user} onRequireAuth={() => setCurrentSection(AppSection.ACCOUNT)} setSection={setCurrentSection} refreshUser={refreshUser} />;
+      case AppSection.HOME: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
+      case AppSection.MART: return <Mart addToCart={addToCart} cart={cart} setCart={setCart} user={user} onRequireAuth={() => navigateTo(AppSection.ACCOUNT)} setSection={navigateTo} refreshUser={refreshUser} goBack={goBack} />;
+      case AppSection.FIXIT: return <FixIt user={user} onRequireAuth={() => navigateTo(AppSection.ACCOUNT)} setSection={navigateTo} refreshUser={refreshUser} goBack={goBack} />;
+      case AppSection.RIDE: return <Deliveries user={user} onRequireAuth={() => navigateTo(AppSection.ACCOUNT)} setSection={navigateTo} refreshUser={refreshUser} goBack={goBack} />;
       case AppSection.ADMIN: return <Admin currentUser={user} />;
-      case AppSection.ACCOUNT: return <Account user={user} setUser={setUser} setSection={setCurrentSection} authIntent={authIntent} clearAuthIntent={() => setAuthIntent(null)} refreshUser={refreshUser} />;
+      case AppSection.ACCOUNT: return <Account user={user} setUser={setUser} setSection={navigateTo} authIntent={authIntent} clearAuthIntent={() => setAuthIntent(null)} refreshUser={refreshUser} goBack={goBack} />;
       case AppSection.ABOUT:
       case AppSection.PRIVACY:
       case AppSection.TERMS:
       case AppSection.CONTACT:
-      case AppSection.FAQ: return <InfoPages section={currentSection} setSection={setCurrentSection} />;
-      default: return <Home setSection={setCurrentSection} user={user} setAuthIntent={setAuthIntent} />;
+      case AppSection.FAQ: return <InfoPages section={currentSection} setSection={navigateTo} goBack={goBack} user={user} />;
+      default: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
     }
   };
 
@@ -144,7 +170,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
-      {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+      <Suspense fallback={
+         <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center">
+           <Loader2 className="animate-spin text-kubwa-green" size={40} />
+         </div>
+      }>
+        {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+      </Suspense>
       
       {user && !user.isSetupComplete && (
         <SetupWizard 
@@ -157,7 +189,13 @@ function App() {
       )}
       
       <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">
-         {renderContent()}
+         <Suspense fallback={
+           <div className="h-full flex items-center justify-center">
+             <Loader2 className="animate-spin text-gray-300" size={32} />
+           </div>
+         }>
+           {renderContent()}
+         </Suspense>
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-6 py-5 flex justify-between items-center z-40 rounded-t-[2.5rem] shadow-2xl">
@@ -170,7 +208,7 @@ function App() {
         ].map((item) => (
           <button 
             key={item.id}
-            onClick={() => setCurrentSection(item.id)}
+            onClick={() => navigateTo(item.id)}
             className={`flex flex-col items-center gap-1 transition-all ${currentSection === item.id ? 'text-kubwa-green' : 'text-gray-300'}`}
           >
             <item.icon size={22} strokeWidth={currentSection === item.id ? 3 : 2} />

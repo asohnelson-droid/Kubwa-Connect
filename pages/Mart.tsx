@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle, ShieldCheck, TrendingUp, CheckCircle, MapPin } from 'lucide-react';
 import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
 import { Product, CartItem, User, AppSection } from '../types';
-import { Button, Badge, Card, Breadcrumbs, Sheet, Input } from '../components/ui';
+import { Button, Badge, Card, Breadcrumbs, Sheet, Input, BackButton } from '../components/ui';
 import { useData } from '../contexts/DataContext';
 
 interface MartProps {
@@ -14,9 +15,10 @@ interface MartProps {
   onRequireAuth: () => void;
   setSection: (section: AppSection) => void;
   refreshUser: () => void;
+  goBack?: () => void;
 }
 
-const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAuth, setSection, refreshUser }) => {
+const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAuth, setSection, refreshUser, goBack }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParentCategory, setSelectedParentCategory] = useState('All'); 
   
@@ -71,7 +73,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     const myProductsCount = products.filter(p => p.vendorId === user.id).length;
     
     // Enforcement Logic: Use dynamic limit from user object
-    const limit = user.productLimit || 6; 
+    const limit = user.productLimit || 4; 
 
     if (myProductsCount >= limit) {
       setShowUpgradeModal(true);
@@ -131,6 +133,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
   return (
     <div className="pb-24 pt-4 px-4">
+      {user && goBack && <BackButton onClick={goBack} />}
+      
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">KUBWA MART</h2>
         <div className="flex items-center gap-2">
@@ -212,7 +216,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               </div>
               
               <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none">Limit Reached</h3>
-              <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest mb-8">Free Tier Cap: 6 Products</p>
+              <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest mb-8">Free Tier Cap: 4 Products</p>
               
               <div className="space-y-4 mb-10 text-left bg-gray-50 p-6 rounded-[2rem]">
                  {[
