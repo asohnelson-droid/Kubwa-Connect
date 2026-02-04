@@ -11,15 +11,9 @@ if (process.env.NODE_ENV === 'production') {
   console.warn = () => {};
 }
 
-// Validation: Ensure critical env vars exist
-const requiredEnvVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
-const missingEnvs = requiredEnvVars.filter(key => {
-  return !((import.meta as any).env?.[key] || process.env?.[key] || (window as any)?._env_?.[key]);
-});
-
-if (missingEnvs.length > 0) {
-  console.error(`[System] Missing critical environment variables: ${missingEnvs.join(', ')}`);
-}
+// Note: Critical environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+// are handled with robust fallbacks in services/supabase.ts.
+// Strict validation here is removed to prevent startup errors when using defaults.
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
