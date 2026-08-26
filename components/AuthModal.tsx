@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity } from 'lucide-react';
+import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity, Store, Wrench, Truck } from 'lucide-react';
 import { Button, Card, Input } from './ui';
 import { api } from '../services/data';
 import { testSupabaseConnection } from '../services/supabase';
@@ -14,6 +14,17 @@ interface AuthModalProps {
   initialMode?: 'LOGIN' | 'SIGNUP' | 'FORGOT' | 'UPDATE_PASSWORD';
 }
 
+// The only roles a person can choose for themselves at signup. ADMIN/SUPER_ADMIN
+// are never offered here -- see the signup allowlist enforced server-side in
+// api.auth.signUp and the handle_new_user DB trigger.
+const SIGNUP_ROLE_OPTIONS: { role: UserRole; label: string; sub: string; icon: React.ElementType }[] = [
+  { role: 'USER', label: 'Just Browsing', sub: 'Shop & book services', icon: UserIcon },
+  { role: 'VENDOR', label: 'Start a Shop', sub: 'Sell in Kubwa Mart', icon: Store },
+  { role: 'PROVIDER', label: 'List a Skill', sub: 'Offer repairs & services', icon: Wrench },
+  { role: 'RIDER', label: 'Become a Rider', sub: 'Deliver orders & earn', icon: Truck },
+];
+const PUBLIC_SIGNUP_ROLES: UserRole[] = SIGNUP_ROLE_OPTIONS.map(o => o.role);
+
 const AuthModal: React.FC<AuthModalProps> = ({ 
   onClose, 
   onSuccess, 
@@ -21,6 +32,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'LOGIN'
 }) => {
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT' | 'UPDATE_PASSWORD'>(initialMode);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(PUBLIC_SIGNUP_ROLES.includes(initialRole) ? initialRole : 'USER');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -62,7 +74,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
              setError(result.error || "Login failed.");
           }
       } else if (mode === 'SIGNUP') {
-          const result = await api.auth.signUp(email, password, name, initialRole);
+          const result = await api.auth.signUp(email, password, name, selectedRole);
           if (result.error) {
               setError(result.error);
           } else if (result.requiresVerification) {
@@ -124,6 +136,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const isNetworkError = error.toLowerCase().includes("failed to fetch") || 
                         error.toLowerCase().includes("network error") || 
                         error.toLowerCase().includes("blocked");
+  const isAlreadyRegistered = mode === 'SIGNUP' && error.toLowerCase().includes("already registered");
+  const ErrorIcon = isNetworkError ? WifiOff : isAlreadyRegistered ? UserIcon : AlertCircle;
+  const errorHeader = isNetworkError ? 'Connection Failure'
+    : isAlreadyRegistered ? 'Account Already Exists'
+    : mode === 'LOGIN' ? 'Sign In Failed'
+    : mode === 'SIGNUP' ? 'Sign Up Failed'
+    : mode === 'FORGOT' ? 'Reset Failed'
+    : 'Update Failed';
 
   if (verificationSent) {
     return (
@@ -175,6 +195,26 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
           <div className="space-y-4">
               {mode === 'SIGNUP' && (
+                <div className="mb-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 text-center">How will you use Kubwa Connect?</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {SIGNUP_ROLE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.role}
+                        type="button"
+                        onClick={() => setSelectedRole(opt.role)}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all ${selectedRole === opt.role ? 'border-kubwa-green bg-kubwa-green/5' : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}
+                      >
+                        <opt.icon size={20} className={selectedRole === opt.role ? 'text-kubwa-green' : 'text-gray-400'} />
+                        <p className="text-xs font-black text-gray-900 mt-2">{opt.label}</p>
+                        <p className="text-[9px] font-bold text-gray-400 mt-0.5">{opt.sub}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mode === 'SIGNUP' && (
                 <div className="relative">
                   <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                   <Input className="pl-14 h-14" value={name} onChange={e => setName(e.target.value)} placeholder="Full Name" required />
@@ -198,14 +238,24 @@ const AuthModal: React.FC<AuthModalProps> = ({
               {error && (
                 <div className="p-5 bg-red-50 text-red-700 rounded-[2rem] flex flex-col gap-4 animate-fade-in border border-red-100 shadow-sm">
                   <div className="flex gap-3 items-start">
-                    {isNetworkError ? <WifiOff size={20} className="shrink-0 text-red-600" /> : <AlertCircle size={20} className="shrink-0" />}
+                    <ErrorIcon size={20} className="shrink-0" />
                     <div className="space-y-2">
-                      <p className="text-[11px] font-black leading-tight uppercase tracking-wide">Connection Failure</p>
+                      <p className="text-[11px] font-black leading-tight uppercase tracking-wide">{errorHeader}</p>
                       <p className="text-[10px] font-medium leading-relaxed opacity-80">
                         {error}
                       </p>
                     </div>
                   </div>
+
+                  {isAlreadyRegistered && (
+                    <Button
+                      type="button"
+                      className="w-full h-11 text-[10px]"
+                      onClick={() => { setError(''); setPassword(''); setMode('LOGIN'); }}
+                    >
+                      SIGN IN INSTEAD
+                    </Button>
+                  )}
                   
                   {isNetworkError && (
                     <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-red-100/50">
@@ -263,15 +313,17 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     </button>
                   )}
                   
-                  <button type="button" onClick={() => {
-                    setError('');
-                    setSuccessMsg('');
-                    setConnectionResult(null);
-                    if (mode === 'LOGIN') setMode('SIGNUP');
-                    else setMode('LOGIN');
-                  }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">
-                      {mode === 'LOGIN' ? "New here? Create Account" : "Back to Sign In"}
-                  </button>
+                  {!(mode === 'LOGIN' && initialRole === 'ADMIN') && (
+                    <button type="button" onClick={() => {
+                      setError('');
+                      setSuccessMsg('');
+                      setConnectionResult(null);
+                      if (mode === 'LOGIN') setMode('SIGNUP');
+                      else setMode('LOGIN');
+                    }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">
+                        {mode === 'LOGIN' ? "New here? Create Account" : "Back to Sign In"}
+                    </button>
+                  )}
               </div>
           </div>
         </form>

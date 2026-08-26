@@ -8,6 +8,7 @@ export type PaymentStatus = 'UNPAID' | 'PAID' | 'EXPIRED' | 'PROCESSING';
 // Order Management Lifecycle
 export type OrderStatus = 'CREATED' | 'VENDOR_CONFIRMED' | 'RIDER_ASSIGNED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
 export type DeliveryStatus = 'PENDING' | 'ACCEPTED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+export type ServiceOrderStatus = 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 export interface Transaction {
   id: string;
@@ -60,6 +61,7 @@ export interface Product {
   price: number;
   category: string;
   image: string;
+  images?: string[];
   stock: number;
   rating: number;
   status: ApprovalStatus;
@@ -89,7 +91,7 @@ export interface MartOrder {
   items: CartItem[];
   total: number;
   status: OrderStatus;
-  date: string;
+  created_at: string;
   deliveryOption: 'PICKUP' | 'DISPATCH';
   riderId?: string;
   deliveryAddress?: string;
@@ -99,10 +101,11 @@ export interface MartOrder {
 export type ActivityItem = any;
 export type CartItem = Product & { quantity: number };
 export interface Address { id: string; userId: string; title: string; details: string; }
-export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; date: string; }
+export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; created_at: string; }
 export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; userStats?: any; }
 export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolean; allowAdminPromotions: boolean; supportEmail: string; supportPhone: string; minVersion: string; }
 export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; }
-export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; date: string; }
-export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; date: string; phoneNumber?: string; }
+export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; created_at: string; }
+export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; created_at: string; phoneNumber?: string; }
+export interface ServiceOrder { id: string; userId: string; serviceId: string; amount: number; status: ServiceOrderStatus; created_at: string; providers?: { userId: string; name: string; image: string; category: string }; }
 export interface PushNotification { title: string; body: string; }

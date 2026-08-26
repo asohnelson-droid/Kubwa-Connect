@@ -27,8 +27,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedProduct?.id]);
 
   // Checkout State
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -111,8 +116,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         deliveryOption: 'DISPATCH',
         vendorId: cart[0].vendorId,
         deliveryAddress: deliveryAddress.trim(),
-        contactPhone: contactPhone.trim(),
-        date: new Date().toISOString()
+        contactPhone: contactPhone.trim()
       });
 
       if (result.success) {
@@ -246,9 +250,29 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       <Sheet isOpen={!!selectedProduct} onClose={() => setSelectedProduct(null)} title={selectedProduct?.name}>
         {selectedProduct && (
           <div className="p-6">
-             <div className="h-48 rounded-3xl overflow-hidden mb-6 relative">
-                <img src={selectedProduct.image} className="w-full h-full object-cover"/>
-             </div>
+             {(() => {
+                const gallery = selectedProduct.images && selectedProduct.images.length > 0 ? selectedProduct.images : [selectedProduct.image];
+                return (
+                  <>
+                    <div className="h-48 rounded-3xl overflow-hidden mb-3 relative">
+                       <img src={gallery[activeImageIndex] || gallery[0]} className="w-full h-full object-cover"/>
+                    </div>
+                    {gallery.length > 1 && (
+                      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+                         {gallery.map((img, i) => (
+                            <button
+                               key={i}
+                               onClick={() => setActiveImageIndex(i)}
+                               className={`w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${i === activeImageIndex ? 'border-kubwa-green' : 'border-transparent opacity-60'}`}
+                            >
+                               <img src={img} className="w-full h-full object-cover" />
+                            </button>
+                         ))}
+                      </div>
+                    )}
+                  </>
+                );
+             })()}
              <p className="font-black text-2xl text-kubwa-green mb-4">₦{selectedProduct.price.toLocaleString()}</p>
              <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Quality product from a verified Kubwa merchant.'}</p>
              <Button className="w-full py-4 h-14 text-base" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>Add to Cart</Button>

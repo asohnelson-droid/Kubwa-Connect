@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Wrench, Truck, ChevronRight, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Flame, Clock, Briefcase, Sparkles } from 'lucide-react';
+import { ShoppingBag, Wrench, Truck, ChevronRight, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Flame, Clock, Briefcase, Sparkles, Loader2, CheckCircle } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
-import { Button, Card } from '../components/ui';
+import { Button, Card, Sheet } from '../components/ui';
 import { KUBWA_AREAS, api } from '../services/data';
 
 interface HomeProps {
   setSection: (section: AppSection) => void;
   user?: UserType | null;
   setAuthIntent: (intent: { section: AppSection; role: UserRole } | null) => void;
+  refreshUser?: () => void;
 }
 
-const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
+const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState('All Kubwa');
   const [visibleAnnouncement, setVisibleAnnouncement] = useState<Announcement | null>(null);
@@ -56,11 +57,53 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
     setSection(serviceKeywords.some(k => query.includes(k)) ? AppSection.FIXIT : AppSection.MART);
   };
 
-  const handleRoleAction = (section: AppSection, role: UserRole) => {
-    if (user?.role === role) setSection(section);
-    else {
-      setAuthIntent({ section, role });
+  const [upgradeTarget, setUpgradeTarget] = useState<{ role: 'VENDOR' | 'PROVIDER' | 'RIDER'; title: string; desc: string; icon: React.ElementType } | null>(null);
+  const [requestingUpgrade, setRequestingUpgrade] = useState(false);
+  const [upgradeSubmitted, setUpgradeSubmitted] = useState(false);
+
+  const UPGRADE_OPTIONS: Record<'VENDOR' | 'PROVIDER' | 'RIDER', { section: AppSection; title: string; sub: string; desc: string; icon: React.ElementType; color: string }> = {
+    VENDOR: { section: AppSection.MART, title: 'Become a Vendor', sub: 'Sell to Kubwa', desc: "Sell your products to residents across Kubwa. Your application will be reviewed before your shop goes live.", icon: Store, color: 'text-kubwa-green' },
+    PROVIDER: { section: AppSection.FIXIT, title: 'Hire out Skills', sub: 'Find fixit jobs', desc: "Offer repairs and home services through FixIt. Your application will be reviewed before you can start receiving bookings.", icon: Briefcase, color: 'text-kubwa-orange' },
+    RIDER: { section: AppSection.RIDE, title: 'Become a Rider', sub: 'Deliver & earn', desc: "Deliver orders across Kubwa and earn. Your application will be reviewed before you can start accepting jobs.", icon: Bike, color: 'text-blue-600' },
+  };
+
+  const handleRoleAction = (role: 'VENDOR' | 'PROVIDER' | 'RIDER') => {
+    const opt = UPGRADE_OPTIONS[role];
+
+    if (!user) {
+      setAuthIntent({ section: opt.section, role });
       setSection(AppSection.ACCOUNT);
+      return;
+    }
+
+    if (user.role === role) {
+      if (user.status === 'PENDING') {
+        alert(`Your ${opt.title.replace('Become a ', '').replace('Hire out ', '')} application is still under review. We'll let you know once it's approved.`);
+      } else {
+        setSection(opt.section);
+      }
+      return;
+    }
+
+    if (user.role !== 'USER') {
+      alert(`Your account is already registered as a ${user.role}. Contact support if you'd like to change your account type.`);
+      return;
+    }
+
+    setUpgradeSubmitted(false);
+    setUpgradeTarget({ role, title: opt.title, desc: opt.desc, icon: opt.icon });
+  };
+
+  const handleConfirmUpgrade = async () => {
+    if (!upgradeTarget) return;
+    setRequestingUpgrade(true);
+    const result = await api.auth.requestRoleUpgrade(upgradeTarget.role);
+    setRequestingUpgrade(false);
+    if (result.success) {
+      setUpgradeSubmitted(true);
+      refreshUser?.();
+    } else {
+      alert(result.error || "Couldn't submit your request. Please try again.");
     }
   };
 
@@ -179,23 +222,21 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
          <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-black tracking-tight text-gray-900 uppercase">Start Earning</h3>
          </div>
-         <div className="grid grid-cols-2 gap-4">
-            <div 
-              onClick={() => handleRoleAction(AppSection.MART, 'VENDOR')}
-              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
-            >
-               <Store size={28} className="text-kubwa-green mb-3 group-hover:scale-110 transition-transform" />
-               <h4 className="font-black text-xs uppercase tracking-tight">Become a Vendor</h4>
-               <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Sell to Kubwa</p>
-            </div>
-            <div 
-              onClick={() => handleRoleAction(AppSection.FIXIT, 'PROVIDER')}
-              className="bg-gray-50 border border-gray-100 p-5 rounded-[2rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
-            >
-               <Briefcase size={28} className="text-kubwa-orange mb-3 group-hover:scale-110 transition-transform" />
-               <h4 className="font-black text-xs uppercase tracking-tight">Hire out Skills</h4>
-               <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Find fixit jobs</p>
-            </div>
+         <div className="grid grid-cols-3 gap-3">
+            {(['VENDOR', 'PROVIDER', 'RIDER'] as const).map(role => {
+              const opt = UPGRADE_OPTIONS[role];
+              return (
+                <div
+                  key={role}
+                  onClick={() => handleRoleAction(role)}
+                  className="bg-gray-50 border border-gray-100 p-4 rounded-[1.75rem] relative overflow-hidden cursor-pointer group hover:bg-white hover:shadow-xl transition-all"
+                >
+                   <opt.icon size={24} className={`${opt.color} mb-2 group-hover:scale-110 transition-transform`} />
+                   <h4 className="font-black text-[10px] uppercase tracking-tight leading-tight">{opt.title}</h4>
+                   <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">{opt.sub}</p>
+                </div>
+              );
+            })}
          </div>
       </div>
 
@@ -221,6 +262,34 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent }) => {
             ))}
          </div>
       </div>
+
+      <Sheet isOpen={!!upgradeTarget} onClose={() => setUpgradeTarget(null)} title={upgradeSubmitted ? 'Request Submitted' : upgradeTarget?.title}>
+        {upgradeTarget && (
+          <div className="p-6 pb-8">
+            {upgradeSubmitted ? (
+              <div className="text-center py-4">
+                <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                   <CheckCircle size={36} />
+                </div>
+                <p className="text-sm font-bold text-gray-600 leading-relaxed mb-8">
+                  Your application is in for review. We'll let you know as soon as it's approved.
+                </p>
+                <Button className="w-full h-14" onClick={() => setUpgradeTarget(null)}>DONE</Button>
+              </div>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-gray-50 rounded-[1.5rem] flex items-center justify-center mb-5">
+                   <upgradeTarget.icon size={28} className="text-gray-700" />
+                </div>
+                <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{upgradeTarget.desc}</p>
+                <Button className="w-full h-14" onClick={handleConfirmUpgrade} disabled={requestingUpgrade}>
+                   {requestingUpgrade ? <Loader2 className="animate-spin" /> : 'SUBMIT APPLICATION'}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 };

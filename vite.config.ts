@@ -4,11 +4,6 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    // Correctly handle API_KEY injection for @google/genai client
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || ''),
-    // Note: VITE_ prefixed variables are handled natively by Vite in production builds
-  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

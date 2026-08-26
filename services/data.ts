@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabase';
-import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus } from '../types';
+import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus } from '../types';
 
 export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
@@ -110,6 +110,15 @@ export const api = {
         },
         signUp: async (email, password, name, role) => {
             try {
+                // SECURITY: Self-service signup must only ever create standard community
+                // accounts. ADMIN / SUPER_ADMIN (and anything else unrecognized) can never
+                // be granted through the public signup form. Admin accounts must be created
+                // out-of-band (e.g. directly in Supabase, or promoted by an existing admin).
+                const PUBLIC_SIGNUP_ROLES: UserRole[] = ['USER', 'VENDOR', 'PROVIDER', 'RIDER'];
+                if (!PUBLIC_SIGNUP_ROLES.includes(role)) {
+                    return { error: "This account type can't be self-registered. Please contact support." };
+                }
+
                 const initialStatus = (role === 'VENDOR' || role === 'PROVIDER' || role === 'RIDER') ? 'PENDING' : 'APPROVED';
                 const redirectUrl = window.location.origin;
 
@@ -174,6 +183,10 @@ export const api = {
         resendVerification: async (email: string) => {
             const { error } = await supabase.auth.resend({ type: 'signup', email });
             return { success: !error, error: error?.message };
+        },
+        requestRoleUpgrade: async (newRole: 'VENDOR' | 'PROVIDER' | 'RIDER'): Promise<{ success: boolean; error?: string }> => {
+            const { error } = await supabase.rpc('request_role_upgrade', { new_role: newRole });
+            return { success: !error, error: error?.message };
         }
     },
     orders: {
@@ -186,7 +199,7 @@ export const api = {
             return (data as any) || [];
         },
         getVendorOrders: async (vendorId: string): Promise<MartOrder[]> => {
-            const { data } = await supabase.from('orders').select('*').eq('vendorId', vendorId).order('date', { ascending: false });
+            const { data } = await supabase.from('orders').select('*').eq('vendorId', vendorId).order('created_at', { ascending: false });
             return (data as any) || [];
         },
         updateStatus: async (orderId: string, status: string) => {
@@ -256,24 +269,16 @@ export const api = {
     },
     providers: {
         getMyProfile: async (userId: string): Promise<ServiceProvider | null> => {
-            const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-            if (!data) return null;
-            return {
-                id: data.id,
-                userId: data.id,
-                name: data.name || data.fullName,
-                category: (data as any).category || 'Service',
-                rate: (data as any).rate || 0,
-                rating: (data as any).rating || 0,
-                reviews: (data as any).reviews || 0,
-                image: data.avatar || '',
-                available: (data as any).available ?? true,
-                isVerified: data.verificationStatus === 'VERIFIED'
-            };
+            const { data } = await supabase.from('providers').select('*').eq('userId', userId).maybeSingle();
+            return (data as any) || null;
         },
         updateStatus: async (providerId: string, available: boolean): Promise<boolean> => {
-            const { error } = await supabase.from('profiles').update({ available }).eq('id', providerId);
+            const { error } = await supabase.from('providers').update({ available }).eq('id', providerId);
             return !error;
+        },
+        upsert: async (userId: string, data: { name: string; category: string; rate: number; bio?: string; image?: string; location?: string }): Promise<{ success: boolean }> => {
+            const { error } = await supabase.from('providers').upsert({ userId, ...data }, { onConflict: 'userId' });
+            return { success: !error };
         },
     },
     products: {
@@ -290,26 +295,40 @@ export const api = {
             return !error;
         }
     },
+    storage: {
+        uploadProductImage: async (vendorId: string, file: File): Promise<string | null> => {
+            const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const path = `${vendorId}/${crypto.randomUUID()}.${ext}`;
+            const { error } = await supabase.storage.from('product-images').upload(path, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+            if (error) {
+                console.warn('[storage] product image upload failed:', error.message);
+                return null;
+            }
+            const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+            return data.publicUrl;
+        },
+        deleteProductImage: async (url: string): Promise<void> => {
+            // Only ever attempt to clean up files actually in our bucket -- an
+            // old base64 data: URL from before this migration isn't a storage
+            // path and would just fail harmlessly, but skip it outright.
+            const marker = '/product-images/';
+            const idx = url.indexOf(marker);
+            if (idx === -1) return;
+            const path = url.slice(idx + marker.length).split('?')[0];
+            await supabase.storage.from('product-images').remove([path]);
+        }
+    },
     getProducts: async (): Promise<Product[]> => {
         const { data } = await supabase.from('products').select('*');
         const dbProducts = (data as Product[]) || [];
         return [...dbProducts, ...MOCK_PRODUCTS];
     },
     getProviders: async (): Promise<ServiceProvider[]> => {
-        const { data } = await supabase.from('profiles').select('*').in('role', ['PROVIDER', 'VENDOR']).eq('status', 'APPROVED');
-        return (data?.map(d => ({
-            id: d.id,
-            userId: d.id,
-            name: d.fullName || d.name,
-            category: (d as any).category || 'General',
-            rate: (d as any).rate || 0,
-            rating: (d as any).rating || 0,
-            reviews: (d as any).reviews || 0,
-            image: d.avatar || '',
-            available: (d as any).available ?? true,
-            isVerified: d.verificationStatus === 'VERIFIED',
-            location: d.address
-        })) as any) || [];
+        const { data } = await supabase.from('providers').select('*');
+        return (data as any) || [];
     },
     getMockContext: async () => {
         const products = await api.getProducts();
@@ -367,6 +386,22 @@ export const api = {
             const { data } = await supabase.from('announcements').select('*').eq('isActive', true);
             return (data as any) || [];
         },
+        getAllAnnouncements: async () => {
+            const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+            return (data as any) || [];
+        },
+        createAnnouncement: async (announcement: { title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO' }) => {
+            const { data, error } = await supabase.from('announcements').insert([announcement]).select();
+            return { success: !error, data: data?.[0] };
+        },
+        toggleAnnouncementActive: async (id: string, isActive: boolean) => {
+            const { error } = await supabase.from('announcements').update({ isActive }).eq('id', id);
+            return !error;
+        },
+        deleteAnnouncement: async (id: string) => {
+            const { error } = await supabase.from('announcements').delete().eq('id', id);
+            return !error;
+        },
         getPendingEntities: async () => {
             const { data } = await supabase.from('profiles').select('*').eq('status', 'PENDING');
             return (data as any) || [];
@@ -422,6 +457,32 @@ export const api = {
         getByTarget: async (id) => {
             const { data } = await supabase.from('reviews').select('*').eq('targetId', id);
             return (data as any) || [];
-        } 
+        },
+        getMyReviews: async (userId: string): Promise<Review[]> => {
+            const { data } = await supabase.from('reviews').select('*').eq('userId', userId);
+            return (data as any) || [];
+        },
+        create: async (review: { userId: string; targetId: string; rating: number; comment: string }) => {
+            const { data, error } = await supabase.from('reviews').insert([review]).select();
+            return { success: !error, data: data?.[0] };
+        }
+    },
+    serviceOrders: {
+        create: async (order: { userId: string; serviceId: string; amount: number }) => {
+            const { data, error } = await supabase.from('service_orders').insert([order]).select();
+            return { success: !error, orderId: data?.[0]?.id };
+        },
+        getMyBookings: async (userId: string): Promise<ServiceOrder[]> => {
+            const { data } = await supabase.from('service_orders').select('*, providers(userId, name, image, category)').eq('userId', userId).order('created_at', { ascending: false });
+            return (data as any) || [];
+        },
+        getForProvider: async (serviceId: string): Promise<ServiceOrder[]> => {
+            const { data } = await supabase.from('service_orders').select('*').eq('serviceId', serviceId).order('created_at', { ascending: false });
+            return (data as any) || [];
+        },
+        updateStatus: async (orderId: string, status: ServiceOrderStatus): Promise<boolean> => {
+            const { error } = await supabase.from('service_orders').update({ status }).eq('id', orderId);
+            return !error;
+        }
     }
 };

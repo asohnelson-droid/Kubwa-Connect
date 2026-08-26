@@ -15,6 +15,8 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [imageEntries, setImageEntries] = useState<{ url: string; file?: File }[]>([]);
+  const [pendingImageDeletions, setPendingImageDeletions] = useState<string[]>([]);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -35,19 +37,45 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   };
 
   const handleSaveProduct = async () => {
-    if (!editingProduct?.name || !editingProduct?.price) return;
+    if (!editingProduct?.name || !editingProduct?.price || imageEntries.length === 0) return;
     setSaving(true);
-    
+
+    const resolvedUrls: string[] = [];
+    for (const entry of imageEntries) {
+      if (entry.file) {
+        const uploadedUrl = await api.storage.uploadProductImage(user.id, entry.file);
+        if (!uploadedUrl) {
+          alert("One of your photos failed to upload. Please try again.");
+          setSaving(false);
+          return;
+        }
+        resolvedUrls.push(uploadedUrl);
+      } else {
+        resolvedUrls.push(entry.url);
+      }
+    }
+
     const payload = {
       ...editingProduct,
+      image: resolvedUrls[0],
+      images: resolvedUrls,
       vendorId: user.id,
       status: 'PENDING' as ApprovalStatus 
     };
 
     await api.products.upsert(payload);
+
+    // Only now that the product is actually saved is it safe to clean up
+    // storage files the vendor removed during this edit.
+    for (const url of pendingImageDeletions) {
+      api.storage.deleteProductImage(url);
+    }
+
     setSaving(false);
     setIsSheetOpen(false);
     setEditingProduct(null);
+    setImageEntries([]);
+    setPendingImageDeletions([]);
     loadData();
   };
 
@@ -56,13 +84,54 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     await api.products.delete(id);
     loadData();
   };
+
+  const handleCloseSheet = () => {
+    imageEntries.forEach(entry => {
+      if (entry.file) URL.revokeObjectURL(entry.url);
+    });
+    setIsSheetOpen(false);
+  };
   
+  const MAX_PRODUCT_IMAGES = 4;
+
+  const openAddProduct = () => {
+    setEditingProduct({ category: 'Food' });
+    setImageEntries([]);
+    setPendingImageDeletions([]);
+    setIsSheetOpen(true);
+  };
+
+  const openEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    const existingUrls = p.images && p.images.length > 0 ? p.images : (p.image ? [p.image] : []);
+    setImageEntries(existingUrls.map(url => ({ url })));
+    setPendingImageDeletions([]);
+    setIsSheetOpen(true);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const reader = new FileReader();
-      reader.onloadend = () => setEditingProduct(prev => ({ ...prev || {}, image: reader.result as string }));
-      reader.readAsDataURL(e.target.files[0]);
-    }
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const remainingSlots = MAX_PRODUCT_IMAGES - imageEntries.length;
+    const filesToAdd = Array.from(files).slice(0, remainingSlots);
+    const newEntries = filesToAdd.map(file => ({ url: URL.createObjectURL(file), file }));
+    setImageEntries(prev => [...prev, ...newEntries]);
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImageEntries(prev => {
+      const entry = prev[index];
+      if (entry.file) {
+        // Local preview only -- never uploaded, just free the blob URL.
+        URL.revokeObjectURL(entry.url);
+      } else {
+        // A real, already-uploaded photo -- queue it for storage cleanup,
+        // but only actually delete once the product save is confirmed.
+        setPendingImageDeletions(d => [...d, entry.url]);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   // Metrics
@@ -70,7 +139,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   const totalOrders = orders.length;
 
   // Limit Check
-  const isLimitReached = products.length >= 4;
+  const isLimitReached = products.length >= (user.productLimit || 4);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -105,8 +174,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
              <Button 
                 onClick={() => { 
                    if (isLimitReached) return;
-                   setEditingProduct({ category: 'Food' }); 
-                   setIsSheetOpen(true); 
+                   openAddProduct();
                 }} 
                 disabled={isLimitReached}
                 className={`h-10 text-xs px-4 ${isLimitReached ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-70 shadow-none' : ''}`}
@@ -136,7 +204,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                    </div>
                    <div className="flex items-center gap-2">
                       <Badge color={p.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>{p.status}</Badge>
-                      <button onClick={() => { setEditingProduct(p); setIsSheetOpen(true); }} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><Edit2 size={14}/></button>
+                      <button onClick={() => openEditProduct(p)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><Edit2 size={14}/></button>
                       <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-100"><Trash2 size={14}/></button>
                    </div>
                 </Card>
@@ -152,7 +220,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
             <Card key={o.id} className="p-4 border-none shadow-sm">
                <div className="flex justify-between mb-2">
                   <span className="font-black text-sm">Order #{o.id.substring(0,6)}</span>
-                  <span className="text-xs text-gray-500">{new Date(o.date).toLocaleDateString()}</span>
+                  <span className="text-xs text-gray-500">{new Date(o.created_at).toLocaleDateString()}</span>
                </div>
                <div className="space-y-1 mb-3">
                   {o.items.map((i: any) => (
@@ -164,32 +232,58 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                </div>
                <div className="pt-3 border-t flex justify-between items-center">
                   <span className="font-black text-kubwa-green">₦{o.total.toLocaleString()}</span>
-                  <select 
-                    className="bg-gray-100 text-[10px] font-bold p-2 rounded-lg outline-none"
-                    value={o.status}
-                    onChange={async (e) => {
-                       await api.orders.updateStatus(o.id, e.target.value);
-                       loadData();
-                    }}
-                  >
-                     <option value="CREATED">Created</option>
-                     <option value="VENDOR_CONFIRMED">Confirmed</option>
-                     <option value="RIDER_ASSIGNED">Rider Assigned</option>
-                     <option value="IN_TRANSIT">In Transit</option>
-                     <option value="DELIVERED">Delivered</option>
-                  </select>
+                  {o.deliveryOption === 'DISPATCH' && ['RIDER_ASSIGNED', 'IN_TRANSIT', 'DELIVERED'].includes(o.status) ? (
+                    <Badge color={o.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
+                       {o.status === 'RIDER_ASSIGNED' ? 'Rider Assigned' : o.status === 'IN_TRANSIT' ? 'Out for Delivery' : 'Delivered'}
+                    </Badge>
+                  ) : (
+                    <select 
+                      className="bg-gray-100 text-[10px] font-bold p-2 rounded-lg outline-none"
+                      value={o.status}
+                      onChange={async (e) => {
+                         await api.orders.updateStatus(o.id, e.target.value);
+                         loadData();
+                      }}
+                    >
+                       <option value="CREATED">Created</option>
+                       <option value="VENDOR_CONFIRMED">Confirmed</option>
+                       {o.deliveryOption === 'PICKUP' && <option value="DELIVERED">Picked Up</option>}
+                       <option value="CANCELLED">Cancelled</option>
+                    </select>
+                  )}
                </div>
             </Card>
           ))}
        </div>
 
        {/* Edit/Add Sheet */}
-       <Sheet isOpen={isSheetOpen} onClose={() => setIsSheetOpen(false)} title={editingProduct?.id ? "Edit Product" : "Add Product"}>
+       <Sheet isOpen={isSheetOpen} onClose={handleCloseSheet} title={editingProduct?.id ? "Edit Product" : "Add Product"}>
           <div className="space-y-4 p-6">
-             <div className="w-full h-40 bg-gray-100 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed border-gray-200">
-                {editingProduct?.image ? <img src={editingProduct.image} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 mb-2"/>}
-                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
-                {!editingProduct?.image && <span className="text-xs text-gray-400 font-bold">Tap to upload image</span>}
+             <div>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                   {imageEntries.map((entry, i) => (
+                      <div key={i} className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100">
+                         <img src={entry.url} className="w-full h-full object-cover" />
+                         {i === 0 && (
+                            <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full">Cover</span>
+                         )}
+                         <button
+                            type="button"
+                            onClick={() => handleRemoveImage(i)}
+                            className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center"
+                         >
+                            <X size={10} />
+                         </button>
+                      </div>
+                   ))}
+                   {imageEntries.length < MAX_PRODUCT_IMAGES && (
+                      <label className="relative aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center cursor-pointer hover:border-gray-300">
+                         <ImageIcon className="text-gray-300" size={18} />
+                         <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
+                      </label>
+                   )}
+                </div>
+                <p className="text-[9px] font-bold text-gray-400 ml-1">Up to {MAX_PRODUCT_IMAGES} photos. First photo is the cover image.</p>
              </div>
              <Input placeholder="Product Name" value={editingProduct?.name || ''} onChange={e => setEditingProduct(prev => ({...prev || {}, name: e.target.value}))} />
              <Input placeholder="Price" type="number" value={editingProduct?.price || ''} onChange={e => setEditingProduct(prev => ({...prev || {}, price: Number(e.target.value)}))} />
@@ -209,8 +303,12 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                value={editingProduct?.description || ''} 
                onChange={e => setEditingProduct(prev => ({...prev || {}, description: e.target.value}))}
              />
-             <Button onClick={handleSaveProduct} disabled={saving} className="w-full h-14">
-                {saving ? <Loader2 className="animate-spin" /> : 'SAVE PRODUCT'}
+             <Button
+                onClick={handleSaveProduct}
+                disabled={saving || !editingProduct?.name || !editingProduct?.price || imageEntries.length === 0}
+                className="w-full h-14"
+             >
+                {saving ? <><Loader2 className="animate-spin" /> Uploading...</> : 'SAVE PRODUCT'}
              </Button>
           </div>
        </Sheet>

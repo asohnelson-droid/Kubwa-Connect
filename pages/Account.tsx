@@ -1,9 +1,9 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { User, AppSection, MonetisationTier, UserRole, PaymentIntent, MartOrder, DeliveryRequest } from '../types';
+import { User, AppSection, MonetisationTier, UserRole, PaymentIntent, MartOrder, DeliveryRequest, ServiceOrder, Review } from '../types';
 import { api } from '../services/data';
-import { Button, Card, Badge, BackButton } from '../components/ui';
+import { Button, Card, Badge, BackButton, Sheet, Input } from '../components/ui';
 import AuthModal from '../components/AuthModal';
 import VendorDashboard from '../components/VendorDashboard';
 import { 
@@ -21,7 +21,9 @@ import {
   ChevronRight,
   PackageCheck,
   ShieldAlert,
-  Store
+  Store,
+  Wrench,
+  CheckCircle
 } from 'lucide-react';
 
 interface AccountProps {
@@ -38,8 +40,16 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'dashboard'>('profile');
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
+  const [serviceBookings, setServiceBookings] = useState<ServiceOrder[]>([]);
+  const [myReviews, setMyReviews] = useState<Review[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Review form
+  const [reviewingBooking, setReviewingBooking] = useState<ServiceOrder | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   
   // Local state for modal configuration, initialized from intent
   const [authConfig, setAuthConfig] = useState<{ role: UserRole; mode: 'LOGIN' | 'SIGNUP' }>({
@@ -67,16 +77,44 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     if (!user) return;
     setLoadingActivity(true);
     try {
-      const [orderData, deliveryData] = await Promise.all([
+      const [orderData, deliveryData, bookingData, reviewData] = await Promise.all([
         api.orders.getMyOrders(user.id),
-        api.getDeliveries(user.id)
+        api.getDeliveries(user.id),
+        api.serviceOrders.getMyBookings(user.id),
+        api.reviews.getMyReviews(user.id)
       ]);
       setOrders(orderData);
       setDeliveries(deliveryData);
+      setServiceBookings(bookingData);
+      setMyReviews(reviewData);
     } catch (err) {
       console.warn("[Account] Activity Load Error:", err);
     } finally {
       setLoadingActivity(false);
+    }
+  };
+
+  const handleOpenReview = (booking: ServiceOrder) => {
+    setReviewingBooking(booking);
+    setReviewRating(5);
+    setReviewComment('');
+  };
+
+  const handleSubmitReview = async () => {
+    if (!user || !reviewingBooking || !reviewComment.trim() || !reviewingBooking.providers?.userId) return;
+    setSubmittingReview(true);
+    const result = await api.reviews.create({
+      userId: user.id,
+      targetId: reviewingBooking.providers.userId,
+      rating: reviewRating,
+      comment: reviewComment.trim()
+    });
+    setSubmittingReview(false);
+    if (result.success) {
+      setReviewingBooking(null);
+      loadActivity();
+    } else {
+      alert("Couldn't submit your review. Please try again.");
     }
   };
 
@@ -279,7 +317,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                             <div className="p-3 bg-green-50 text-green-600 rounded-xl"><PackageCheck size={20} /></div>
                             <div>
                                <p className="text-sm font-black text-gray-900 uppercase">Order #{order.id.slice(0, 5)}</p>
-                               <p className="text-[10px] font-bold text-gray-400">{new Date(order.date).toLocaleDateString()}</p>
+                               <p className="text-[10px] font-bold text-gray-400">{new Date(order.created_at).toLocaleDateString()}</p>
                             </div>
                          </div>
                          <div className="text-right">
@@ -314,10 +352,92 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                     ))}
                  </div>
                )}
+
+               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2 mt-8">FixIt Bookings</h3>
+               {serviceBookings.length === 0 ? (
+                 <div className="text-center py-10 text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] bg-gray-50 rounded-[2rem] border border-dashed">No bookings yet</div>
+               ) : (
+                 <div className="space-y-3">
+                    {serviceBookings.map(booking => {
+                      const alreadyReviewed = myReviews.some(r => r.targetId === booking.providers?.userId);
+                      return (
+                        <Card key={booking.id} className="p-6 border-none shadow-sm rounded-[2rem]">
+                           <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                 <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 shrink-0">
+                                    {booking.providers?.image ? <img src={booking.providers.image} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Wrench size={18} /></div>}
+                                 </div>
+                                 <div>
+                                    <p className="text-sm font-black text-gray-900 uppercase">{booking.providers?.name || 'Provider'}</p>
+                                    <p className="text-[10px] font-bold text-gray-400">{booking.providers?.category}</p>
+                                 </div>
+                              </div>
+                              <div className="text-right">
+                                 <p className="font-black text-kubwa-green">₦{booking.amount.toLocaleString()}</p>
+                                 <Badge color={
+                                    booking.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                                    booking.status === 'CANCELLED' ? 'bg-red-50 text-red-500' :
+                                    'bg-gray-100 text-gray-600'
+                                 } className="mt-1">{booking.status.replace('_', ' ')}</Badge>
+                              </div>
+                           </div>
+                           {booking.status === 'COMPLETED' && (
+                              <div className="mt-4 pt-4 border-t border-gray-50">
+                                 {alreadyReviewed ? (
+                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-green-600">
+                                       <CheckCircle size={14} /> Review submitted
+                                    </div>
+                                 ) : (
+                                    <Button variant="outline" className="w-full h-11 text-[10px]" onClick={() => handleOpenReview(booking)}>
+                                       <Star size={14} /> Leave a Review
+                                    </Button>
+                                 )}
+                              </div>
+                           )}
+                        </Card>
+                      );
+                    })}
+                 </div>
+               )}
              </>
            )}
         </div>
       )}
+
+      <Sheet isOpen={!!reviewingBooking} onClose={() => setReviewingBooking(null)} title="Rate Your Experience">
+        {reviewingBooking && (
+          <div className="pb-6 space-y-5">
+            <div className="flex items-center gap-4">
+               <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 shrink-0">
+                  {reviewingBooking.providers?.image ? <img src={reviewingBooking.providers.image} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Wrench size={20} /></div>}
+               </div>
+               <div>
+                  <p className="font-black text-sm text-gray-900">{reviewingBooking.providers?.name || 'Provider'}</p>
+                  <p className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest">{reviewingBooking.providers?.category}</p>
+               </div>
+            </div>
+
+            <div className="flex justify-center gap-2 py-2">
+               {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} onClick={() => setReviewRating(n)}>
+                     <Star size={32} className={n <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'} />
+                  </button>
+               ))}
+            </div>
+
+            <textarea
+              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold h-28 resize-none outline-none focus:ring-2 focus:ring-kubwa-green"
+              placeholder="How was your experience?"
+              value={reviewComment}
+              onChange={e => setReviewComment(e.target.value)}
+            />
+
+            <Button className="w-full h-14" onClick={handleSubmitReview} disabled={submittingReview || !reviewComment.trim()}>
+              {submittingReview ? <Loader2 className="animate-spin" /> : 'SUBMIT REVIEW'}
+            </Button>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 };

@@ -1,10 +1,9 @@
 
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Bot, MessageSquare, Loader2, X } from 'lucide-react';
+import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
 import SetupWizard from './components/SetupWizard';
-import { askKubwaAssistant } from './services/ai';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
 import { useData } from './contexts/DataContext';
@@ -138,11 +137,11 @@ function App() {
 
   const renderContent = () => {
     if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-        return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
+        return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
     }
 
     switch (currentSection) {
-      case AppSection.HOME: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
+      case AppSection.HOME: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
       case AppSection.MART: return <Mart addToCart={addToCart} cart={cart} setCart={setCart} user={user} onRequireAuth={() => navigateTo(AppSection.ACCOUNT)} setSection={navigateTo} refreshUser={refreshUser} goBack={goBack} />;
       case AppSection.FIXIT: return <FixIt user={user} onRequireAuth={() => navigateTo(AppSection.ACCOUNT)} setSection={navigateTo} refreshUser={refreshUser} goBack={goBack} />;
       case AppSection.RIDE: return <Deliveries user={user} onRequireAuth={() => navigateTo(AppSection.ACCOUNT)} setSection={navigateTo} refreshUser={refreshUser} goBack={goBack} />;
@@ -153,7 +152,7 @@ function App() {
       case AppSection.TERMS:
       case AppSection.CONTACT:
       case AppSection.FAQ: return <InfoPages section={currentSection} setSection={navigateTo} goBack={goBack} user={user} />;
-      default: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} />;
+      default: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
     }
   };
 

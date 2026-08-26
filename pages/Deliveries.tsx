@@ -296,7 +296,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
                      <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
                         <div>
                            <Badge color="bg-blue-100 text-blue-700 font-bold">{job.itemType}</Badge>
-                           <p className="text-[10px] text-gray-400 mt-1">{new Date(job.date).toLocaleTimeString()}</p>
+                           <p className="text-[10px] text-gray-400 mt-1">{new Date(job.created_at).toLocaleTimeString()}</p>
                         </div>
                         <span className="font-bold text-xl text-green-700">₦{job.price.toLocaleString()}</span>
                      </div>

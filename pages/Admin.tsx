@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, Badge, Button } from '../components/ui';
+import { Card, Badge, Button, Sheet, Input } from '../components/ui';
 import { 
   LayoutDashboard, 
   Users, 
@@ -23,11 +23,14 @@ import {
   TrendingUp,
   Activity,
   UserCheck,
+  Bell,
+  Trash2,
+  Plus,
   // Add User icon import with alias to avoid conflict with User type from types.ts
   User as UserIcon
 } from 'lucide-react';
 import { api } from '../services/data';
-import { User, ApprovalStatus, Transaction, Product, AnalyticsData } from '../types';
+import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement } from '../types';
 import { 
   LineChart, 
   Line, 
@@ -44,7 +47,7 @@ import {
 } from 'recharts';
 
 const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'billing' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'billing' | 'users' | 'announcements'>('overview');
   const [pendingEntities, setPendingEntities] = useState<User[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -52,6 +55,14 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
   const [stats, setStats] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Announcements tab
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [isAnnouncementSheetOpen, setIsAnnouncementSheetOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+  const [newType, setNewType] = useState<'INFO' | 'ALERT' | 'PROMO'>('INFO');
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -75,6 +86,9 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
         } else if (activeTab === 'users') {
             const data = await api.admin.getAllUsers();
             setAllUsers(data);
+        } else if (activeTab === 'announcements') {
+            const data = await api.admin.getAllAnnouncements();
+            setAnnouncements(data);
         }
     } catch (e) {
         console.error("Failed to load admin data", e);
@@ -108,6 +122,45 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
     if (success) {
         setPendingEntities(prev => prev.map(u => u.id === userId ? { ...u, isFeatured: !current } : u));
         setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, isFeatured: !current } : u));
+    }
+    setActionLoading(null);
+  };
+
+  const handleCreateAnnouncement = async () => {
+    if (!newTitle.trim() || !newMessage.trim()) return;
+    setCreatingAnnouncement(true);
+    const result = await api.admin.createAnnouncement({
+      title: newTitle.trim(),
+      message: newMessage.trim(),
+      type: newType
+    });
+    if (result.success) {
+      setIsAnnouncementSheetOpen(false);
+      setNewTitle('');
+      setNewMessage('');
+      setNewType('INFO');
+      loadData();
+    } else {
+      alert("Failed to create announcement. Please try again.");
+    }
+    setCreatingAnnouncement(false);
+  };
+
+  const handleToggleAnnouncementActive = async (id: string, current: boolean) => {
+    setActionLoading(id);
+    const success = await api.admin.toggleAnnouncementActive(id, !current);
+    if (success) {
+      setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, isActive: !current } : a));
+    }
+    setActionLoading(null);
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm("Delete this announcement? This can't be undone.")) return;
+    setActionLoading(id);
+    const success = await api.admin.deleteAnnouncement(id);
+    if (success) {
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
     }
     setActionLoading(null);
   };
@@ -160,6 +213,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
            { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
            { id: 'approvals', label: 'Entities', icon: Clock },
            { id: 'products', label: 'Inventory', icon: ShoppingBag },
+           { id: 'announcements', label: 'Announcements', icon: Bell },
            { id: 'billing', label: 'Revenue', icon: DollarSign },
            { id: 'users', label: 'Residents', icon: Users }
          ].map(tab => (
@@ -350,6 +404,94 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                         ))}
                     </div>
                 )}
+            </div>
+          )}
+
+          {activeTab === 'announcements' && (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2">Home Screen Announcements</h3>
+                    <Button onClick={() => setIsAnnouncementSheetOpen(true)} className="h-12 text-xs px-5">
+                        <Plus size={16} /> New Announcement
+                    </Button>
+                </div>
+
+                {loading ? (
+                    <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-green" size={40} /></div>
+                ) : announcements.length === 0 ? (
+                    <Card className="py-20 text-center rounded-[3rem] border-dashed border-2">
+                         <div className="w-20 h-20 bg-gray-50 text-gray-300 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                            <Bell size={40} />
+                         </div>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">No announcements yet</p>
+                    </Card>
+                ) : (
+                    <div className="space-y-4">
+                        {announcements.map(a => (
+                            <Card key={a.id} className="p-6 border-none shadow-sm rounded-[2rem]">
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Badge color={
+                                                a.type === 'ALERT' ? 'bg-red-50 text-red-600' :
+                                                a.type === 'PROMO' ? 'bg-yellow-50 text-yellow-600' :
+                                                'bg-blue-50 text-blue-600'
+                                            }>{a.type}</Badge>
+                                            <Badge color={a.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}>
+                                                {a.isActive ? 'Live' : 'Hidden'}
+                                            </Badge>
+                                        </div>
+                                        <h4 className="font-black text-gray-900 text-sm uppercase tracking-tight truncate">{a.title}</h4>
+                                        <p className="text-xs font-bold text-gray-500 mt-1 line-clamp-2">{a.message}</p>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button
+                                            onClick={() => handleToggleAnnouncementActive(a.id, a.isActive)}
+                                            disabled={actionLoading === a.id}
+                                            className={`p-3 rounded-2xl transition-all ${a.isActive ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                        >
+                                            {actionLoading === a.id ? <Loader2 size={18} className="animate-spin" /> : a.isActive ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteAnnouncement(a.id)}
+                                            disabled={actionLoading === a.id}
+                                            className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                )}
+
+                <Sheet isOpen={isAnnouncementSheetOpen} onClose={() => setIsAnnouncementSheetOpen(false)} title="New Announcement">
+                    <div className="space-y-4 p-6">
+                        <Input placeholder="Title" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+                        <textarea
+                            className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold h-28 resize-none outline-none focus:ring-2 focus:ring-kubwa-green"
+                            placeholder="Message"
+                            value={newMessage}
+                            onChange={e => setNewMessage(e.target.value)}
+                        />
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Type</label>
+                            <select
+                                className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none"
+                                value={newType}
+                                onChange={e => setNewType(e.target.value as 'INFO' | 'ALERT' | 'PROMO')}
+                            >
+                                <option value="INFO">Info</option>
+                                <option value="ALERT">Alert</option>
+                                <option value="PROMO">Promo</option>
+                            </select>
+                        </div>
+                        <Button onClick={handleCreateAnnouncement} disabled={creatingAnnouncement || !newTitle.trim() || !newMessage.trim()} className="w-full h-14">
+                            {creatingAnnouncement ? <Loader2 className="animate-spin" /> : 'PUBLISH ANNOUNCEMENT'}
+                        </Button>
+                    </div>
+                </Sheet>
             </div>
           )}
 
