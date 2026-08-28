@@ -106,6 +106,6 @@ export interface AnalyticsData { dau: number; revenue: number; retention: number
 export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolean; allowAdminPromotions: boolean; supportEmail: string; supportPhone: string; minVersion: string; }
 export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; }
 export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; created_at: string; }
-export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; created_at: string; phoneNumber?: string; }
+export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; created_at: string; phoneNumber?: string; rider?: { name: string; phoneNumber?: string }; }
 export interface ServiceOrder { id: string; userId: string; serviceId: string; amount: number; status: ServiceOrderStatus; created_at: string; providers?: { userId: string; name: string; image: string; category: string }; }
 export interface PushNotification { title: string; body: string; }

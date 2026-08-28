@@ -360,7 +360,7 @@ export const api = {
         return { products, providers };
     },
     getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => {
-        let query = supabase.from('deliveries').select('*');
+        let query = supabase.from('deliveries').select('*, rider:profiles!deliveries_riderid_fkey(name, phoneNumber)');
         if (userId) query = query.or(`userId.eq.${userId},riderId.eq.${userId}`);
         const { data } = await query;
         return (data as any) || [];

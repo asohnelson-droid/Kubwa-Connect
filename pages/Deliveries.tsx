@@ -262,7 +262,11 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
             <Clock className="text-blue-300" />
           </div>
 
-          <Button className="w-full py-3" onClick={handleFindRider}>Find Rider</Button>
+          <Button className="w-full py-3" onClick={handleFindRider} disabled={isSearching}>
+            {isSearching ? (
+              <><Loader2 size={18} className="animate-spin" /> {riderFound ? 'Request Sent!' : 'Finding Rider...'}</>
+            ) : 'Find Rider'}
+          </Button>
         </Card>
       )}
 
@@ -397,7 +401,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
                       <div className="bg-gray-200 p-2 rounded-full"><UserIcon size={16} /></div>
                       <div>
                          <p className="text-xs font-bold text-gray-500">Rider Assigned</p>
-                         <p className="text-sm font-bold">Musa Rider</p>
+                         <p className="text-sm font-bold">{d.rider?.name || 'Your rider'}</p>
                       </div>
                       {/* Call Button */}
                       {d.phoneNumber && (
@@ -429,6 +433,20 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
             ))
           )}
           {!loading && deliveries.length === 0 && <p className="text-center text-gray-400 py-8">No active deliveries.</p>}
+        </div>
+      )}
+
+      {riderFound && (
+        <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+          <Card className="w-full max-w-sm p-10 text-center animate-zoom-in rounded-[3rem] border-none shadow-2xl">
+            <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+              <CheckCircle size={40} />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Request Sent!</h3>
+            <p className="text-gray-500 font-bold text-xs mt-3 leading-relaxed">
+              We're finding you a rider. You can track progress from the Track Order tab.
+            </p>
+          </Card>
         </div>
       )}
     </div>
