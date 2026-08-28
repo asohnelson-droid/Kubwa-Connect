@@ -36,8 +36,11 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   }, [selectedProduct?.id]);
 
   // Checkout State
+  const [deliveryOption, setDeliveryOption] = useState<'DISPATCH' | 'PICKUP'>('DISPATCH');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [pickupInfo, setPickupInfo] = useState<{ storeName?: string; address?: string; location?: string } | null>(null);
+  const [loadingPickupInfo, setLoadingPickupInfo] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -50,6 +53,20 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         if (user.phoneNumber) setContactPhone(user.phoneNumber);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (cart.length === 0) setPickupInfo(null);
+  }, [cart.length]);
+
+  useEffect(() => {
+    if (deliveryOption === 'PICKUP' && cart.length > 0 && !pickupInfo) {
+      setLoadingPickupInfo(true);
+      api.getVendorPickupInfo(cart[0].vendorId).then(info => {
+        setPickupInfo(info);
+        setLoadingPickupInfo(false);
+      });
+    }
+  }, [deliveryOption, cart]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -97,7 +114,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     if (cart.length === 0) return;
 
     // Production-Ready Validation
-    if (!deliveryAddress.trim()) {
+    if (deliveryOption === 'DISPATCH' && !deliveryAddress.trim()) {
         alert("Please enter a delivery address.");
         return;
     }
@@ -113,9 +130,9 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         items: cart,
         total: calculateTotal(),
         status: 'CREATED',
-        deliveryOption: 'DISPATCH',
+        deliveryOption,
         vendorId: cart[0].vendorId,
-        deliveryAddress: deliveryAddress.trim(),
+        deliveryAddress: deliveryOption === 'DISPATCH' ? deliveryAddress.trim() : undefined,
         contactPhone: contactPhone.trim()
       });
 
@@ -123,7 +140,9 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         setCart([]);
         setIsCartOpen(false);
         setSection(AppSection.HOME);
-        alert("Success! Your order has been placed. We'll contact you shortly.");
+        alert(deliveryOption === 'PICKUP'
+          ? "Success! Your order has been placed. Head to the vendor to pick it up once confirmed."
+          : "Success! Your order has been placed. We'll contact you shortly.");
       } else {
         alert("Failed to place order. Please try again.");
       }
@@ -304,14 +323,47 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  {/* Checkout Form */}
                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
                     <p className="font-black uppercase text-[10px] text-gray-400 tracking-widest flex items-center gap-1">
-                        <MapPin size={10} /> Delivery Details
+                        <MapPin size={10} /> Fulfillment
                     </p>
-                    <Input 
-                        placeholder="Delivery Address (e.g. 5 Arab Road)" 
-                        value={deliveryAddress} 
-                        onChange={e => setDeliveryAddress(e.target.value)} 
-                        className="bg-white"
-                    />
+                    <div className="flex gap-2">
+                       <button
+                          type="button"
+                          onClick={() => setDeliveryOption('DISPATCH')}
+                          className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${deliveryOption === 'DISPATCH' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                       >
+                          Delivery
+                       </button>
+                       <button
+                          type="button"
+                          onClick={() => setDeliveryOption('PICKUP')}
+                          className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${deliveryOption === 'PICKUP' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                       >
+                          Pickup
+                       </button>
+                    </div>
+
+                    {deliveryOption === 'DISPATCH' ? (
+                      <Input 
+                          placeholder="Delivery Address (e.g. 5 Arab Road)" 
+                          value={deliveryAddress} 
+                          onChange={e => setDeliveryAddress(e.target.value)} 
+                          className="bg-white"
+                      />
+                    ) : (
+                      <div className="bg-white rounded-xl p-3 text-xs">
+                         {loadingPickupInfo ? (
+                            <span className="text-gray-400 font-bold">Loading pickup location...</span>
+                         ) : pickupInfo ? (
+                            <>
+                               <p className="font-black text-gray-900">{pickupInfo.storeName || 'Vendor location'}</p>
+                               <p className="text-gray-500 font-medium mt-0.5">{pickupInfo.address || pickupInfo.location || 'Address not set by vendor yet — confirm with them directly.'}</p>
+                            </>
+                         ) : (
+                            <span className="text-gray-400 font-bold">Pickup location unavailable — confirm with the vendor directly.</span>
+                         )}
+                      </div>
+                    )}
+
                     <Input 
                         placeholder="Contact Phone" 
                         value={contactPhone} 

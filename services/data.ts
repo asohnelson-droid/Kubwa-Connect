@@ -187,6 +187,26 @@ export const api = {
         requestRoleUpgrade: async (newRole: 'VENDOR' | 'PROVIDER' | 'RIDER'): Promise<{ success: boolean; error?: string }> => {
             const { error } = await supabase.rpc('request_role_upgrade', { new_role: newRole });
             return { success: !error, error: error?.message };
+        },
+        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string }): Promise<{ success: boolean; error?: string }> => {
+            try {
+                const metaData: any = { ...data };
+                if (data.name) metaData.full_name = data.name;
+
+                const { error: authError } = await supabase.auth.updateUser({ data: metaData });
+                if (authError) throw authError;
+
+                const { error: profileError } = await supabase.from('profiles').update(data).eq('id', userId);
+                if (profileError) throw profileError;
+
+                return { success: true };
+            } catch (e: any) {
+                return { success: false, error: e.message || "Failed to update profile." };
+            }
+        },
+        updateEmail: async (newEmail: string): Promise<{ success: boolean; error?: string }> => {
+            const { error } = await supabase.auth.updateUser({ email: newEmail });
+            return { success: !error, error: error?.message };
         }
     },
     orders: {
@@ -325,6 +345,10 @@ export const api = {
         const { data } = await supabase.from('products').select('*');
         const dbProducts = (data as Product[]) || [];
         return [...dbProducts, ...MOCK_PRODUCTS];
+    },
+    getVendorPickupInfo: async (vendorId: string): Promise<{ storeName?: string; address?: string; location?: string } | null> => {
+        const { data } = await supabase.from('profiles').select('storeName, address, location').eq('id', vendorId).maybeSingle();
+        return data || null;
     },
     getProviders: async (): Promise<ServiceProvider[]> => {
         const { data } = await supabase.from('providers').select('*');

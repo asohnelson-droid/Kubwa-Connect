@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, AppSection, MonetisationTier, UserRole, PaymentIntent, MartOrder, DeliveryRequest, ServiceOrder, Review } from '../types';
 import { api } from '../services/data';
+import { supabase } from '../services/supabase';
 import { Button, Card, Badge, BackButton, Sheet, Input } from '../components/ui';
 import AuthModal from '../components/AuthModal';
 import VendorDashboard from '../components/VendorDashboard';
@@ -50,6 +51,16 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Edit profile form
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [editEmail, setEditEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailChangeRequested, setEmailChangeRequested] = useState(false);
   
   // Local state for modal configuration, initialized from intent
   const [authConfig, setAuthConfig] = useState<{ role: UserRole; mode: 'LOGIN' | 'SIGNUP' }>({
@@ -73,6 +84,25 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     }
   }, [user, activeTab]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`buyer-orders-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `userId=eq.${user.id}` },
+        (payload) => {
+          setOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } as MartOrder : o));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const loadActivity = async () => {
     if (!user) return;
     setLoadingActivity(true);
@@ -91,6 +121,45 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
       console.warn("[Account] Activity Load Error:", err);
     } finally {
       setLoadingActivity(false);
+    }
+  };
+
+  const handleOpenEditProfile = () => {
+    if (!user) return;
+    setEditName(user.name || '');
+    setEditPhone(user.phoneNumber || '');
+    setEditAddress(user.address || '');
+    setEditEmail('');
+    setEmailChangeRequested(false);
+    setShowEditProfile(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user || !editName.trim()) return;
+    setSavingProfile(true);
+    const result = await api.auth.updateProfile(user.id, {
+      name: editName.trim(),
+      phoneNumber: editPhone.trim(),
+      address: editAddress.trim()
+    });
+    setSavingProfile(false);
+    if (result.success) {
+      refreshUser();
+      setShowEditProfile(false);
+    } else {
+      alert(result.error || "Couldn't update your details. Please try again.");
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    if (!editEmail.trim()) return;
+    setSavingEmail(true);
+    const result = await api.auth.updateEmail(editEmail.trim());
+    setSavingEmail(false);
+    if (result.success) {
+      setEmailChangeRequested(true);
+    } else {
+      alert(result.error || "Couldn't start the email change. Please try again.");
     }
   };
 
@@ -200,7 +269,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                   )}
                 </div>
                 <div className="flex gap-2">
-                   <button className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
+                   <button onClick={handleOpenEditProfile} className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
                       <Settings size={22} />
                    </button>
                    <button onClick={async () => { await api.auth.signOut(); }} className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all group">
@@ -322,7 +391,12 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                          </div>
                          <div className="text-right">
                             <p className="font-black text-kubwa-green">₦{order.total.toLocaleString()}</p>
-                            <Badge color="bg-gray-100 text-gray-600 mt-1">{order.status}</Badge>
+                            <Badge color={
+                               order.status === 'DELIVERED' ? 'bg-green-100 text-green-700 mt-1' :
+                               order.status === 'CANCELLED' ? 'bg-red-50 text-red-500 mt-1' :
+                               order.status === 'IN_TRANSIT' || order.status === 'RIDER_ASSIGNED' ? 'bg-blue-100 text-blue-700 mt-1' :
+                               'bg-gray-100 text-gray-600 mt-1'
+                            }>{order.status.replace('_', ' ')}</Badge>
                          </div>
                       </Card>
                     ))}
@@ -435,6 +509,40 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
             <Button className="w-full h-14" onClick={handleSubmitReview} disabled={submittingReview || !reviewComment.trim()}>
               {submittingReview ? <Loader2 className="animate-spin" /> : 'SUBMIT REVIEW'}
             </Button>
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet isOpen={showEditProfile} onClose={() => setShowEditProfile(false)} title="Edit Profile">
+        {user && (
+          <div className="p-6 pb-8 space-y-6">
+            <div className="space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Your Details</p>
+              <Input placeholder="Full Name" value={editName} onChange={e => setEditName(e.target.value)} />
+              <Input placeholder="Phone Number" type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+              <Input placeholder="Address" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+              <Button className="w-full h-14" onClick={handleSaveProfile} disabled={savingProfile || !editName.trim()}>
+                {savingProfile ? <Loader2 className="animate-spin" /> : 'SAVE CHANGES'}
+              </Button>
+            </div>
+
+            <div className="pt-6 border-t border-gray-100 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Change Email</p>
+              <p className="text-[11px] font-medium text-gray-500">Current: {user.email}</p>
+              {emailChangeRequested ? (
+                <div className="bg-green-50 text-green-700 rounded-2xl p-4 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle size={16} className="shrink-0" />
+                  Check your new inbox for a confirmation link — the change won't take effect until you click it.
+                </div>
+              ) : (
+                <>
+                  <Input placeholder="New Email Address" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+                  <Button variant="outline" className="w-full h-12" onClick={handleChangeEmail} disabled={savingEmail || !editEmail.trim()}>
+                    {savingEmail ? <Loader2 className="animate-spin" /> : 'UPDATE EMAIL'}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </Sheet>

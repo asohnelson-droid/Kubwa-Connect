@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, Product, MartOrder, ApprovalStatus } from '../types';
 import { api, PRODUCT_CATEGORIES } from '../services/data';
+import { supabase } from '../services/supabase';
 import { Card, Button, Input, Badge, Sheet } from './ui';
-import { Plus, Edit2, Trash2, Package, DollarSign, Loader2, Image as ImageIcon, Crown, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, DollarSign, Loader2, Image as ImageIcon, Crown, X, Bell } from 'lucide-react';
 
 interface VendorDashboardProps {
   user: User;
@@ -20,10 +21,41 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [newOrderAlert, setNewOrderAlert] = useState<MartOrder | null>(null);
 
   useEffect(() => {
     loadData();
+
+    const channel = supabase
+      .channel(`vendor-dashboard-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'products', filter: `vendorId=eq.${user.id}` },
+        (payload) => {
+          setProducts(prev => prev.map(p => p.id === payload.new.id ? { ...p, ...payload.new } as Product : p));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders', filter: `vendorId=eq.${user.id}` },
+        (payload) => {
+          const newOrder = payload.new as MartOrder;
+          setOrders(prev => [newOrder, ...prev]);
+          setNewOrderAlert(newOrder);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user.id]);
+
+  useEffect(() => {
+    if (!newOrderAlert) return;
+    const timer = setTimeout(() => setNewOrderAlert(null), 8000);
+    return () => clearTimeout(timer);
+  }, [newOrderAlert]);
 
   const loadData = async () => {
     setLoading(true);
@@ -143,6 +175,19 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+       {newOrderAlert && (
+          <div className="bg-gray-900 text-white p-5 rounded-[2rem] flex items-center justify-between gap-4 animate-slide-in-bottom shadow-xl">
+             <div className="flex items-center gap-4">
+                <div className="bg-kubwa-green p-2.5 rounded-2xl shrink-0"><Bell size={18} /></div>
+                <div>
+                   <p className="text-xs font-black uppercase tracking-widest">New Order Received!</p>
+                   <p className="text-[10px] text-white/60 font-bold mt-0.5">₦{newOrderAlert.total.toLocaleString()} · {newOrderAlert.items?.length || 0} item(s)</p>
+                </div>
+             </div>
+             <button onClick={() => setNewOrderAlert(null)} className="p-1 hover:bg-white/10 rounded-full shrink-0"><X size={18} /></button>
+          </div>
+       )}
+
        {/* Metrics Cards */}
        <div className="grid grid-cols-2 gap-4">
           <Card className="p-6 bg-kubwa-green text-white border-none">
@@ -230,6 +275,18 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                     </div>
                   ))}
                </div>
+               {(o.deliveryAddress || o.contactPhone) && (
+                  <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1">
+                     {o.deliveryAddress && (
+                        <p className="text-[11px] text-gray-600 font-medium">📍 {o.deliveryAddress}</p>
+                     )}
+                     {o.contactPhone && (
+                        <a href={`tel:${o.contactPhone}`} className="text-[11px] text-kubwa-green font-black block">
+                           📞 {o.contactPhone}
+                        </a>
+                     )}
+                  </div>
+               )}
                <div className="pt-3 border-t flex justify-between items-center">
                   <span className="font-black text-kubwa-green">₦{o.total.toLocaleString()}</span>
                   {o.deliveryOption === 'DISPATCH' && ['RIDER_ASSIGNED', 'IN_TRANSIT', 'DELIVERED'].includes(o.status) ? (
