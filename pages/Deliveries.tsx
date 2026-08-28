@@ -1,8 +1,9 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Truck, Package, MapPin, Clock, Navigation, Loader2, Crown, CheckCircle, Search, Bookmark, Phone, Power, User as UserIcon, Minus, Plus, RefreshCw } from 'lucide-react';
+import { Truck, Package, MapPin, Clock, Navigation, Loader2, Crown, CheckCircle, Search, Bookmark, Phone, Power, User as UserIcon, Minus, Plus, RefreshCw, Bell, X } from 'lucide-react';
 import { api } from '../services/data';
+import { supabase } from '../services/supabase';
 import { Button, Card, Input, Badge, Breadcrumbs, BackButton } from '../components/ui';
 import { User, DeliveryRequest, Address, AppSection, DeliveryStatus } from '../types';
 
@@ -30,6 +31,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   const [riderOnline, setRiderOnline] = useState(false);
   const [availableJobs, setAvailableJobs] = useState<DeliveryRequest[]>([]);
   const [acceptingJob, setAcceptingJob] = useState<string | null>(null);
+  const [newJobAlert, setNewJobAlert] = useState<DeliveryRequest | null>(null);
 
   // Saved Addresses
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
@@ -50,11 +52,38 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
     if (isRider) {
         if (activeTab === 'request') setActiveTab('jobs');
     }
-    
+
     if (activeTab === 'track') loadDeliveries();
     if (activeTab === 'jobs' && isApprovedRider) loadJobs();
     if (user) api.users.getAddresses(user.id).then(setSavedAddresses);
   }, [activeTab, user, isRider]);
+
+  useEffect(() => {
+    if (!isApprovedRider || !user) return;
+
+    const channel = supabase
+      .channel(`rider-jobs-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'deliveries', filter: 'status=eq.PENDING' },
+        (payload) => {
+          const newJob = payload.new as DeliveryRequest;
+          setAvailableJobs(prev => prev.some(j => j.id === newJob.id) ? prev : [newJob, ...prev]);
+          setNewJobAlert(newJob);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isApprovedRider, user?.id]);
+
+  useEffect(() => {
+    if (!newJobAlert) return;
+    const timer = setTimeout(() => setNewJobAlert(null), 8000);
+    return () => clearTimeout(timer);
+  }, [newJobAlert]);
 
   // Simulation Loop for Map Movement
   useEffect(() => {
@@ -185,6 +214,19 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
            </button>
         )}
       </div>
+
+      {isApprovedRider && newJobAlert && (
+         <div className="bg-gray-900 text-white p-5 rounded-[2rem] flex items-center justify-between gap-4 animate-slide-in-bottom shadow-xl mb-6">
+            <div className="flex items-center gap-4">
+               <div className="bg-kubwa-green p-2.5 rounded-2xl shrink-0"><Bell size={18} /></div>
+               <div>
+                  <p className="text-xs font-black uppercase tracking-widest">New Job Available!</p>
+                  <p className="text-[10px] text-white/60 font-bold mt-0.5">{newJobAlert.pickup} → {newJobAlert.dropoff}</p>
+               </div>
+            </div>
+            <button onClick={() => setNewJobAlert(null)} className="p-1 hover:bg-white/10 rounded-full shrink-0"><X size={18} /></button>
+         </div>
+      )}
 
       <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
         {!isRider && (
