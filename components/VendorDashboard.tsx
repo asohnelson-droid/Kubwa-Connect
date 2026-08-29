@@ -5,7 +5,7 @@ import { User, Product, MartOrder, ApprovalStatus } from '../types';
 import { api, PRODUCT_CATEGORIES } from '../services/data';
 import { supabase } from '../services/supabase';
 import { Card, Button, Input, Badge, Sheet, SafeImage, SectionHeader } from './ui';
-import { Plus, Edit2, Trash2, Package, DollarSign, Loader2, Image as ImageIcon, Crown, X, Bell } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, DollarSign, Loader2, Image as ImageIcon, Crown, X, Bell, Bike, Phone } from 'lucide-react';
 
 interface VendorDashboardProps {
   user: User;
@@ -22,6 +22,12 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState<MartOrder | null>(null);
+
+  // Rider dispatch
+  const [dispatchingOrder, setDispatchingOrder] = useState<MartOrder | null>(null);
+  const [availableRiders, setAvailableRiders] = useState<{ id: string; name: string; phoneNumber?: string }[]>([]);
+  const [loadingRiders, setLoadingRiders] = useState(false);
+  const [assigningRiderId, setAssigningRiderId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -115,6 +121,27 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     if(!confirm("Are you sure?")) return;
     await api.products.delete(id);
     loadData();
+  };
+
+  const openDispatchSheet = async (order: MartOrder) => {
+    setDispatchingOrder(order);
+    setLoadingRiders(true);
+    const riders = await api.riders.getAvailable();
+    setAvailableRiders(riders);
+    setLoadingRiders(false);
+  };
+
+  const handleAssignRider = async (riderId: string) => {
+    if (!dispatchingOrder) return;
+    setAssigningRiderId(riderId);
+    const result = await api.orders.dispatchToRider(dispatchingOrder.id, riderId);
+    setAssigningRiderId(null);
+    if (result.success) {
+      setDispatchingOrder(null);
+      loadData();
+    } else {
+      alert(result.error || "Couldn't dispatch this rider. Please try again.");
+    }
   };
 
   const handleCloseSheet = () => {
@@ -295,6 +322,10 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                     <Badge color={o.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
                        {o.status === 'RIDER_ASSIGNED' ? 'Rider assigned' : o.status === 'IN_TRANSIT' ? 'Out for delivery' : 'Delivered'}
                     </Badge>
+                  ) : o.deliveryOption === 'DISPATCH' && o.status === 'VENDOR_CONFIRMED' ? (
+                    <Button onClick={() => openDispatchSheet(o)} className="h-10 text-xs px-4">
+                       <Bike size={14} /> Dispatch rider
+                    </Button>
                   ) : (
                     <select 
                       className="bg-gray-100 text-xs font-bold p-2 rounded-lg outline-none"
@@ -398,6 +429,58 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
              </Card>
           </div>
        )}
+
+       {/* Rider Dispatch Sheet */}
+       <Sheet isOpen={!!dispatchingOrder} onClose={() => setDispatchingOrder(null)} title="Dispatch Rider">
+          <div className="pb-6">
+             {dispatchingOrder && (
+                <div className="bg-gray-50 rounded-2xl p-4 mb-5">
+                   <p className="text-xs font-bold text-gray-400">Delivering to</p>
+                   <p className="text-sm font-bold text-kubwa-ink mt-0.5">{dispatchingOrder.deliveryAddress}</p>
+                </div>
+             )}
+
+             {loadingRiders ? (
+                <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" /></div>
+             ) : availableRiders.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
+                   <Bike size={36} className="mx-auto mb-2 opacity-20" />
+                   <p className="text-sm font-semibold">No riders online right now.</p>
+                   <p className="text-xs mt-1">Check back shortly, or contact a rider directly to ask them to go online.</p>
+                </div>
+             ) : (
+                <div className="space-y-3">
+                   {availableRiders.map(rider => (
+                      <Card key={rider.id} className="p-4 border-none shadow-sm rounded-2xl flex items-center justify-between gap-3">
+                         <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-full bg-kubwa-ride/10 text-kubwa-ride flex items-center justify-center shrink-0">
+                               <Bike size={18} />
+                            </div>
+                            <div className="min-w-0">
+                               <p className="font-bold text-sm text-kubwa-ink truncate">{rider.name}</p>
+                               <p className="text-xs font-semibold text-green-600">Online now</p>
+                            </div>
+                         </div>
+                         <div className="flex items-center gap-2 shrink-0">
+                            {rider.phoneNumber && (
+                               <a href={`tel:${rider.phoneNumber}`} className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200">
+                                  <Phone size={16} />
+                               </a>
+                            )}
+                            <Button
+                               onClick={() => handleAssignRider(rider.id)}
+                               disabled={!!assigningRiderId}
+                               className="h-10 text-xs px-4"
+                            >
+                               {assigningRiderId === rider.id ? <Loader2 size={14} className="animate-spin" /> : 'Assign'}
+                            </Button>
+                         </div>
+                      </Card>
+                   ))}
+                </div>
+             )}
+          </div>
+       </Sheet>
     </div>
   );
 };

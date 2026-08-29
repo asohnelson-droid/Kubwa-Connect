@@ -225,6 +225,10 @@ export const api = {
         updateStatus: async (orderId: string, status: string) => {
              const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
              return !error;
+        },
+        dispatchToRider: async (orderId: string, riderId: string): Promise<{ success: boolean; error?: string }> => {
+            const { error } = await supabase.rpc('dispatch_order_to_rider', { order_id: orderId, rider_id: riderId });
+            return { success: !error, error: error?.message };
         }
     },
     users: {
@@ -299,6 +303,20 @@ export const api = {
         upsert: async (userId: string, data: { name: string; category: string; rate: number; bio?: string; image?: string; location?: string }): Promise<{ success: boolean }> => {
             const { error } = await supabase.from('providers').upsert({ userId, ...data }, { onConflict: 'userId' });
             return { success: !error };
+        },
+    },
+    riders: {
+        getAvailable: async (): Promise<{ id: string; name: string; phoneNumber?: string }[]> => {
+            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber"').eq('role', 'RIDER').eq('status', 'APPROVED').eq('available', true);
+            return (data as any) || [];
+        },
+        getMyAvailability: async (userId: string): Promise<boolean> => {
+            const { data } = await supabase.from('profiles').select('available').eq('id', userId).maybeSingle();
+            return !!data?.available;
+        },
+        setAvailability: async (userId: string, available: boolean): Promise<boolean> => {
+            const { error } = await supabase.from('profiles').update({ available }).eq('id', userId);
+            return !error;
         },
     },
     products: {

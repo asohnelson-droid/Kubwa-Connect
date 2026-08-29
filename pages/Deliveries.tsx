@@ -29,6 +29,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   
   // Rider State
   const [riderOnline, setRiderOnline] = useState(false);
+  const [togglingOnline, setTogglingOnline] = useState(false);
   const [availableJobs, setAvailableJobs] = useState<DeliveryRequest[]>([]);
   const [acceptingJob, setAcceptingJob] = useState<string | null>(null);
   const [newJobAlert, setNewJobAlert] = useState<DeliveryRequest | null>(null);
@@ -102,6 +103,21 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
     }
     return () => clearInterval(interval);
   }, [deliveries, activeTab]);
+
+  useEffect(() => {
+    if (isRider && user) {
+      api.riders.getMyAvailability(user.id).then(setRiderOnline);
+    }
+  }, [isRider, user?.id]);
+
+  const handleToggleOnline = async () => {
+    if (!user) return;
+    setTogglingOnline(true);
+    const newStatus = !riderOnline;
+    const success = await api.riders.setAvailability(user.id, newStatus);
+    if (success) setRiderOnline(newStatus);
+    setTogglingOnline(false);
+  };
 
   const loadDeliveries = async () => {
     setLoading(true);
@@ -207,10 +223,11 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
         {!isRider && isElite && <Badge color="bg-kubwa-ink text-kubwa-amber border border-kubwa-amber/40">Elite Benefits</Badge>}
         {isRider && (
            <button 
-             onClick={() => setRiderOnline(!riderOnline)}
+             onClick={handleToggleOnline}
+             disabled={togglingOnline}
              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${riderOnline ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}
            >
-             <Power size={14} /> {riderOnline ? 'Online' : 'Offline'}
+             <Power size={14} /> {togglingOnline ? '...' : riderOnline ? 'Online' : 'Offline'}
            </button>
         )}
       </div>
@@ -325,7 +342,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
             {!riderOnline && (
                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-2xl text-amber-700">
                  <p className="font-bold text-sm flex items-center gap-2"><Power size={16}/> You are offline</p>
-                 <p className="text-xs font-medium mt-0.5">Go online to indicate availability to the system (though you can still accept jobs manually below).</p>
+                 <p className="text-xs font-medium mt-0.5">Vendors can only select you for direct dispatch while you're online. You can still browse and accept open jobs below either way.</p>
                </div>
             )}
             
