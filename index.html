@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kubwa Connect - Shop. Fix. Deliver.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://checkout.flutterwave.com/v3.js"></script>
     <script src="https://js.paystack.co/v1/inline.js"></script>
@@ -11,12 +14,30 @@
       tailwind.config = {
         theme: {
           extend: {
+            fontFamily: {
+              display: ['"Space Grotesk"', 'sans-serif'],
+              sans: ['Inter', 'sans-serif'],
+            },
             colors: {
               kubwa: {
-                green: '#FF5733',
-                orange: '#F97316',
+                /* Honest names, real roles -- a category color actually means
+                   something now: mart is always green, fixit always amber,
+                   ride always blue, primary is the one flame accent that cuts
+                   across all of them. */
+                primary: '#FF5A36',
+                primaryDark: '#E2431F',
+                ink: '#161A2B',
+                mart: '#16A34A',
+                fixit: '#F59E0B',
+                ride: '#2563EB',
                 amber: '#FBBF24',
-                dark: '#111827',
+                surface: '#FAFAF8',
+                /* Aliases: 127 existing usages across the app still reference
+                   these old names. Keeping them pointed at the right values
+                   so nothing breaks while each page gets migrated in turn. */
+                green: '#FF5A36',
+                orange: '#F97316',
+                dark: '#161A2B',
                 light: '#F3F4F6'
               }
             },
@@ -56,24 +77,12 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      body {
+        font-family: 'Inter', sans-serif;
+      }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.48.0",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
-  }
-}
-</script>
-</head>
-  <body class="bg-gray-50 text-slate-800">
+  </head>
+  <body class="bg-kubwa-surface text-slate-800">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
