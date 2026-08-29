@@ -159,19 +159,19 @@ function App() {
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-         <div className="w-16 h-16 bg-kubwa-green rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
-            <span className="text-white text-2xl font-black">KC</span>
+         <div className="w-16 h-16 bg-kubwa-primary rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
+            <span className="text-white font-display text-2xl font-bold">KC</span>
          </div>
-         <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Syncing App State...</p>
+         <p className="mt-6 text-xs font-bold text-gray-400">Syncing app state...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
+    <div className="min-h-screen bg-kubwa-surface max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
       <Suspense fallback={
          <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center">
-           <Loader2 className="animate-spin text-kubwa-green" size={40} />
+           <Loader2 className="animate-spin text-kubwa-primary" size={40} />
          </div>
       }>
         {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
@@ -197,23 +197,28 @@ function App() {
          </Suspense>
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-6 py-5 flex justify-between items-center z-40 rounded-t-[2.5rem] shadow-2xl">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-4 py-3 flex justify-between items-center z-40 rounded-t-[2rem] shadow-2xl">
         {[
           { id: AppSection.HOME, icon: HomeIcon, label: 'Home' },
           { id: AppSection.MART, icon: ShoppingBag, label: 'Mart' },
           { id: AppSection.FIXIT, icon: Wrench, label: 'FixIt' },
           { id: AppSection.RIDE, icon: Truck, label: 'Ride' },
           { id: AppSection.ACCOUNT, icon: User, label: user ? 'Profile' : 'Join' }
-        ].map((item) => (
-          <button 
-            key={item.id}
-            onClick={() => navigateTo(item.id)}
-            className={`flex flex-col items-center gap-1 transition-all ${currentSection === item.id ? 'text-kubwa-green' : 'text-gray-300'}`}
-          >
-            <item.icon size={22} strokeWidth={currentSection === item.id ? 3 : 2} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
-          </button>
-        ))}
+        ].map((item) => {
+          const isActive = currentSection === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => navigateTo(item.id)}
+              className="flex flex-col items-center gap-1 transition-all"
+            >
+              <div className={`p-2.5 rounded-2xl transition-all ${isActive ? 'bg-kubwa-primary/10' : ''}`}>
+                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-kubwa-primary' : 'text-gray-400'} />
+              </div>
+              <span className={`text-[10px] transition-all ${isActive ? 'font-bold text-kubwa-primary' : 'font-semibold text-gray-400'}`}>{item.label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

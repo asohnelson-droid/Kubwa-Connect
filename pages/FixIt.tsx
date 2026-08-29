@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Star, Loader2, Power, X, Briefcase, MapPin, Shield, Wrench, Plus, Minus, ChevronRight, CheckCircle, Clock, Calendar, ShieldCheck } from 'lucide-react';
 import { api, KUBWA_AREAS, FIXIT_SERVICES } from '../services/data';
 import { ServiceProvider, User as UserType, Review, AppSection, ServiceOrder, ServiceOrderStatus } from '../types';
-import { Button, Card, Badge, Breadcrumbs, Input, BackButton, Sheet } from '../components/ui';
+import { Button, Card, Badge, Breadcrumbs, Input, BackButton, Sheet, SafeImage, SectionHeader } from '../components/ui';
 import AuthModal from '../components/AuthModal';
 import { useData } from '../contexts/DataContext';
 
@@ -215,12 +215,12 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">FIXIT SERVICES</h2>
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">FixIt Services</h2>
         {myProfile && (
            <button 
              onClick={handleToggleStatus}
              disabled={togglingStatus}
-             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black transition-all ${myProfile.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${myProfile.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
            >
              <Power size={14} /> {myProfile.available ? 'Online' : 'Offline'}
            </button>
@@ -228,53 +228,53 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       </div>
 
       {user?.role === 'PROVIDER' && !loadingMyProfile && !myProfile && (
-        <Card className="p-6 mb-8 border-none shadow-sm rounded-[2rem] bg-gray-900 text-white flex items-center justify-between gap-4">
+        <Card className="p-6 mb-8 border-none shadow-sm rounded-[1.75rem] bg-kubwa-ink text-white flex items-center justify-between gap-4">
           <div>
-            <p className="font-black text-sm uppercase tracking-tight">Set up your listing</p>
-            <p className="text-[10px] text-white/60 font-bold mt-1">Add your rate and category so residents can find and hire you.</p>
+            <p className="font-bold text-sm">Set up your listing</p>
+            <p className="text-xs text-white/60 font-semibold mt-1">Add your rate and category so residents can find and hire you.</p>
           </div>
-          <Button onClick={() => setShowSetupSheet(true)} className="h-11 text-[10px] px-4 shrink-0">Set Up</Button>
+          <Button onClick={() => setShowSetupSheet(true)} className="h-11 text-xs px-4 shrink-0">Set up</Button>
         </Card>
       )}
 
       {myProfile && (
         <div className="mb-8">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">My Bookings</h3>
+          <SectionHeader title="My Bookings" />
           {loadingBookings ? (
-            <div className="flex justify-center py-6"><Loader2 className="animate-spin text-kubwa-green" size={24} /></div>
+            <div className="flex justify-center py-6"><Loader2 className="animate-spin text-kubwa-primary" size={24} /></div>
           ) : myBookings.length === 0 ? (
-            <Card className="py-8 text-center rounded-[2rem] border-dashed border-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">No booking requests yet</p>
+            <Card className="py-8 text-center rounded-[1.75rem] border-dashed border-2">
+              <p className="text-xs font-semibold text-gray-400">No booking requests yet</p>
             </Card>
           ) : (
             <div className="space-y-3">
               {myBookings.map(booking => (
                 <Card key={booking.id} className="p-5 border-none shadow-sm rounded-2xl">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="font-black text-sm">Booking #{booking.id.slice(0, 6)}</span>
+                    <span className="font-bold text-sm text-kubwa-ink">Booking #{booking.id.slice(0, 6)}</span>
                     <Badge color={
                       booking.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
                       booking.status === 'CANCELLED' ? 'bg-red-50 text-red-500' :
                       booking.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                      'bg-yellow-100 text-yellow-700'
+                      'bg-amber-100 text-amber-700'
                     }>{booking.status.replace('_', ' ')}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-black text-kubwa-green">₦{booking.amount.toLocaleString()}</span>
+                    <span className="font-bold text-kubwa-mart">₦{booking.amount.toLocaleString()}</span>
                     <div className="flex gap-2">
                       {booking.status === 'PENDING' && (
-                        <Button className="h-10 text-[10px] px-4" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'ACCEPTED')}>
+                        <Button className="h-10 text-xs px-4" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'ACCEPTED')}>
                           {bookingActionLoading === booking.id ? <Loader2 size={14} className="animate-spin" /> : 'Accept'}
                         </Button>
                       )}
                       {booking.status === 'ACCEPTED' && (
-                        <Button className="h-10 text-[10px] px-4" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'IN_PROGRESS')}>
-                          {bookingActionLoading === booking.id ? <Loader2 size={14} className="animate-spin" /> : 'Start Job'}
+                        <Button className="h-10 text-xs px-4" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'IN_PROGRESS')}>
+                          {bookingActionLoading === booking.id ? <Loader2 size={14} className="animate-spin" /> : 'Start job'}
                         </Button>
                       )}
                       {booking.status === 'IN_PROGRESS' && (
-                        <Button className="h-10 text-[10px] px-4 bg-green-600" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'COMPLETED')}>
-                          {bookingActionLoading === booking.id ? <Loader2 size={14} className="animate-spin" /> : 'Mark Complete'}
+                        <Button className="h-10 text-xs px-4 bg-green-600 shadow-none" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'COMPLETED')}>
+                          {bookingActionLoading === booking.id ? <Loader2 size={14} className="animate-spin" /> : 'Mark complete'}
                         </Button>
                       )}
                     </div>
@@ -291,7 +291,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
         <input 
           type="text" 
           placeholder="What do you need fixed?" 
-          className="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-kubwa-green/20 outline-none font-bold" 
+          className="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-kubwa-primary/20 outline-none font-semibold" 
           value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)} 
         />
@@ -302,7 +302,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
           <button 
             key={cat} 
             onClick={() => setSelectedCategory(cat)} 
-            className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border whitespace-nowrap ${selectedCategory === cat ? 'bg-kubwa-orange text-white border-kubwa-orange shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'}`}
+            className={`px-5 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${selectedCategory === cat ? 'bg-kubwa-fixit text-white border-kubwa-fixit shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'}`}
           >
             {cat}
           </button>
@@ -310,25 +310,25 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {contextLoading && providers.length === 0 ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-kubwa-green" /></div> : 
-          filteredProviders.length === 0 ? <div className="text-center py-20 text-gray-400 font-bold uppercase tracking-widest text-sm">No providers found</div> :
+        {contextLoading && providers.length === 0 ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-kubwa-primary" /></div> : 
+          filteredProviders.length === 0 ? <div className="text-center py-20 text-gray-400 font-semibold text-sm">No providers found</div> :
           filteredProviders.map(provider => (
             <Card key={provider.id} className="p-4 flex gap-4 hover:shadow-lg transition-all cursor-pointer border-none shadow-sm" onClick={() => setSelectedProvider(provider)}>
               <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 shrink-0">
-                <img src={provider.image} className="w-full h-full object-cover" alt="" />
+                <SafeImage src={provider.image} className="w-full h-full object-cover" alt={provider.name} />
               </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-black text-gray-900">{provider.name}</h3>
-                    <p className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest">{provider.category}</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-kubwa-ink truncate">{provider.name}</h3>
+                    <p className="text-xs font-bold text-kubwa-fixit">{provider.category}</p>
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-black">
-                    <Star size={12} className="text-yellow-400 fill-yellow-400" /> {provider.rating}
+                  <div className="flex items-center gap-1 text-xs font-bold shrink-0">
+                    <Star size={12} className="text-kubwa-amber fill-kubwa-amber" /> {provider.rating}
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-2">
-                   <span className="text-sm font-black text-gray-900">₦{provider.rate.toLocaleString()}/hr</span>
+                   <span className="text-sm font-bold text-kubwa-ink">₦{provider.rate.toLocaleString()}/hr</span>
                    <Badge color={provider.available ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'}>
                      {provider.available ? 'Online' : 'Away'}
                    </Badge>
@@ -343,9 +343,9 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
         {selectedProvider && (
           <div className="pb-6">
             <div className="h-40 rounded-3xl overflow-hidden mb-4 relative bg-gray-100">
-              <img src={selectedProvider.image} className="w-full h-full object-cover" alt="" />
+              <SafeImage src={selectedProvider.image} className="w-full h-full object-cover" alt={selectedProvider.name} />
               {selectedProvider.isVerified && (
-                <div className="absolute top-3 right-3 bg-white/90 px-3 py-1.5 rounded-full flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase tracking-wide">
+                <div className="absolute top-3 right-3 bg-white/90 px-3 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold text-kubwa-ride">
                   <ShieldCheck size={12} /> Verified
                 </div>
               )}
@@ -353,14 +353,14 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
 
             <div className="flex justify-between items-start mb-4">
               <div>
-                <p className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest">{selectedProvider.category}</p>
+                <p className="text-xs font-bold text-kubwa-fixit">{selectedProvider.category}</p>
                 {selectedProvider.location && (
-                  <p className="text-xs text-gray-400 font-bold flex items-center gap-1 mt-1"><MapPin size={12} /> {selectedProvider.location}</p>
+                  <p className="text-xs text-gray-400 font-semibold flex items-center gap-1 mt-1"><MapPin size={12} /> {selectedProvider.location}</p>
                 )}
               </div>
-              <div className="flex items-center gap-1 font-black text-sm">
-                <Star size={16} className="text-yellow-400 fill-yellow-400" /> {selectedProvider.rating}
-                <span className="text-gray-300 font-bold">({selectedProvider.reviews})</span>
+              <div className="flex items-center gap-1 font-bold text-sm">
+                <Star size={16} className="text-kubwa-amber fill-kubwa-amber" /> {selectedProvider.rating}
+                <span className="text-gray-300 font-semibold">({selectedProvider.reviews})</span>
               </div>
             </div>
 
@@ -377,16 +377,16 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             )}
 
             <div className="border-t border-gray-100 pt-4 mb-6">
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Reviews</h4>
+              <h4 className="text-xs font-bold text-gray-400 mb-3">Reviews</h4>
               {providerReviews.length === 0 ? (
-                <p className="text-xs text-gray-400 font-bold">No reviews yet.</p>
+                <p className="text-xs text-gray-400 font-semibold">No reviews yet.</p>
               ) : (
                 <div className="space-y-4">
                   {providerReviews.map(review => (
                     <div key={review.id} className="border-b border-gray-50 pb-3 last:border-none">
                       <div className="flex items-center gap-1 mb-1">
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} size={12} className={i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'} />
+                          <Star key={i} size={12} className={i < review.rating ? 'text-kubwa-amber fill-kubwa-amber' : 'text-gray-200'} />
                         ))}
                       </div>
                       <p className="text-xs text-gray-600 font-medium">{review.comment}</p>
@@ -397,12 +397,12 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             </div>
 
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Rate</span>
-              <span className="text-xl font-black text-kubwa-green">₦{selectedProvider.rate.toLocaleString()}<span className="text-xs text-gray-400">/hr</span></span>
+              <span className="text-xs font-bold text-gray-400">Rate</span>
+              <span className="text-xl font-bold text-kubwa-mart">₦{selectedProvider.rate.toLocaleString()}<span className="text-xs text-gray-400">/hr</span></span>
             </div>
 
             <Button className="w-full h-14" onClick={handleHireClick} disabled={!selectedProvider.available}>
-              {selectedProvider.available ? 'HIRE NOW' : 'CURRENTLY OFFLINE'}
+              {selectedProvider.available ? 'Hire now' : 'Currently offline'}
             </Button>
           </div>
         )}
@@ -414,26 +414,26 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
           <div className="pb-6 space-y-5">
             <Card className="p-4 flex items-center gap-4 border-none bg-gray-50 shadow-none">
               <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 shrink-0">
-                <img src={selectedProvider.image} className="w-full h-full object-cover" alt="" />
+                <SafeImage src={selectedProvider.image} className="w-full h-full object-cover" alt={selectedProvider.name} />
               </div>
               <div>
-                <p className="font-black text-sm text-gray-900">{selectedProvider.name}</p>
-                <p className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest">{selectedProvider.category}</p>
+                <p className="font-bold text-sm text-kubwa-ink">{selectedProvider.name}</p>
+                <p className="text-xs font-bold text-kubwa-fixit">{selectedProvider.category}</p>
               </div>
             </Card>
 
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">When do you need this?</p>
+              <p className="text-xs font-bold text-gray-400 mb-2">When do you need this?</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setBookingTimeMode('ASAP')}
-                  className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${bookingTimeMode === 'ASAP' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}
+                  className={`flex-1 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${bookingTimeMode === 'ASAP' ? 'bg-kubwa-ink text-white' : 'bg-gray-100 text-gray-500'}`}
                 >
                   <Clock size={14} /> ASAP
                 </button>
                 <button
                   onClick={() => setBookingTimeMode('SCHEDULED')}
-                  className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${bookingTimeMode === 'SCHEDULED' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}
+                  className={`flex-1 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${bookingTimeMode === 'SCHEDULED' ? 'bg-kubwa-ink text-white' : 'bg-gray-100 text-gray-500'}`}
                 >
                   <Calendar size={14} /> Schedule
                 </button>
@@ -448,7 +448,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             )}
 
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Estimated Duration</p>
+              <p className="text-xs font-bold text-gray-400 mb-2">Estimated duration</p>
               <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-2">
                 <button
                   onClick={() => setEstimatedDuration(d => Math.max(1, d - 1))}
@@ -456,7 +456,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
                 >
                   <Minus size={16} />
                 </button>
-                <span className="font-black text-lg">{estimatedDuration} {estimatedDuration === 1 ? 'hour' : 'hours'}</span>
+                <span className="font-bold text-lg text-kubwa-ink">{estimatedDuration} {estimatedDuration === 1 ? 'hour' : 'hours'}</span>
                 <button
                   onClick={() => setEstimatedDuration(d => d + 1)}
                   className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-gray-600"
@@ -467,12 +467,12 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Estimated Total</span>
-              <span className="text-2xl font-black text-kubwa-green">₦{(selectedProvider.rate * estimatedDuration).toLocaleString()}</span>
+              <span className="text-xs font-bold text-gray-400">Estimated total</span>
+              <span className="text-2xl font-bold text-kubwa-mart">₦{(selectedProvider.rate * estimatedDuration).toLocaleString()}</span>
             </div>
 
             <Button className="w-full h-14" onClick={handleConfirmBooking} disabled={isBooking}>
-              {isBooking ? <Loader2 className="animate-spin" /> : 'CONFIRM BOOKING'}
+              {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm booking'}
             </Button>
           </div>
         )}
@@ -480,13 +480,13 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
 
       {/* Booking Confirmation Overlay */}
       {bookingConfirmation && (
-        <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-          <Card className="w-full max-w-sm p-10 text-center animate-zoom-in rounded-[3rem] border-none shadow-2xl">
-            <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+        <div className="fixed inset-0 z-[200] bg-kubwa-ink/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+          <Card className="w-full max-w-sm p-10 text-center animate-zoom-in rounded-[2.5rem] border-none shadow-2xl">
+            <div className="w-20 h-20 bg-kubwa-mart/10 text-kubwa-mart rounded-[1.75rem] flex items-center justify-center mx-auto mb-6">
               <CheckCircle size={40} />
             </div>
-            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Booking Sent!</h3>
-            <p className="text-gray-500 font-bold text-xs mt-3 leading-relaxed">
+            <h3 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Booking sent!</h3>
+            <p className="text-gray-500 font-semibold text-xs mt-3 leading-relaxed">
               {selectedProvider?.name} will confirm your request shortly. You can track it from your Profile.
             </p>
           </Card>
@@ -496,11 +496,11 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       {/* Provider Setup Sheet */}
       <Sheet isOpen={showSetupSheet} onClose={() => setShowSetupSheet(false)} title="Set Up Your Listing">
         <div className="space-y-4 pb-6">
-          <Input placeholder="Your Name / Business Name" value={setupName} onChange={e => setSetupName(e.target.value)} />
+          <Input placeholder="Your name / business name" value={setupName} onChange={e => setSetupName(e.target.value)} />
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Service Category</label>
+            <label className="text-xs font-bold text-gray-400 ml-2">Service category</label>
             <select
-              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none"
+              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none"
               value={setupCategory}
               onChange={e => setSetupCategory(e.target.value)}
             >
@@ -509,13 +509,13 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
           </div>
           <Input type="number" placeholder="Rate per hour (₦)" value={setupRate} onChange={e => setSetupRate(e.target.value)} />
           <textarea
-            className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold h-28 resize-none outline-none focus:ring-2 focus:ring-kubwa-green"
+            className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold h-28 resize-none outline-none focus:ring-2 focus:ring-kubwa-primary/20"
             placeholder="Tell residents about your experience..."
             value={setupBio}
             onChange={e => setSetupBio(e.target.value)}
           />
           <Button onClick={handleSaveSetup} disabled={savingSetup || !setupName.trim() || !setupRate.trim()} className="w-full h-14">
-            {savingSetup ? <Loader2 className="animate-spin" /> : 'PUBLISH LISTING'}
+            {savingSetup ? <Loader2 className="animate-spin" /> : 'Publish listing'}
           </Button>
         </div>
       </Sheet>
