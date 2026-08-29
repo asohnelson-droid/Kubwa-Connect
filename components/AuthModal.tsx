@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity, Store, Wrench, Truck } from 'lucide-react';
+import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity, Store, Wrench, Truck, Zap } from 'lucide-react';
 import { Button, Card, Input } from './ui';
 import { api } from '../services/data';
 import { testSupabaseConnection } from '../services/supabase';
@@ -17,11 +17,11 @@ interface AuthModalProps {
 // The only roles a person can choose for themselves at signup. ADMIN/SUPER_ADMIN
 // are never offered here -- see the signup allowlist enforced server-side in
 // api.auth.signUp and the handle_new_user DB trigger.
-const SIGNUP_ROLE_OPTIONS: { role: UserRole; label: string; sub: string; icon: React.ElementType }[] = [
-  { role: 'USER', label: 'Just Browsing', sub: 'Shop & book services', icon: UserIcon },
-  { role: 'VENDOR', label: 'Start a Shop', sub: 'Sell in Kubwa Mart', icon: Store },
-  { role: 'PROVIDER', label: 'List a Skill', sub: 'Offer repairs & services', icon: Wrench },
-  { role: 'RIDER', label: 'Become a Rider', sub: 'Deliver orders & earn', icon: Truck },
+const SIGNUP_ROLE_OPTIONS: { role: UserRole; label: string; sub: string; icon: React.ElementType; activeClasses: string; iconActive: string }[] = [
+  { role: 'USER', label: 'Just Browsing', sub: 'Shop & book services', icon: UserIcon, activeClasses: 'border-kubwa-primary bg-kubwa-primary/5', iconActive: 'text-kubwa-primary' },
+  { role: 'VENDOR', label: 'Start a Shop', sub: 'Sell in Kubwa Mart', icon: Store, activeClasses: 'border-kubwa-mart bg-kubwa-mart/5', iconActive: 'text-kubwa-mart' },
+  { role: 'PROVIDER', label: 'List a Skill', sub: 'Offer repairs & services', icon: Wrench, activeClasses: 'border-kubwa-fixit bg-kubwa-fixit/5', iconActive: 'text-kubwa-fixit' },
+  { role: 'RIDER', label: 'Become a Rider', sub: 'Deliver orders & earn', icon: Truck, activeClasses: 'border-kubwa-ride bg-kubwa-ride/5', iconActive: 'text-kubwa-ride' },
 ];
 const PUBLIC_SIGNUP_ROLES: UserRole[] = SIGNUP_ROLE_OPTIONS.map(o => o.role);
 
@@ -147,27 +147,27 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   if (verificationSent) {
     return (
-      <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-        <Card className="w-full max-w-sm relative p-8 text-center animate-zoom-in rounded-[3rem] border-none shadow-2xl">
-          <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
-             <Mail size={36} />
+      <div className="fixed inset-0 z-[200] bg-kubwa-ink/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+        <Card className="w-full max-w-sm relative p-8 text-center animate-zoom-in rounded-[2.5rem] border-none shadow-2xl">
+          <div className="w-20 h-20 bg-kubwa-primary/10 text-kubwa-primary rounded-[1.75rem] flex items-center justify-center mx-auto mb-6">
+             <Mail size={32} />
           </div>
-          <h3 className="font-black text-2xl mb-2 uppercase tracking-tight">Check your email</h3>
-          <p className="text-gray-500 mb-6 text-xs font-bold leading-relaxed">
+          <h3 className="font-display font-bold text-2xl mb-2 text-kubwa-ink">Check your email</h3>
+          <p className="text-gray-500 mb-6 text-sm font-medium leading-relaxed">
             We've sent a secure activation link to:<br/>
-            <span className="text-gray-900 font-black">{email}</span>
+            <span className="text-kubwa-ink font-bold">{email}</span>
           </p>
           <div className="bg-gray-50 p-4 rounded-2xl mb-8 flex gap-3 text-left">
-             <Info size={16} className="text-kubwa-green shrink-0 mt-1" />
-             <p className="text-[10px] font-bold text-gray-500 leading-tight">
-                Can't find it? Please check your <span className="text-gray-900">Spam</span> or <span className="text-gray-900">Promotions</span> folder. 
+             <Info size={16} className="text-kubwa-primary shrink-0 mt-1" />
+             <p className="text-xs font-semibold text-gray-500 leading-tight">
+                Can't find it? Please check your <span className="text-kubwa-ink">Spam</span> or <span className="text-kubwa-ink">Promotions</span> folder. 
              </p>
           </div>
           <div className="space-y-3">
-            <Button onClick={handleResend} disabled={resending || resendTimer > 0} variant="outline" className="w-full h-14 text-[10px] font-black">
-              {resending ? <Loader2 size={16} className="animate-spin" /> : (resendTimer > 0 ? `Try again in ${resendTimer}s` : 'Resend Activation Link')}
+            <Button onClick={handleResend} disabled={resending || resendTimer > 0} variant="outline" className="w-full h-14 text-xs">
+              {resending ? <Loader2 size={16} className="animate-spin" /> : (resendTimer > 0 ? `Try again in ${resendTimer}s` : 'Resend activation link')}
             </Button>
-            <Button onClick={onClose} className="w-full h-14 text-xs font-black">Close & Check Inbox</Button>
+            <Button onClick={onClose} className="w-full h-14">Close &amp; check inbox</Button>
           </div>
         </Card>
       </div>
@@ -175,20 +175,20 @@ const AuthModal: React.FC<AuthModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-      <Card className="w-full max-w-sm relative animate-zoom-in rounded-[3rem] border-none shadow-2xl overflow-hidden p-0">
-        <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors z-10">
-          <X size={24} strokeWidth={3} />
+    <div className="fixed inset-0 z-[200] bg-kubwa-ink/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+      <Card className="w-full max-w-sm relative animate-zoom-in rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
+        <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-kubwa-ink transition-colors z-10">
+          <X size={22} strokeWidth={2.5} />
         </button>
         <form onSubmit={handleSubmit} className="p-10 max-h-[90vh] overflow-y-auto no-scrollbar">
           <div className="text-center mb-10">
-             <div className="w-20 h-20 bg-kubwa-green/10 text-kubwa-green rounded-[2rem] flex items-center justify-center mx-auto mb-6">
-                {mode === 'SIGNUP' ? <UserPlus size={36} /> : mode === 'FORGOT' || mode === 'UPDATE_PASSWORD' ? <KeyRound size={36} /> : <span className="text-3xl">⚡</span>}
+             <div className="w-20 h-20 bg-kubwa-primary/10 text-kubwa-primary rounded-[1.75rem] flex items-center justify-center mx-auto mb-6">
+                {mode === 'SIGNUP' ? <UserPlus size={32} /> : mode === 'FORGOT' || mode === 'UPDATE_PASSWORD' ? <KeyRound size={32} /> : <Zap size={32} className="fill-kubwa-primary" />}
              </div>
-             <h3 className="text-3xl font-black text-gray-900 mb-1 uppercase tracking-tight leading-none">
-               {mode === 'LOGIN' ? 'Welcome' : mode === 'SIGNUP' ? 'Join Us' : mode === 'FORGOT' ? 'Recovery' : 'New Pass'}
+             <h3 className="font-display text-3xl font-bold text-kubwa-ink mb-1 leading-none">
+               {mode === 'LOGIN' ? 'Welcome' : mode === 'SIGNUP' ? 'Join us' : mode === 'FORGOT' ? 'Recovery' : 'New password'}
              </h3>
-             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+             <p className="text-xs font-bold text-gray-400">
                {mode === 'FORGOT' ? 'Reset your password' : mode === 'UPDATE_PASSWORD' ? 'Set your new password' : 'Kubwa Connect Community'}
              </p>
           </div>
@@ -196,18 +196,18 @@ const AuthModal: React.FC<AuthModalProps> = ({
           <div className="space-y-4">
               {mode === 'SIGNUP' && (
                 <div className="mb-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 text-center">How will you use Kubwa Connect?</p>
+                  <p className="text-xs font-bold text-gray-400 mb-3 text-center">How will you use Kubwa Connect?</p>
                   <div className="grid grid-cols-2 gap-3">
                     {SIGNUP_ROLE_OPTIONS.map(opt => (
                       <button
                         key={opt.role}
                         type="button"
                         onClick={() => setSelectedRole(opt.role)}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all ${selectedRole === opt.role ? 'border-kubwa-green bg-kubwa-green/5' : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all ${selectedRole === opt.role ? opt.activeClasses : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}
                       >
-                        <opt.icon size={20} className={selectedRole === opt.role ? 'text-kubwa-green' : 'text-gray-400'} />
-                        <p className="text-xs font-black text-gray-900 mt-2">{opt.label}</p>
-                        <p className="text-[9px] font-bold text-gray-400 mt-0.5">{opt.sub}</p>
+                        <opt.icon size={18} className={selectedRole === opt.role ? opt.iconActive : 'text-gray-400'} />
+                        <p className="text-xs font-bold text-kubwa-ink mt-2">{opt.label}</p>
+                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{opt.sub}</p>
                       </button>
                     ))}
                   </div>
@@ -217,31 +217,31 @@ const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'SIGNUP' && (
                 <div className="relative">
                   <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <Input className="pl-14 h-14" value={name} onChange={e => setName(e.target.value)} placeholder="Full Name" required />
+                  <Input className="pl-14 h-14" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" required />
                 </div>
               )}
               
               {mode !== 'UPDATE_PASSWORD' && (
                 <div className="relative">
                   <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <Input className="pl-14 h-14" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email Address" required />
+                  <Input className="pl-14 h-14" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" required />
                 </div>
               )}
 
               {mode !== 'FORGOT' && (
                 <div className="relative">
                   <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'UPDATE_PASSWORD' ? "New Password" : "Password"} required />
+                  <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'UPDATE_PASSWORD' ? "New password" : "Password"} required />
                 </div>
               )}
 
               {error && (
-                <div className="p-5 bg-red-50 text-red-700 rounded-[2rem] flex flex-col gap-4 animate-fade-in border border-red-100 shadow-sm">
+                <div className="p-5 bg-red-50 text-red-700 rounded-[1.75rem] flex flex-col gap-4 animate-fade-in border border-red-100">
                   <div className="flex gap-3 items-start">
                     <ErrorIcon size={20} className="shrink-0" />
                     <div className="space-y-2">
-                      <p className="text-[11px] font-black leading-tight uppercase tracking-wide">{errorHeader}</p>
-                      <p className="text-[10px] font-medium leading-relaxed opacity-80">
+                      <p className="text-xs font-bold leading-tight">{errorHeader}</p>
+                      <p className="text-xs font-medium leading-relaxed opacity-80">
                         {error}
                       </p>
                     </div>
@@ -250,41 +250,41 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   {isAlreadyRegistered && (
                     <Button
                       type="button"
-                      className="w-full h-11 text-[10px]"
+                      className="w-full h-11 text-xs"
                       onClick={() => { setError(''); setPassword(''); setMode('LOGIN'); }}
                     >
-                      SIGN IN INSTEAD
+                      Sign in instead
                     </Button>
                   )}
                   
                   {isNetworkError && (
                     <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-red-100/50">
-                       <div className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-400">
-                         <HelpCircle size={12} /> Diagnostic Tools
+                       <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                         <HelpCircle size={12} /> Diagnostic tools
                        </div>
                        
                        <Button 
                          type="button" 
                          variant="outline" 
-                         className="w-full h-10 text-[9px] font-black border-red-100 bg-white"
+                         className="w-full h-10 text-[10px] border-red-100 bg-white"
                          onClick={handleRunDiagnostics}
                          disabled={testingConnection}
                        >
-                         {testingConnection ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} TEST PROJECT CONNECTION
+                         {testingConnection ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Test project connection
                        </Button>
 
                        {connectionResult && (
-                         <div className={`p-2 rounded-xl text-[9px] font-bold ${connectionResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                         <div className={`p-2 rounded-xl text-[10px] font-semibold ${connectionResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                            {connectionResult.ok ? '✅ ' : '❌ '}{connectionResult.message}
                          </div>
                        )}
 
                        {!connectionResult?.ok && (
-                         <ul className="text-[9px] font-bold text-gray-600 space-y-1.5 list-disc pl-4 mt-2">
-                            <li>Check for <b>Adblockers</b> (uBlock, Ghostery).</li>
-                            <li>Brave users: Turn off <b>Brave Shields</b> for this site.</li>
-                            <li>Ensure you are not on a restricted Office or Public Wi-Fi.</li>
-                            <li>Open this app in <b>Incognito Mode</b>.</li>
+                         <ul className="text-[10px] font-semibold text-gray-600 space-y-1.5 list-disc pl-4 mt-2">
+                            <li>Check for <b>adblockers</b> (uBlock, Ghostery).</li>
+                            <li>Brave users: turn off <b>Brave Shields</b> for this site.</li>
+                            <li>Ensure you are not on a restricted office or public Wi-Fi.</li>
+                            <li>Open this app in <b>incognito mode</b>.</li>
                          </ul>
                        )}
                     </div>
@@ -295,21 +295,21 @@ const AuthModal: React.FC<AuthModalProps> = ({
               {successMsg && (
                 <div className="p-4 bg-green-50 text-green-700 rounded-2xl flex gap-3 items-center animate-fade-in">
                   <CheckCircle size={18} className="shrink-0" />
-                  <p className="text-[10px] font-black leading-tight">{successMsg}</p>
+                  <p className="text-xs font-bold leading-tight">{successMsg}</p>
                 </div>
               )}
 
-              <Button type="submit" disabled={loading} className="w-full h-16 text-xs font-black shadow-xl mt-4">
-                  {loading ? <Loader2 size={24} className="animate-spin" /> : 
-                   mode === 'LOGIN' ? 'SIGN IN' : 
-                   mode === 'SIGNUP' ? 'CREATE ACCOUNT' : 
-                   mode === 'FORGOT' ? 'SEND RESET LINK' : 'UPDATE PASSWORD'}
+              <Button type="submit" disabled={loading} className="w-full h-16 shadow-xl mt-4">
+                  {loading ? <Loader2 size={22} className="animate-spin" /> : 
+                   mode === 'LOGIN' ? 'Sign in' : 
+                   mode === 'SIGNUP' ? 'Create account' : 
+                   mode === 'FORGOT' ? 'Send reset link' : 'Update password'}
               </Button>
               
               <div className="text-center mt-6 flex flex-col gap-3">
                   {mode === 'LOGIN' && (
-                    <button type="button" onClick={() => setMode('FORGOT')} className="text-[10px] font-black text-kubwa-orange uppercase tracking-widest hover:underline">
-                      Forgot Password?
+                    <button type="button" onClick={() => setMode('FORGOT')} className="text-xs font-bold text-kubwa-fixit hover:underline">
+                      Forgot password?
                     </button>
                   )}
                   
@@ -320,8 +320,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
                       setConnectionResult(null);
                       if (mode === 'LOGIN') setMode('SIGNUP');
                       else setMode('LOGIN');
-                    }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-kubwa-green transition-colors">
-                        {mode === 'LOGIN' ? "New here? Create Account" : "Back to Sign In"}
+                    }} className="text-xs font-bold text-gray-400 hover:text-kubwa-primary transition-colors">
+                        {mode === 'LOGIN' ? "New here? Create account" : "Back to sign in"}
                     </button>
                   )}
               </div>

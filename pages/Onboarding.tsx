@@ -14,25 +14,25 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       title: "Welcome to Kubwa Connect",
       desc: "The Super App for every resident of Kubwa. Shop, hire services, and book deliveries—all in one place.",
       icon: <div className="w-40 h-40 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-zoom-in"><MapPin size={80} className="text-white drop-shadow-lg" /></div>,
-      color: "bg-kubwa-green"
+      color: "bg-kubwa-primary"
     },
     {
       title: "Shop Local",
       desc: "Order groceries, fashion, and daily essentials from trusted vendors in your neighborhood.",
       icon: <div className="w-40 h-40 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-zoom-in"><ShoppingBag size={80} className="text-white drop-shadow-lg" /></div>,
-      color: "bg-red-500"
+      color: "bg-kubwa-mart"
     },
     {
       title: "Hire Artisans",
       desc: "Need a plumber, electrician, or cleaner? Connect with verified pros nearby instantly.",
       icon: <div className="w-40 h-40 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-zoom-in"><Wrench size={80} className="text-white drop-shadow-lg" /></div>,
-      color: "bg-orange-500"
+      color: "bg-kubwa-fixit"
     },
     {
       title: "Fast Delivery",
       desc: "Send packages or request a pickup. Reliable logistics powered by local riders.",
       icon: <div className="w-40 h-40 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-zoom-in"><Truck size={80} className="text-white drop-shadow-lg" /></div>,
-      color: "bg-blue-600"
+      color: "bg-kubwa-ride"
     }
   ];
 
@@ -86,7 +86,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
          </div>
 
          <div key={step} className="text-center mb-8 animate-fade-in">
-            <h2 className="text-2xl font-bold mb-3">{steps[step].title}</h2>
+            <h2 className="font-display text-2xl font-bold mb-3">{steps[step].title}</h2>
             <p className="text-gray-500 leading-relaxed text-sm h-10 px-4">{steps[step].desc}</p>
          </div>
 
@@ -95,7 +95,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
            className={`w-full py-4 text-lg font-bold shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95 ${steps[step].color} text-white hover:opacity-90 border-none`}
          >
            {step === steps.length - 1 ? (
-             <>Get Started <Check size={24} /></>
+             <>Get started <Check size={24} /></>
            ) : (
              <>Next <ArrowRight size={24} /></>
            )}
