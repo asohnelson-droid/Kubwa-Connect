@@ -19,6 +19,7 @@ interface MartProps {
 }
 
 const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAuth, setSection, refreshUser, goBack }) => {
+  const isDemoProduct = (product: Product) => product.vendorId?.startsWith('demo_');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParentCategory, setSelectedParentCategory] = useState('All'); 
   
@@ -113,6 +114,15 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     if (!user) { onRequireAuth(); return; }
     if (cart.length === 0) return;
 
+    // A cart saved before this fix could still contain a sample item -- catch
+    // it here with a specific, actionable message rather than a generic
+    // failure after attempting the insert.
+    const demoItemsInCart = cart.filter(item => item.vendorId?.startsWith('demo_'));
+    if (demoItemsInCart.length > 0) {
+        alert(`"${demoItemsInCart[0].name}" is a sample listing and can't be ordered. Please remove it from your cart to continue.`);
+        return;
+    }
+
     // Production-Ready Validation
     if (deliveryOption === 'DISPATCH' && !deliveryAddress.trim()) {
         alert("Please enter a delivery address.");
@@ -144,6 +154,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
           ? "Success! Your order has been placed. Head to the vendor to pick it up once confirmed."
           : "Success! Your order has been placed. We'll contact you shortly.");
       } else {
+        console.error("[Mart] placeOrder failed:", result.error);
         alert("Failed to place order. Please try again.");
       }
     } catch (err) {
@@ -220,9 +231,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                 <h3 className="font-bold text-kubwa-ink text-xs mb-1 line-clamp-1">{product.name}</h3>
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-kubwa-mart text-xs">₦{product.price.toLocaleString()}</span>
-                  <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-kubwa-ink group-hover:text-white transition-colors" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
-                    <Plus size={14}/>
-                  </div>
+                  {isDemoProduct(product) ? (
+                    <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wide">Sample</span>
+                  ) : (
+                    <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-kubwa-ink group-hover:text-white transition-colors" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
+                      <Plus size={14}/>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -294,7 +309,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
              })()}
              <p className="font-bold text-2xl text-kubwa-mart mb-4">₦{selectedProduct.price.toLocaleString()}</p>
              <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Quality product from a verified Kubwa merchant.'}</p>
-             <Button className="w-full py-4 h-14 text-base" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>Add to cart</Button>
+             {isDemoProduct(selectedProduct) ? (
+               <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                 <p className="text-xs font-bold text-gray-400">Sample listing for browsing only — not available to order.</p>
+               </div>
+             ) : (
+               <Button className="w-full py-4 h-14 text-base" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>Add to cart</Button>
+             )}
           </div>
         )}
       </Sheet>

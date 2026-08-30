@@ -212,7 +212,7 @@ export const api = {
     orders: {
         placeOrder: async (orderData: Partial<MartOrder>) => {
             const { data, error } = await supabase.from('orders').insert([orderData]).select();
-            return { success: !error, orderId: data?.[0]?.id };
+            return { success: !error, orderId: data?.[0]?.id, error: error?.message };
         },
         getMyOrders: async (userId: string): Promise<MartOrder[]> => {
             const { data } = await supabase.from('orders').select('*').eq('userId', userId);
