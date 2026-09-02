@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { User, Product, MartOrder, ApprovalStatus } from '../types';
 import { api, PRODUCT_CATEGORIES } from '../services/data';
+import { PaymentService } from '../services/payments';
 import { supabase } from '../services/supabase';
 import { Card, Button, Input, Badge, Sheet, SafeImage, SectionHeader } from './ui';
 import { Plus, Edit2, Trash2, Package, DollarSign, Loader2, Image as ImageIcon, Crown, X, Bell, Bike, Phone } from 'lucide-react';
 
 interface VendorDashboardProps {
   user: User;
+  refreshUser: () => void;
 }
 
-const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
+const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradingPlan, setUpgradingPlan] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState<MartOrder | null>(null);
 
   // Rider dispatch
@@ -62,6 +65,19 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     const timer = setTimeout(() => setNewOrderAlert(null), 8000);
     return () => clearTimeout(timer);
   }, [newOrderAlert]);
+
+  const handleUpgradePayment = async () => {
+    setUpgradingPlan(true);
+    const result = await PaymentService.pay('VENDOR_FEATURED', user);
+    setUpgradingPlan(false);
+    if (result.success) {
+      setIsUpgradeModalOpen(false);
+      refreshUser();
+      alert("You're upgraded! Unlimited listings and your Featured badge are live now.");
+    } else {
+      alert(result.error || "Payment couldn't be completed. Please try again.");
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -422,12 +438,13 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                 </div>
                 
                 <h3 className="font-display text-2xl font-bold text-kubwa-ink mb-2">Upgrade your plan</h3>
-                <p className="text-gray-500 font-medium text-sm max-w-xs mx-auto mb-8 leading-relaxed">
-                   You've hit the limit of 4 products on the Free tier. Unlock unlimited listings and verified badges today.
+                <p className="text-gray-500 font-medium text-sm max-w-xs mx-auto mb-6 leading-relaxed">
+                   You've hit the limit of 4 products on the Free tier. Unlock unlimited listings and a verified badge today.
                 </p>
+                <p className="text-2xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-400">/month</span></p>
                 
-                <Button onClick={() => setIsUpgradeModalOpen(false)} className="w-full h-14 shadow-xl">
-                   Close
+                <Button onClick={handleUpgradePayment} disabled={upgradingPlan} className="w-full h-14 shadow-xl">
+                   {upgradingPlan ? <Loader2 className="animate-spin" /> : 'Upgrade now'}
                 </Button>
              </Card>
           </div>

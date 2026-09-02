@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle, ShieldCheck, TrendingUp, CheckCircle, MapPin } from 'lucide-react';
 import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
+import { PaymentService } from '../services/payments';
 import { Product, CartItem, User, AppSection } from '../types';
 import { Button, Badge, Card, Breadcrumbs, Sheet, Input, BackButton, SafeImage } from '../components/ui';
 import { useData } from '../contexts/DataContext';
@@ -31,6 +32,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
 
   useEffect(() => {
@@ -82,6 +84,20 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   /**
    * STRICT PRODUCT LIMIT CHECK
    */
+  const handleUpgradePayment = async () => {
+    if (!user) return;
+    setUpgrading(true);
+    const result = await PaymentService.pay('VENDOR_FEATURED', user);
+    setUpgrading(false);
+    if (result.success) {
+      setShowUpgradeModal(false);
+      refreshUser();
+      alert("You're upgraded! Unlimited listings and your Featured badge are live now.");
+    } else {
+      alert(result.error || "Payment couldn't be completed. Please try again.");
+    }
+  };
+
   const handleAddProductClick = () => {
     if (!user) { 
       onRequireAuth(); 
@@ -275,7 +291,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               <h3 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight leading-none">Limit reached</h3>
               <p className="text-xs font-semibold text-gray-400 mt-3 mb-8">Free tier cap: 4 products</p>
               
-              <div className="space-y-4 mb-10 text-left bg-gray-50 p-6 rounded-[1.75rem]">
+              <div className="space-y-4 mb-6 text-left bg-gray-50 p-6 rounded-[1.75rem]">
                  {[
                    'Unlimited product listings',
                    'Verified seller badge',
@@ -287,10 +303,12 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                    </div>
                  ))}
               </div>
+
+              <p className="text-3xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-400">/month</span></p>
               
               <div className="space-y-3">
-                <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full h-16 shadow-xl shadow-kubwa-primary/20">
-                  Upgrade shop now
+                <Button onClick={handleUpgradePayment} disabled={upgrading} className="w-full h-16 shadow-xl shadow-kubwa-primary/20">
+                  {upgrading ? <Loader2 className="animate-spin" /> : 'Upgrade shop now'}
                 </Button>
                 <button onClick={() => setShowUpgradeModal(false)} className="text-xs font-bold text-gray-300 hover:text-kubwa-ink transition-colors py-2">
                   Maybe later
