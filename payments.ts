@@ -33,6 +33,71 @@ export const PaymentService = {
   },
 
   /**
+   * Same pattern as pay(), for a Mart order instead of a tier upgrade. The
+   * amount shown in the Paystack popup is for display/UX only -- the actual
+   * amount that's allowed to succeed is recomputed server-side from real
+   * product prices in verify-order-payment, never trusted from here.
+   */
+  async payForOrder(params: {
+    user: User;
+    vendorId: string;
+    items: { id: string; quantity: number; name?: string }[];
+    total: number;
+    deliveryOption: string;
+    deliveryAddress?: string;
+    contactPhone: string;
+  }): Promise<PaymentResult & { orderId?: string }> {
+    if (!PAYSTACK_PUBLIC_KEY) {
+      return { success: false, error: "Online payment isn't set up yet. Please choose Pay on Delivery." };
+    }
+    if (!window.PaystackPop) {
+      return { success: false, error: "Paystack failed to load. Please refresh and try again." };
+    }
+
+    const popupResult = await new Promise<{ success: boolean; reference?: string; error?: string }>((resolve) => {
+      try {
+        const handler = window.PaystackPop.setup({
+          key: PAYSTACK_PUBLIC_KEY,
+          email: params.user.email,
+          amount: Math.round(params.total * 100),
+          currency: 'NGN',
+          ref: `KC-ORDER-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          callback: (response: any) => {
+            resolve({ success: true, reference: response.reference });
+          },
+          onClose: () => {
+            resolve({ success: false, error: 'Payment window was closed.' });
+          }
+        });
+        handler.openIframe();
+      } catch (err: any) {
+        resolve({ success: false, error: err.message || "Could not start Paystack." });
+      }
+    });
+
+    if (!popupResult.success || !popupResult.reference) {
+      return { success: false, error: popupResult.error || "Payment was not completed." };
+    }
+
+    const { data, error } = await supabase.functions.invoke('verify-order-payment', {
+      body: {
+        reference: popupResult.reference,
+        vendorId: params.vendorId,
+        items: params.items,
+        deliveryOption: params.deliveryOption,
+        deliveryAddress: params.deliveryAddress,
+        contactPhone: params.contactPhone
+      }
+    });
+
+    if (error || !data?.success) {
+      return { success: false, error: data?.error || error?.message || "We couldn't verify your payment. If you were charged, contact support with reference: " + popupResult.reference };
+    }
+
+    return { success: true, orderId: data.orderId };
+  },
+
+  /**
    * Opens the real Paystack popup, then -- critically -- never trusts its
    * own success callback as the final word. The popup reporting "success"
    * only means the user completed the flow in their browser; it proves

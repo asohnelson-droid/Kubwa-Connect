@@ -29,6 +29,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
   // Rider dispatch
   const [dispatchingOrder, setDispatchingOrder] = useState<MartOrder | null>(null);
   const [availableRiders, setAvailableRiders] = useState<{ id: string; name: string; phoneNumber?: string }[]>([]);
+  const [offlineRiders, setOfflineRiders] = useState<{ id: string; name: string; phoneNumber?: string }[]>([]);
   const [loadingRiders, setLoadingRiders] = useState(false);
   const [assigningRiderId, setAssigningRiderId] = useState<string | null>(null);
 
@@ -142,8 +143,12 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
   const openDispatchSheet = async (order: MartOrder) => {
     setDispatchingOrder(order);
     setLoadingRiders(true);
-    const riders = await api.riders.getAvailable();
-    setAvailableRiders(riders);
+    const [online, all] = await Promise.all([
+      api.riders.getAvailable(),
+      api.riders.getAllApproved()
+    ]);
+    setAvailableRiders(online);
+    setOfflineRiders(all.filter(r => !online.some(o => o.id === r.id)));
     setLoadingRiders(false);
   };
 
@@ -462,42 +467,80 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
 
              {loadingRiders ? (
                 <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" /></div>
-             ) : availableRiders.length === 0 ? (
-                <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
-                   <Bike size={36} className="mx-auto mb-2 opacity-20" />
-                   <p className="text-sm font-semibold">No riders online right now.</p>
-                   <p className="text-xs mt-1">Check back shortly, or contact a rider directly to ask them to go online.</p>
-                </div>
              ) : (
-                <div className="space-y-3">
-                   {availableRiders.map(rider => (
-                      <Card key={rider.id} className="p-4 border-none shadow-sm rounded-2xl flex items-center justify-between gap-3">
-                         <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-full bg-kubwa-ride/10 text-kubwa-ride flex items-center justify-center shrink-0">
-                               <Bike size={18} />
-                            </div>
-                            <div className="min-w-0">
-                               <p className="font-bold text-sm text-kubwa-ink truncate">{rider.name}</p>
-                               <p className="text-xs font-semibold text-green-600">Online now</p>
-                            </div>
-                         </div>
-                         <div className="flex items-center gap-2 shrink-0">
-                            {rider.phoneNumber && (
-                               <a href={`tel:${rider.phoneNumber}`} className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200">
-                                  <Phone size={16} />
-                               </a>
-                            )}
-                            <Button
-                               onClick={() => handleAssignRider(rider.id)}
-                               disabled={!!assigningRiderId}
-                               className="h-10 text-xs px-4"
-                            >
-                               {assigningRiderId === rider.id ? <Loader2 size={14} className="animate-spin" /> : 'Assign'}
-                            </Button>
-                         </div>
-                      </Card>
-                   ))}
-                </div>
+                <>
+                  {availableRiders.length === 0 && (
+                     <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl mb-4">
+                        <Bike size={32} className="mx-auto mb-2 opacity-20" />
+                        <p className="text-sm font-semibold">No riders online right now.</p>
+                        {offlineRiders.length > 0 && <p className="text-xs mt-1">Call one of your riders below to ask them to go online.</p>}
+                     </div>
+                  )}
+
+                  {availableRiders.length > 0 && (
+                    <div className="space-y-3">
+                       {availableRiders.map(rider => (
+                          <Card key={rider.id} className="p-4 border-none shadow-sm rounded-2xl flex items-center justify-between gap-3">
+                             <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-full bg-kubwa-ride/10 text-kubwa-ride flex items-center justify-center shrink-0">
+                                   <Bike size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                   <p className="font-bold text-sm text-kubwa-ink truncate">{rider.name}</p>
+                                   <p className="text-xs font-semibold text-green-600">Online now</p>
+                                </div>
+                             </div>
+                             <div className="flex items-center gap-2 shrink-0">
+                                {rider.phoneNumber && (
+                                   <a href={`tel:${rider.phoneNumber}`} className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200">
+                                      <Phone size={16} />
+                                   </a>
+                                )}
+                                <Button
+                                   onClick={() => handleAssignRider(rider.id)}
+                                   disabled={!!assigningRiderId}
+                                   className="h-10 text-xs px-4"
+                                >
+                                   {assigningRiderId === rider.id ? <Loader2 size={14} className="animate-spin" /> : 'Assign'}
+                                </Button>
+                             </div>
+                          </Card>
+                       ))}
+                    </div>
+                  )}
+
+                  {availableRiders.length === 0 && offlineRiders.length > 0 && (
+                    <div className="space-y-3">
+                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide ml-1">Other approved riders (offline)</p>
+                       {offlineRiders.map(rider => (
+                          <Card key={rider.id} className="p-4 border-none shadow-sm rounded-2xl flex items-center justify-between gap-3 opacity-75">
+                             <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center shrink-0">
+                                   <Bike size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                   <p className="font-bold text-sm text-kubwa-ink truncate">{rider.name}</p>
+                                   <p className="text-xs font-semibold text-gray-400">Offline</p>
+                                </div>
+                             </div>
+                             {rider.phoneNumber ? (
+                                <a href={`tel:${rider.phoneNumber}`} className="h-10 px-4 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-gray-200 shrink-0">
+                                   <Phone size={14} /> Call
+                                </a>
+                             ) : (
+                                <span className="text-[10px] font-semibold text-gray-300 shrink-0">No phone on file</span>
+                             )}
+                          </Card>
+                       ))}
+                    </div>
+                  )}
+
+                  {availableRiders.length === 0 && offlineRiders.length === 0 && (
+                    <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
+                       <p className="text-xs font-semibold">No approved riders on the platform yet.</p>
+                    </div>
+                  )}
+                </>
              )}
           </div>
        </Sheet>

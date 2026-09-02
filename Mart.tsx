@@ -45,6 +45,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [contactPhone, setContactPhone] = useState('');
   const [pickupInfo, setPickupInfo] = useState<{ storeName?: string; address?: string; location?: string } | null>(null);
   const [loadingPickupInfo, setLoadingPickupInfo] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'CONTACT' | 'ONLINE'>('CONTACT');
 
   useEffect(() => {
     fetchProducts();
@@ -152,6 +153,28 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
     setPlacingOrder(true);
     try {
+      if (paymentMethod === 'ONLINE') {
+        const result = await PaymentService.payForOrder({
+          user,
+          vendorId: cart[0].vendorId,
+          items: cart.map(c => ({ id: c.id, quantity: c.quantity, name: c.name })),
+          total: calculateTotal(),
+          deliveryOption,
+          deliveryAddress: deliveryOption === 'DISPATCH' ? deliveryAddress.trim() : undefined,
+          contactPhone: contactPhone.trim()
+        });
+
+        if (result.success) {
+          setCart([]);
+          setIsCartOpen(false);
+          setSection(AppSection.HOME);
+          alert("Payment successful! Your order has been placed and paid for.");
+        } else {
+          alert(result.error || "Payment couldn't be completed. Please try again.");
+        }
+        return;
+      }
+
       const result = await api.orders.placeOrder({
         userId: user.id,
         items: cart,
@@ -448,12 +471,32 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                     />
                  </div>
 
+                 <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
+                    <p className="font-bold text-xs text-gray-400">Payment</p>
+                    <div className="flex gap-2">
+                       <button
+                          type="button"
+                          onClick={() => setPaymentMethod('CONTACT')}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${paymentMethod === 'CONTACT' ? 'bg-kubwa-ink text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                       >
+                          Pay on delivery
+                       </button>
+                       <button
+                          type="button"
+                          onClick={() => setPaymentMethod('ONLINE')}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${paymentMethod === 'ONLINE' ? 'bg-kubwa-ink text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                       >
+                          Pay online now
+                       </button>
+                    </div>
+                 </div>
+
                  <div className="pt-4 flex justify-between items-center">
                     <span className="font-bold text-xs text-gray-400">Grand total</span>
                     <span className="font-bold text-2xl text-kubwa-mart">₦{calculateTotal().toLocaleString()}</span>
                  </div>
                  <Button className="w-full h-16 mt-4 shadow-xl shadow-kubwa-primary/10" onClick={handleCheckout} disabled={placingOrder}>
-                    {placingOrder ? <Loader2 className="animate-spin" /> : 'Confirm order'}
+                    {placingOrder ? <Loader2 className="animate-spin" /> : paymentMethod === 'ONLINE' ? `Pay ₦${calculateTotal().toLocaleString()} now` : 'Confirm order'}
                  </Button>
               </div>
             )}

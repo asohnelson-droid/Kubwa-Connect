@@ -317,6 +317,10 @@ export const api = {
             const { data } = await supabase.from('profiles').select('id, name, "phoneNumber"').eq('role', 'RIDER').eq('status', 'APPROVED').eq('available', true);
             return (data as any) || [];
         },
+        getAllApproved: async (): Promise<{ id: string; name: string; phoneNumber?: string; available: boolean }[]> => {
+            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber", available').eq('role', 'RIDER').eq('status', 'APPROVED');
+            return (data as any) || [];
+        },
         getMyAvailability: async (userId: string): Promise<boolean> => {
             const { data } = await supabase.from('profiles').select('available').eq('id', userId).maybeSingle();
             return !!data?.available;
