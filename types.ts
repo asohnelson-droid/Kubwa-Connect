@@ -102,7 +102,7 @@ export type ActivityItem = any;
 export type CartItem = Product & { quantity: number };
 export interface Address { id: string; userId: string; title: string; details: string; }
 export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; created_at: string; }
-export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; userStats?: any; }
+export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; revenueByDay?: { name: string; rev: number }[]; userStats?: any; }
 export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolean; allowAdminPromotions: boolean; supportEmail: string; supportPhone: string; minVersion: string; }
 export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; }
 export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; created_at: string; }

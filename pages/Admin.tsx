@@ -177,16 +177,6 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
 
   const COLORS = ['#FF5A36', '#16A34A', '#F59E0B', '#2563EB'];
 
-  const revenueData = [
-    { name: 'Mon', rev: 4000 },
-    { name: 'Tue', rev: 3000 },
-    { name: 'Wed', rev: 5000 },
-    { name: 'Thu', rev: 8000 },
-    { name: 'Fri', rev: 6000 },
-    { name: 'Sat', rev: 12000 },
-    { name: 'Sun', rev: 9000 },
-  ];
-
   const ROLE_COLORS: Record<string, string> = {
     VENDOR: 'bg-kubwa-mart/10 text-kubwa-mart',
     PROVIDER: 'bg-kubwa-fixit/10 text-kubwa-fixit',
@@ -242,7 +232,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                       <p className="text-xs font-bold opacity-70 mb-2">Platform revenue</p>
                       <p className="text-4xl font-bold tracking-tight">₦{stats?.revenue.toLocaleString()}</p>
                       <div className="mt-4 flex items-center gap-2 text-xs font-bold">
-                         <span className="bg-white/20 px-2.5 py-1 rounded-lg">+{stats?.conversion}% growth</span>
+                         <span className="bg-white/20 px-2.5 py-1 rounded-lg">{(stats?.conversion ?? 0) >= 0 ? '+' : ''}{stats?.conversion ?? 0}% vs last week</span>
                       </div>
                    </Card>
                    <Card className="p-8 bg-kubwa-ink text-white border-none shadow-xl rounded-[2rem]">
@@ -253,9 +243,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                    <Card className="p-8 bg-white border-none shadow-sm rounded-[2rem]">
                       <p className="text-xs font-bold text-gray-400 mb-2">Pending tasks</p>
                       <p className="text-4xl font-bold text-kubwa-ink tracking-tight">{stats?.userStats?.pending || 0}</p>
-                      <div className="mt-4 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                         <div className="h-full bg-kubwa-fixit" style={{ width: '45%' }} />
-                      </div>
+                      <p className="text-xs font-semibold text-gray-400 mt-4">Applications awaiting review</p>
                    </Card>
                 </div>
 
@@ -265,8 +253,13 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                            <TrendingUp size={16}/> Revenue velocity (7d)
                         </h3>
                         <div className="h-64 w-full">
+                           {(!stats?.revenueByDay || stats.revenueByDay.every(d => d.rev === 0)) ? (
+                              <div className="h-full flex items-center justify-center text-center px-6">
+                                 <p className="text-xs font-semibold text-gray-300">No subscription revenue in the last 7 days yet.</p>
+                              </div>
+                           ) : (
                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={revenueData}>
+                              <LineChart data={stats.revenueByDay}>
                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 700, fill: '#ccc'}} />
                                  <YAxis hide />
@@ -274,6 +267,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                  <Line type="monotone" dataKey="rev" stroke="#FF5A36" strokeWidth={3.5} dot={{r: 4, fill: '#FF5A36', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
                               </LineChart>
                            </ResponsiveContainer>
+                           )}
                         </div>
                     </Card>
 
@@ -282,16 +276,20 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                            <Activity size={16}/> Revenue distribution
                         </h3>
                         <div className="h-64 w-full flex items-center">
+                           {(!stats?.revenueSplit || stats.revenueSplit.length === 0) ? (
+                              <p className="text-xs font-semibold text-gray-300 text-center w-full px-6">No subscription revenue in the last 7 days yet.</p>
+                           ) : (
+                           <>
                            <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                  <Pie
-                                    data={stats?.revenueSplit || []}
+                                    data={stats.revenueSplit}
                                     innerRadius={60}
                                     outerRadius={80}
                                     paddingAngle={5}
                                     dataKey="value"
                                  >
-                                    {stats?.revenueSplit?.map((entry, index) => (
+                                    {stats.revenueSplit.map((entry, index) => (
                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                  </Pie>
@@ -299,13 +297,15 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                               </PieChart>
                            </ResponsiveContainer>
                            <div className="space-y-3">
-                              {stats?.revenueSplit?.map((item, idx) => (
+                              {stats.revenueSplit.map((item, idx) => (
                                  <div key={idx} className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[idx % COLORS.length]}} />
                                     <span className="text-xs font-bold text-gray-500">{item.name}</span>
                                  </div>
                               ))}
                            </div>
+                           </>
+                           )}
                         </div>
                     </Card>
                 </div>

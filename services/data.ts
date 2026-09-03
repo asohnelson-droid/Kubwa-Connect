@@ -499,17 +499,59 @@ export const api = {
             const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
             const { count: pendingCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
             const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
-            
+
+            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: recentTxns } = await supabase
+                .from('transactions')
+                .select('amount, intent, created_at')
+                .eq('status', 'SUCCESS')
+                .gte('created_at', fourteenDaysAgo);
+
+            const txns = recentTxns || [];
+            const now = Date.now();
+            const sevenDaysAgoMs = now - 7 * 24 * 60 * 60 * 1000;
+
+            // Kobo -> Naira. This is the only real revenue this business has --
+            // Mart/FixIt transactions are not commissioned, only tier
+            // subscriptions are, so anything else here would be fiction.
+            const thisWeek = txns.filter(t => new Date(t.created_at).getTime() >= sevenDaysAgoMs);
+            const lastWeek = txns.filter(t => new Date(t.created_at).getTime() < sevenDaysAgoMs);
+            const thisWeekTotal = thisWeek.reduce((sum, t) => sum + t.amount, 0) / 100;
+            const lastWeekTotal = lastWeek.reduce((sum, t) => sum + t.amount, 0) / 100;
+            const growthPct = lastWeekTotal > 0
+                ? Math.round(((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100)
+                : (thisWeekTotal > 0 ? 100 : 0);
+
+            const splitByIntent: Record<string, number> = {};
+            for (const t of thisWeek) {
+                const label = t.intent === 'VENDOR_FEATURED' ? 'Vendor Featured'
+                    : t.intent === 'VENDOR_VERIFIED' ? 'Vendor Verified'
+                    : t.intent === 'FIXIT_VERIFIED' ? 'FixIt Verified'
+                    : t.intent;
+                splitByIntent[label] = (splitByIntent[label] || 0) + (t.amount / 100);
+            }
+
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const revenueByDay = Array.from({ length: 7 }, (_, i) => {
+                const dayStart = new Date(now - (6 - i) * 24 * 60 * 60 * 1000);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+                const dayTotal = txns
+                    .filter(t => {
+                        const ts = new Date(t.created_at).getTime();
+                        return ts >= dayStart.getTime() && ts < dayEnd.getTime();
+                    })
+                    .reduce((sum, t) => sum + t.amount, 0) / 100;
+                return { name: dayNames[dayStart.getDay()], rev: dayTotal };
+            });
+
             return {
                 dau: userCount || 0,
-                revenue: 245000,
-                retention: 78,
-                conversion: 12,
-                revenueSplit: [
-                    { name: 'Mart Fees', value: 120000 },
-                    { name: 'FixIt Leads', value: 85000 },
-                    { name: 'Subscriptions', value: 40000 }
-                ],
+                revenue: thisWeekTotal,
+                retention: 0, // Not tracked -- no session/return-visit data exists in this schema yet.
+                conversion: growthPct,
+                revenueSplit: Object.entries(splitByIntent).map(([name, value]) => ({ name, value })),
+                revenueByDay,
                 userStats: {
                     pending: pendingCount || 0,
                     total: userCount || 0,
