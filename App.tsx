@@ -37,21 +37,25 @@ function App() {
    * Manages history stack to allow standardized "Back" functionality
    */
   const navigateTo = useCallback((section: AppSection) => {
-    if (section === currentSection) return;
-    setHistory(prev => [...prev, currentSection]);
-    setCurrentSection(section);
-  }, [currentSection]);
+    setCurrentSection(prevSection => {
+      if (section === prevSection) return prevSection;
+      setHistory(prevHistory => [...prevHistory, prevSection]);
+      return section;
+    });
+  }, []);
 
   const goBack = useCallback(() => {
-    if (history.length === 0) {
-      setCurrentSection(AppSection.HOME);
-      return;
-    }
-    const newHistory = [...history];
-    const prev = newHistory.pop();
-    setHistory(newHistory);
-    if (prev) setCurrentSection(prev);
-  }, [history]);
+    setHistory(prevHistory => {
+      if (prevHistory.length === 0) {
+        setCurrentSection(AppSection.HOME);
+        return prevHistory;
+      }
+      const newHistory = [...prevHistory];
+      const prev = newHistory.pop();
+      if (prev) setCurrentSection(prev);
+      return newHistory;
+    });
+  }, []);
 
   /**
    * STABLE USER REFRESH

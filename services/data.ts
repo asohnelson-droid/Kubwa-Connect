@@ -59,6 +59,35 @@ const mapUserMetadata = (sessionUser: any): User => {
     };
 };
 
+/**
+ * profiles is the real, authoritative source for these fields -- they're
+ * deliberately locked so only trusted server-side actions (admin approval,
+ * payment verification, expiry reversion) can change them, and none of
+ * those keep auth metadata in sync. Without this overlay, a user's own
+ * session would keep showing stale metadata-era values for their tier,
+ * limit, verification, and approval status until they fully logged out
+ * and back in.
+ */
+const overlayProfileData = async (appUser: User): Promise<User> => {
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('avatar, "productLimit", tier, "verificationStatus", "paymentStatus", status, "isFeatured"')
+        .eq('id', appUser.id)
+        .maybeSingle();
+
+    if (profile) {
+        if (profile.avatar) appUser.avatar = profile.avatar;
+        if (profile.productLimit !== null && profile.productLimit !== undefined) appUser.productLimit = profile.productLimit;
+        if (profile.tier) appUser.tier = profile.tier as MonetisationTier;
+        if (profile.verificationStatus) appUser.verificationStatus = profile.verificationStatus;
+        if (profile.paymentStatus) appUser.paymentStatus = profile.paymentStatus;
+        if (profile.status) appUser.status = profile.status as ApprovalStatus;
+        appUser.isFeatured = !!profile.isFeatured || appUser.tier === 'FEATURED';
+    }
+
+    return appUser;
+};
+
 const MOCK_PRODUCTS: Product[] = [
     // Food & Groceries
     { id: 'demo_f1', vendorId: 'demo_v1', name: 'Jollof Rice Combo', price: 2500, category: 'Food', image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&q=80&w=500', stock: 50, rating: 4.8, status: 'APPROVED', isPromoted: true, description: 'Spicy jollof rice with grilled chicken and plantain.' },
@@ -93,16 +122,7 @@ export const api = {
                 if (fetchError) return null;
                 
                 const appUser = mapUserMetadata(sessionUser);
-
-                // HYBRID SYNC: Recover avatar from 'profiles' if missing in Auth Metadata (due to size limits)
-                if (!appUser.avatar) {
-                   const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', appUser.id).maybeSingle();
-                   if (profile?.avatar) {
-                       appUser.avatar = profile.avatar;
-                   }
-                }
-
-                return appUser;
+                return await overlayProfileData(appUser);
             } catch (e: any) {
                 console.warn("[Auth] Session failed:", e.message);
                 return null;
@@ -159,7 +179,7 @@ export const api = {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) return { error: error.message };
                 if (!data?.user) return { error: "Login failed." };
-                return { user: mapUserMetadata(data.user) };
+                return { user: await overlayProfileData(mapUserMetadata(data.user)) };
             } catch (e: any) {
                 return { error: `Sign-in failed: ${e.message}` };
             }
