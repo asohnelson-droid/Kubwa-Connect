@@ -26,11 +26,13 @@ import {
   Bell,
   Trash2,
   Plus,
+  PackageCheck,
+  RotateCcw,
   // Add User icon import with alias to avoid conflict with User type from types.ts
   User as UserIcon
 } from 'lucide-react';
 import { api } from '../services/data';
-import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement } from '../types';
+import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement, MartOrder } from '../types';
 import { 
   LineChart, 
   Line, 
@@ -47,14 +49,20 @@ import {
 } from 'recharts';
 
 const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'billing' | 'users' | 'announcements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'orders' | 'billing' | 'users' | 'announcements'>('overview');
   const [pendingEntities, setPendingEntities] = useState<User[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [orders, setOrders] = useState<MartOrder[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Refunds
+  const [refundingOrder, setRefundingOrder] = useState<MartOrder | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [issuingRefund, setIssuingRefund] = useState(false);
 
   // Announcements tab
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -83,6 +91,9 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
         } else if (activeTab === 'billing') {
             const data = await api.admin.getAllTransactions();
             setTransactions(data);
+        } else if (activeTab === 'orders') {
+            const data = await api.admin.getAllOrders();
+            setOrders(data);
         } else if (activeTab === 'users') {
             const data = await api.admin.getAllUsers();
             setAllUsers(data);
@@ -165,6 +176,20 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
     setActionLoading(null);
   };
 
+  const handleIssueRefund = async () => {
+    if (!refundingOrder || !refundReason.trim()) return;
+    setIssuingRefund(true);
+    const result = await api.admin.issueRefund(refundingOrder.id, refundReason.trim());
+    setIssuingRefund(false);
+    if (result.success) {
+      setOrders(prev => prev.map(o => o.id === refundingOrder.id ? { ...o, refundStatus: 'REFUNDED', refundReason: refundReason.trim() } : o));
+      setRefundingOrder(null);
+      setRefundReason('');
+    } else {
+      alert(result.error || "Couldn't issue the refund. Please try again.");
+    }
+  };
+
   if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'SUPER_ADMIN') return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-12 text-center animate-fade-in">
         <div className="w-24 h-24 bg-red-50 text-red-500 rounded-[2rem] flex items-center justify-center mb-8">
@@ -209,6 +234,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
            { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
            { id: 'approvals', label: 'Entities', icon: Clock },
            { id: 'products', label: 'Inventory', icon: ShoppingBag },
+           { id: 'orders', label: 'Orders', icon: PackageCheck },
            { id: 'announcements', label: 'Announcements', icon: Bell },
            { id: 'billing', label: 'Revenue', icon: DollarSign },
            { id: 'users', label: 'Residents', icon: Users }
@@ -535,6 +561,52 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             </div>
           )}
 
+          {activeTab === 'orders' && (
+            <div className="space-y-4">
+               <h3 className="text-xs font-bold text-gray-400 ml-2">Recent orders (most recent 100)</h3>
+               {loading ? (
+                  <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" /></div>
+               ) : orders.length === 0 ? (
+                  <div className="text-center py-20 text-gray-400 font-bold text-sm">No orders yet</div>
+               ) : (
+                 orders.map(order => (
+                   <Card key={order.id} className="p-6 border-none shadow-sm rounded-[2rem]">
+                      <div className="flex justify-between items-start gap-4">
+                         <div className="flex items-center gap-4 min-w-0">
+                            <div className="p-3.5 bg-gray-50 rounded-2xl text-gray-400 shrink-0">
+                               <PackageCheck size={22} />
+                            </div>
+                            <div className="min-w-0">
+                               <p className="text-sm font-bold text-kubwa-ink">Order #{order.id.slice(0, 6)}</p>
+                               <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{new Date(order.created_at).toLocaleDateString()} &middot; {order.deliveryOption}</p>
+                               <div className="flex items-center gap-1.5 mt-1.5">
+                                  <Badge color="bg-gray-100 text-gray-600">{order.status.replace('_', ' ')}</Badge>
+                                  {order.refundStatus === 'REFUNDED' && (
+                                     <Badge color="bg-red-50 text-red-500">Refunded</Badge>
+                                  )}
+                               </div>
+                            </div>
+                         </div>
+                         <div className="text-right shrink-0">
+                            <p className="text-lg font-bold text-kubwa-mart">₦{order.total.toLocaleString()}</p>
+                            {order.refundStatus === 'REFUNDED' ? (
+                               <p className="text-[10px] font-semibold text-gray-400 mt-2 max-w-[140px]">{order.refundReason}</p>
+                            ) : (
+                               <button
+                                  onClick={() => { setRefundingOrder(order); setRefundReason(''); }}
+                                  className="mt-2 flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-600 ml-auto"
+                               >
+                                  <RotateCcw size={12} /> Issue refund
+                               </button>
+                            )}
+                         </div>
+                      </div>
+                   </Card>
+                 ))
+               )}
+            </div>
+          )}
+
           {activeTab === 'billing' && (
             <div className="space-y-4">
                <div className="flex justify-between items-center px-2">
@@ -568,6 +640,29 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             </div>
           )}
       </div>
+
+      <Sheet isOpen={!!refundingOrder} onClose={() => setRefundingOrder(null)} title="Issue Refund">
+        {refundingOrder && (
+          <div className="p-6 pb-8 space-y-4">
+            <div className="bg-gray-50 rounded-2xl p-4">
+               <p className="text-xs font-bold text-gray-400">Order #{refundingOrder.id.slice(0, 6)}</p>
+               <p className="text-2xl font-bold text-kubwa-ink mt-1">₦{refundingOrder.total.toLocaleString()}</p>
+            </div>
+            <p className="text-xs font-semibold text-gray-500 leading-relaxed">
+               This records the refund for your own tracking and marks the order visibly refunded. It does not move money automatically -- process the actual payment reversal in Paystack yourself.
+            </p>
+            <textarea
+              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold h-24 resize-none outline-none focus:ring-2 focus:ring-kubwa-primary/20"
+              placeholder="Reason for this refund (required)"
+              value={refundReason}
+              onChange={e => setRefundReason(e.target.value)}
+            />
+            <Button onClick={handleIssueRefund} disabled={issuingRefund || !refundReason.trim()} className="w-full h-14 bg-red-500 shadow-red-500/20">
+              {issuingRefund ? <Loader2 className="animate-spin" /> : 'Confirm refund'}
+            </Button>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 };

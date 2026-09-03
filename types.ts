@@ -96,6 +96,9 @@ export interface MartOrder {
   riderId?: string;
   deliveryAddress?: string;
   contactPhone?: string;
+  refundStatus?: 'NONE' | 'REFUNDED';
+  refundReason?: string;
+  refundedAt?: string;
 }
 
 export type ActivityItem = any;

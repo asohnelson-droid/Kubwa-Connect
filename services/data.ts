@@ -566,6 +566,14 @@ export const api = {
         getAllTransactions: async (): Promise<Transaction[]> => {
             const { data } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
             return (data as any) || [];
+        },
+        getAllOrders: async (): Promise<MartOrder[]> => {
+            const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
+            return (data as any) || [];
+        },
+        issueRefund: async (orderId: string, reason: string): Promise<{ success: boolean; error?: string }> => {
+            const { error } = await supabase.rpc('issue_refund', { p_order_id: orderId, p_reason: reason });
+            return { success: !error, error: error?.message };
         }
     },
     reviews: { 
