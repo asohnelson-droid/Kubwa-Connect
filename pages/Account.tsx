@@ -320,7 +320,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
       </div>
 
       {activeTab === 'dashboard' && isVendor ? (
-         <VendorDashboard user={user} />
+         <VendorDashboard user={user} refreshUser={refreshUser} />
       ) : activeTab === 'profile' ? (
         <div className="space-y-6 animate-fade-in">
           {isAdmin && (

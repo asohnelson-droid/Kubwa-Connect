@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle, ShieldCheck, TrendingUp, CheckCircle, MapPin } from 'lucide-react';
 import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
+import { PaymentService } from '../services/payments';
 import { Product, CartItem, User, AppSection } from '../types';
 import { Button, Badge, Card, Breadcrumbs, Sheet, Input, BackButton, SafeImage } from '../components/ui';
 import { useData } from '../contexts/DataContext';
@@ -20,6 +21,7 @@ interface MartProps {
 
 const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAuth, setSection, refreshUser, goBack }) => {
   const isDemoProduct = (product: Product) => product.vendorId?.startsWith('demo_');
+  const isOutOfStock = (product: Product) => !isDemoProduct(product) && product.stock <= 0;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParentCategory, setSelectedParentCategory] = useState('All'); 
   
@@ -30,6 +32,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
 
   useEffect(() => {
@@ -42,6 +45,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [contactPhone, setContactPhone] = useState('');
   const [pickupInfo, setPickupInfo] = useState<{ storeName?: string; address?: string; location?: string } | null>(null);
   const [loadingPickupInfo, setLoadingPickupInfo] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'CONTACT' | 'ONLINE'>('CONTACT');
 
   useEffect(() => {
     fetchProducts();
@@ -81,6 +85,20 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   /**
    * STRICT PRODUCT LIMIT CHECK
    */
+  const handleUpgradePayment = async () => {
+    if (!user) return;
+    setUpgrading(true);
+    const result = await PaymentService.pay('VENDOR_FEATURED', user);
+    setUpgrading(false);
+    if (result.success) {
+      setShowUpgradeModal(false);
+      refreshUser();
+      alert("You're upgraded! Unlimited listings and your Featured badge are live now.");
+    } else {
+      alert(result.error || "Payment couldn't be completed. Please try again.");
+    }
+  };
+
   const handleAddProductClick = () => {
     if (!user) { 
       onRequireAuth(); 
@@ -135,6 +153,28 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
     setPlacingOrder(true);
     try {
+      if (paymentMethod === 'ONLINE') {
+        const result = await PaymentService.payForOrder({
+          user,
+          vendorId: cart[0].vendorId,
+          items: cart.map(c => ({ id: c.id, quantity: c.quantity, name: c.name })),
+          total: calculateTotal(),
+          deliveryOption,
+          deliveryAddress: deliveryOption === 'DISPATCH' ? deliveryAddress.trim() : undefined,
+          contactPhone: contactPhone.trim()
+        });
+
+        if (result.success) {
+          setCart([]);
+          setIsCartOpen(false);
+          setSection(AppSection.HOME);
+          alert("Payment successful! Your order has been placed and paid for.");
+        } else {
+          alert(result.error || "Payment couldn't be completed. Please try again.");
+        }
+        return;
+      }
+
       const result = await api.orders.placeOrder({
         userId: user.id,
         items: cart,
@@ -155,7 +195,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
           : "Success! Your order has been placed. We'll contact you shortly.");
       } else {
         console.error("[Mart] placeOrder failed:", result.error);
-        alert("Failed to place order. Please try again.");
+        alert(result.error?.includes('Not enough stock') ? result.error : "Failed to place order. Please try again.");
       }
     } catch (err) {
       console.error(err);
@@ -220,10 +260,15 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
           filteredProducts.map(product => (
             <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group border-none shadow-sm" onClick={() => setSelectedProduct(product)}>
               <div className="h-40 bg-gray-100 overflow-hidden relative">
-                <SafeImage src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                {product.isPromoted && (
+                <SafeImage src={product.image} alt={product.name} className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isOutOfStock(product) ? 'grayscale opacity-60' : ''}`} />
+                {product.isPromoted && !isOutOfStock(product) && (
                   <div className="absolute top-2 left-2 bg-kubwa-amber text-white p-1 rounded-lg">
                     <TrendingUp size={12} />
+                  </div>
+                )}
+                {isOutOfStock(product) && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="bg-kubwa-ink/80 text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide">Out of Stock</span>
                   </div>
                 )}
               </div>
@@ -233,8 +278,21 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                   <span className="font-bold text-kubwa-mart text-xs">₦{product.price.toLocaleString()}</span>
                   {isDemoProduct(product) ? (
                     <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wide">Sample</span>
+                  ) : isOutOfStock(product) ? (
+                    <span className="text-[9px] font-bold text-red-300 uppercase tracking-wide">Sold out</span>
                   ) : (
-                    <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-kubwa-ink group-hover:text-white transition-colors" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
+                    <div
+                      className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-kubwa-ink group-hover:text-white transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const inCart = cart.find(c => c.id === product.id)?.quantity || 0;
+                        if (inCart >= product.stock) {
+                          alert(`Only ${product.stock} left in stock.`);
+                          return;
+                        }
+                        addToCart(product);
+                      }}
+                    >
                       <Plus size={14}/>
                     </div>
                   )}
@@ -256,7 +314,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               <h3 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight leading-none">Limit reached</h3>
               <p className="text-xs font-semibold text-gray-400 mt-3 mb-8">Free tier cap: 4 products</p>
               
-              <div className="space-y-4 mb-10 text-left bg-gray-50 p-6 rounded-[1.75rem]">
+              <div className="space-y-4 mb-6 text-left bg-gray-50 p-6 rounded-[1.75rem]">
                  {[
                    'Unlimited product listings',
                    'Verified seller badge',
@@ -268,10 +326,12 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                    </div>
                  ))}
               </div>
+
+              <p className="text-3xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-400">/month</span></p>
               
               <div className="space-y-3">
-                <Button onClick={() => { setShowUpgradeModal(false); setSection(AppSection.ACCOUNT); }} className="w-full h-16 shadow-xl shadow-kubwa-primary/20">
-                  Upgrade shop now
+                <Button onClick={handleUpgradePayment} disabled={upgrading} className="w-full h-16 shadow-xl shadow-kubwa-primary/20">
+                  {upgrading ? <Loader2 className="animate-spin" /> : 'Upgrade shop now'}
                 </Button>
                 <button onClick={() => setShowUpgradeModal(false)} className="text-xs font-bold text-gray-300 hover:text-kubwa-ink transition-colors py-2">
                   Maybe later
@@ -313,8 +373,25 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                <div className="bg-gray-50 rounded-2xl p-4 text-center">
                  <p className="text-xs font-bold text-gray-400">Sample listing for browsing only — not available to order.</p>
                </div>
+             ) : isOutOfStock(selectedProduct) ? (
+               <div className="bg-red-50 rounded-2xl p-4 text-center">
+                 <p className="text-xs font-bold text-red-500">Out of stock — check back later.</p>
+               </div>
              ) : (
-               <Button className="w-full py-4 h-14 text-base" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>Add to cart</Button>
+               <Button
+                 className="w-full py-4 h-14 text-base"
+                 onClick={() => {
+                   const inCart = cart.find(c => c.id === selectedProduct.id)?.quantity || 0;
+                   if (inCart >= selectedProduct.stock) {
+                     alert(`Only ${selectedProduct.stock} left in stock.`);
+                     return;
+                   }
+                   addToCart(selectedProduct);
+                   setSelectedProduct(null);
+                 }}
+               >
+                 Add to cart
+               </Button>
              )}
           </div>
         )}
@@ -394,12 +471,32 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                     />
                  </div>
 
+                 <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
+                    <p className="font-bold text-xs text-gray-400">Payment</p>
+                    <div className="flex gap-2">
+                       <button
+                          type="button"
+                          onClick={() => setPaymentMethod('CONTACT')}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${paymentMethod === 'CONTACT' ? 'bg-kubwa-ink text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                       >
+                          Pay on delivery
+                       </button>
+                       <button
+                          type="button"
+                          onClick={() => setPaymentMethod('ONLINE')}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${paymentMethod === 'ONLINE' ? 'bg-kubwa-ink text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                       >
+                          Pay online now
+                       </button>
+                    </div>
+                 </div>
+
                  <div className="pt-4 flex justify-between items-center">
                     <span className="font-bold text-xs text-gray-400">Grand total</span>
                     <span className="font-bold text-2xl text-kubwa-mart">₦{calculateTotal().toLocaleString()}</span>
                  </div>
                  <Button className="w-full h-16 mt-4 shadow-xl shadow-kubwa-primary/10" onClick={handleCheckout} disabled={placingOrder}>
-                    {placingOrder ? <Loader2 className="animate-spin" /> : 'Confirm order'}
+                    {placingOrder ? <Loader2 className="animate-spin" /> : paymentMethod === 'ONLINE' ? `Pay ₦${calculateTotal().toLocaleString()} now` : 'Confirm order'}
                  </Button>
               </div>
             )}

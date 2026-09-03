@@ -211,8 +211,15 @@ export const api = {
     },
     orders: {
         placeOrder: async (orderData: Partial<MartOrder>) => {
-            const { data, error } = await supabase.from('orders').insert([orderData]).select();
-            return { success: !error, orderId: data?.[0]?.id, error: error?.message };
+            const { data, error } = await supabase.rpc('place_order_with_stock', {
+                p_vendor_id: orderData.vendorId,
+                p_items: orderData.items,
+                p_total: orderData.total,
+                p_delivery_option: orderData.deliveryOption,
+                p_delivery_address: orderData.deliveryAddress || null,
+                p_contact_phone: orderData.contactPhone
+            });
+            return { success: !error, orderId: data as string | undefined, error: error?.message };
         },
         getMyOrders: async (userId: string): Promise<MartOrder[]> => {
             const { data } = await supabase.from('orders').select('*').eq('userId', userId);
@@ -308,6 +315,10 @@ export const api = {
     riders: {
         getAvailable: async (): Promise<{ id: string; name: string; phoneNumber?: string }[]> => {
             const { data } = await supabase.from('profiles').select('id, name, "phoneNumber"').eq('role', 'RIDER').eq('status', 'APPROVED').eq('available', true);
+            return (data as any) || [];
+        },
+        getAllApproved: async (): Promise<{ id: string; name: string; phoneNumber?: string; available: boolean }[]> => {
+            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber", available').eq('role', 'RIDER').eq('status', 'APPROVED');
             return (data as any) || [];
         },
         getMyAvailability: async (userId: string): Promise<boolean> => {

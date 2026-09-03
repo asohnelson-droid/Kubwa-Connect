@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Star, Loader2, Power, X, Briefcase, MapPin, Shield, Wrench, Plus, Minus, ChevronRight, CheckCircle, Clock, Calendar, ShieldCheck } from 'lucide-react';
 import { api, KUBWA_AREAS, FIXIT_SERVICES } from '../services/data';
+import { PaymentService } from '../services/payments';
 import { ServiceProvider, User as UserType, Review, AppSection, ServiceOrder, ServiceOrderStatus } from '../types';
 import { Button, Card, Badge, Breadcrumbs, Input, BackButton, Sheet, SafeImage, SectionHeader } from '../components/ui';
 import AuthModal from '../components/AuthModal';
@@ -44,6 +45,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
   const [myProfile, setMyProfile] = useState<ServiceProvider | null>(null);
   const [loadingMyProfile, setLoadingMyProfile] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [myBookings, setMyBookings] = useState<ServiceOrder[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookingActionLoading, setBookingActionLoading] = useState<string | null>(null);
@@ -115,6 +117,20 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       fetchServices();
     }
     setTogglingStatus(false);
+  };
+
+  const handleGetVerified = async () => {
+    if (!user) return;
+    setVerifying(true);
+    const result = await PaymentService.pay('FIXIT_VERIFIED', user);
+    setVerifying(false);
+    if (result.success) {
+      setMyProfile(prev => prev ? { ...prev, isVerified: true } : prev);
+      fetchServices();
+      alert("You're verified! Your badge is live now.");
+    } else {
+      alert(result.error || "Payment couldn't be completed. Please try again.");
+    }
   };
 
   const handleSaveSetup = async () => {
@@ -234,6 +250,18 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             <p className="text-xs text-white/60 font-semibold mt-1">Add your rate and category so residents can find and hire you.</p>
           </div>
           <Button onClick={() => setShowSetupSheet(true)} className="h-11 text-xs px-4 shrink-0">Set up</Button>
+        </Card>
+      )}
+
+      {myProfile && !myProfile.isVerified && (
+        <Card className="p-6 mb-8 border-none shadow-sm rounded-[1.75rem] bg-kubwa-fixit/10 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-bold text-sm text-kubwa-ink flex items-center gap-1.5"><ShieldCheck size={16} className="text-kubwa-fixit" /> Get verified</p>
+            <p className="text-xs text-gray-500 font-semibold mt-1">₦{PaymentService.getPrice('FIXIT_VERIFIED').toLocaleString()}/month — stand out with a verified badge and rank higher in search.</p>
+          </div>
+          <Button onClick={handleGetVerified} disabled={verifying} className="h-11 text-xs px-4 shrink-0 bg-kubwa-fixit shadow-kubwa-fixit/20">
+            {verifying ? <Loader2 size={14} className="animate-spin" /> : 'Verify'}
+          </Button>
         </Card>
       )}
 
