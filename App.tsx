@@ -40,21 +40,37 @@ function App() {
     setCurrentSection(prevSection => {
       if (section === prevSection) return prevSection;
       setHistory(prevHistory => [...prevHistory, prevSection]);
+      window.history.pushState({ appSection: section }, '');
       return section;
     });
   }, []);
 
   const goBack = useCallback(() => {
-    setHistory(prevHistory => {
-      if (prevHistory.length === 0) {
-        setCurrentSection(AppSection.HOME);
-        return prevHistory;
-      }
-      const newHistory = [...prevHistory];
-      const prev = newHistory.pop();
-      if (prev) setCurrentSection(prev);
-      return newHistory;
-    });
+    window.history.back();
+  }, []);
+
+  // Single source of truth for "back", regardless of whether it's triggered
+  // by the device's physical/gesture back button or an in-app back button
+  // (which now also just calls window.history.back() above) -- both funnel
+  // through this one listener, so behavior is identical either way.
+  useEffect(() => {
+    window.history.replaceState({ appSection: AppSection.HOME }, '');
+
+    const handlePopState = () => {
+      setHistory(prevHistory => {
+        if (prevHistory.length === 0) {
+          setCurrentSection(AppSection.HOME);
+          return prevHistory;
+        }
+        const newHistory = [...prevHistory];
+        const prev = newHistory.pop();
+        if (prev !== undefined) setCurrentSection(prev);
+        return newHistory;
+      });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   /**
@@ -117,6 +133,7 @@ function App() {
           setUser(null);
           setCurrentSection(AppSection.HOME);
           setHistory([]);
+          window.history.replaceState({ appSection: AppSection.HOME }, '');
         }
       }
     });
