@@ -1,6 +1,7 @@
 
 
 import { supabase } from './supabase';
+import { compressImage } from './imageUtils';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus } from '../types';
 
 export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
@@ -366,9 +367,10 @@ export const api = {
     },
     storage: {
         uploadProductImage: async (vendorId: string, file: File): Promise<string | null> => {
-            const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const compressed = await compressImage(file);
+            const ext = compressed.name.split('.').pop()?.toLowerCase() || 'jpg';
             const path = `${vendorId}/${crypto.randomUUID()}.${ext}`;
-            const { error } = await supabase.storage.from('product-images').upload(path, file, {
+            const { error } = await supabase.storage.from('product-images').upload(path, compressed, {
                 cacheControl: '3600',
                 upsert: false
             });
@@ -388,6 +390,21 @@ export const api = {
             if (idx === -1) return;
             const path = url.slice(idx + marker.length).split('?')[0];
             await supabase.storage.from('product-images').remove([path]);
+        },
+        uploadAvatar: async (userId: string, file: File): Promise<string | null> => {
+            const compressed = await compressImage(file, 800, 0.85); // avatars display small -- no need for the larger dimension used for product photos
+            const ext = compressed.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+            const { error } = await supabase.storage.from('avatars').upload(path, compressed, {
+                cacheControl: '3600',
+                upsert: false
+            });
+            if (error) {
+                console.warn('[storage] avatar upload failed:', error.message);
+                return null;
+            }
+            const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+            return data.publicUrl;
         }
     },
     getProducts: async (): Promise<Product[]> => {

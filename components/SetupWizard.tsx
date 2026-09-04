@@ -19,6 +19,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [bio, setBio] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -30,28 +31,33 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError('');
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      // Increased limit to 500KB
-      if (file.size > 500 * 1024) { 
-        setImageError("This photo is too large. Please use a file smaller than 500KB.");
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onloadend = () => setAvatarPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // No size gate here at all -- the real phone-camera file gets
+    // compressed down before it's ever actually uploaded, so an arbitrary
+    // raw-file-size cutoff on the original photo no longer serves any
+    // purpose and was exactly what caused most uploads to be rejected.
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleFinish = async () => {
     if (loading) return;
     setLoading(true);
     try {
+      let avatarUrl: string | undefined;
+      if (avatarFile) {
+        const uploaded = await api.storage.uploadAvatar(user.id, avatarFile);
+        if (!uploaded) {
+          setImageError("Your photo couldn't be uploaded. Please try a different one.");
+          setLoading(false);
+          return;
+        }
+        avatarUrl = uploaded;
+      }
       const updatedUser = await api.users.completeSetup(user.id, {
         bio: bio.trim(),
-        avatar: avatarPreview,
+        avatar: avatarUrl,
         phoneNumber: phoneNumber.trim(),
         address: `${address.trim()}, ${area}`,
         storeName: isVendor ? storeName.trim() : undefined,
@@ -59,7 +65,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
       if (updatedUser) {
         onComplete(updatedUser);
       } else {
-        alert("Memory Full: We couldn't save your profile because your phone's memory is full. Try using a smaller photo.");
+        alert("We couldn't save your profile. Please check your connection and try again.");
       }
     } catch (err) {
       alert("Error saving profile. Check your connection.");
