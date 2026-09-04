@@ -209,15 +209,19 @@ export const api = {
             const { error } = await supabase.rpc('request_role_upgrade', { new_role: newRole });
             return { success: !error, error: error?.message };
         },
-        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string }): Promise<{ success: boolean; error?: string }> => {
+        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string; avatar?: string }): Promise<{ success: boolean; error?: string }> => {
             try {
-                const metaData: any = { ...data };
-                if (data.name) metaData.full_name = data.name;
+                const { avatar, ...syncableData } = data;
+                const metaData: any = { ...syncableData };
+                if (syncableData.name) metaData.full_name = syncableData.name;
 
                 const { error: authError } = await supabase.auth.updateUser({ data: metaData });
                 if (authError) throw authError;
 
-                const { error: profileError } = await supabase.from('profiles').update(data).eq('id', userId);
+                const profileUpdate: any = { ...syncableData };
+                if (avatar !== undefined) profileUpdate.avatar = avatar;
+
+                const { error: profileError } = await supabase.from('profiles').update(profileUpdate).eq('id', userId);
                 if (profileError) throw profileError;
 
                 return { success: true };
@@ -405,6 +409,16 @@ export const api = {
             }
             const { data } = supabase.storage.from('avatars').getPublicUrl(path);
             return data.publicUrl;
+        },
+        deleteAvatar: async (url: string): Promise<void> => {
+            // Best-effort cleanup of the previous photo once a new one is
+            // successfully saved -- each upload gets a unique filename, so
+            // without this, replaced avatars would just accumulate forever.
+            const marker = '/avatars/';
+            const idx = url.indexOf(marker);
+            if (idx === -1) return;
+            const path = url.slice(idx + marker.length).split('?')[0];
+            await supabase.storage.from('avatars').remove([path]);
         }
     },
     getProducts: async (): Promise<Product[]> => {

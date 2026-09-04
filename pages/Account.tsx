@@ -24,7 +24,8 @@ import {
   ShieldAlert,
   Store,
   Wrench,
-  CheckCircle
+  CheckCircle,
+  Camera
 } from 'lucide-react';
 
 interface AccountProps {
@@ -58,6 +59,9 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
+  const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
   const [emailChangeRequested, setEmailChangeRequested] = useState(false);
@@ -131,19 +135,46 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     setEditAddress(user.address || '');
     setEditEmail('');
     setEmailChangeRequested(false);
+    setEditAvatarFile(null);
+    setEditAvatarPreview(user.avatar || null);
+    setAvatarError('');
     setShowEditProfile(true);
+  };
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAvatarError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditAvatarFile(file);
+    setEditAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleSaveProfile = async () => {
     if (!user || !editName.trim()) return;
     setSavingProfile(true);
+
+    let avatarUrl: string | undefined;
+    if (editAvatarFile) {
+      const uploaded = await api.storage.uploadAvatar(user.id, editAvatarFile);
+      if (!uploaded) {
+        setAvatarError("Your photo couldn't be uploaded. Please try a different one.");
+        setSavingProfile(false);
+        return;
+      }
+      avatarUrl = uploaded;
+    }
+
     const result = await api.auth.updateProfile(user.id, {
       name: editName.trim(),
       phoneNumber: editPhone.trim(),
-      address: editAddress.trim()
+      address: editAddress.trim(),
+      ...(avatarUrl ? { avatar: avatarUrl } : {})
     });
     setSavingProfile(false);
     if (result.success) {
+      if (avatarUrl && user.avatar) {
+        api.storage.deleteAvatar(user.avatar); // best-effort, don't block on it
+      }
       refreshUser();
       setShowEditProfile(false);
     } else {
@@ -522,6 +553,27 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
       <Sheet isOpen={showEditProfile} onClose={() => setShowEditProfile(false)} title="Edit Profile">
         {user && (
           <div className="p-6 pb-8 space-y-6">
+            <div className="flex flex-col items-center gap-2">
+              <label className="relative w-24 h-24 rounded-full cursor-pointer group shrink-0">
+                <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center text-2xl font-bold text-gray-400">
+                  {editAvatarPreview ? (
+                    <SafeImage src={editAvatarPreview} className="w-full h-full object-cover" alt="" />
+                  ) : (
+                    editName.charAt(0) || user.name.charAt(0)
+                  )}
+                </div>
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera size={22} className="text-white" />
+                </div>
+                <div className="absolute bottom-0 right-0 w-8 h-8 bg-kubwa-ink rounded-full flex items-center justify-center border-2 border-white">
+                  <Camera size={14} className="text-white" />
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
+              </label>
+              {avatarError && <p className="text-[11px] font-semibold text-red-500 text-center">{avatarError}</p>}
+              <p className="text-[11px] font-semibold text-gray-400">Tap to {user.avatar ? 'change' : 'add'} photo</p>
+            </div>
+
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-400 ml-1">Your details</p>
               <Input placeholder="Full name" value={editName} onChange={e => setEditName(e.target.value)} />
