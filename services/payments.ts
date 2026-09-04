@@ -23,7 +23,7 @@ export interface PaymentResult {
 
 const TIER_PRICES: Record<PaymentIntent, number> = {
   VENDOR_VERIFIED: 2000,
-  VENDOR_FEATURED: 5000,
+  VENDOR_FEATURED: 3000,
   FIXIT_VERIFIED: 2000,
 };
 
