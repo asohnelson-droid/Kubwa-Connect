@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 import { compressImage } from './imageUtils';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus } from '../types';
 
-export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
+export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin', 'FCDA', 'Chikakore', 'Kubwa Village', 'Deidei', 'Galadinma', 'FOI', 'Federal Housing', 'Phase 2 Site 1', 'Phase 2 Site 2', 'Kagini', 'Karsana'];
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
 export const PRODUCT_CATEGORIES = [
