@@ -88,7 +88,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
           {step === 1 ? (
             <div className="text-center animate-fade-in">
                <div className="relative w-32 h-32 rounded-[2rem] bg-gray-50 mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-gray-100">
-                  {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={30} />}
+                  {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <Camera className="text-gray-500" size={30} />}
                   <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
                </div>
                
@@ -98,8 +98,8 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                  </div>
                )}
 
-               <h3 className="font-display text-xl font-bold mb-2 text-kubwa-ink">Your passport <span className="text-gray-400 text-sm font-medium">(optional)</span></h3>
-               <p className="text-gray-400 text-xs font-bold mb-8">Upload a photo for identification.</p>
+               <h3 className="font-display text-xl font-bold mb-2 text-kubwa-ink">Your passport <span className="text-gray-500 text-sm font-medium">(optional)</span></h3>
+               <p className="text-gray-500 text-xs font-bold mb-8">Upload a photo for identification.</p>
                <textarea className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold h-32 resize-none outline-none focus:ring-2 focus:ring-kubwa-primary/20" placeholder="A short bio about you or your business..." value={bio} onChange={e => setBio(e.target.value)} />
             </div>
           ) : (
@@ -111,7 +111,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                <Input placeholder="Active phone number" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
                <Input placeholder="Main street address" value={address} onChange={e => setAddress(e.target.value)} />
                <div className="space-y-1">
-                 <label className="text-xs font-bold text-gray-400 ml-2">Area district</label>
+                 <label className="text-xs font-bold text-gray-500 ml-2">Area district</label>
                  <select className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-kubwa-primary/20" value={area} onChange={e => setArea(e.target.value)}>
                    {KUBWA_AREAS.map(a => <option key={a}>{a}</option>)}
                  </select>

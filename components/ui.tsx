@@ -35,7 +35,7 @@ export const Badge: React.FC<{ children: React.ReactNode; color?: string; classN
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className = '', ...props }) => (
   <input
-    className={`w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-kubwa-primary/10 focus:border-kubwa-primary transition-all placeholder:text-gray-400 placeholder:font-medium font-semibold text-kubwa-ink ${className}`}
+    className={`w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-kubwa-primary/10 focus:border-kubwa-primary transition-all placeholder:text-gray-500 placeholder:font-medium font-semibold text-kubwa-ink ${className}`}
     {...props}
   />
 );
@@ -61,7 +61,7 @@ export const Sheet: React.FC<{ isOpen: boolean; onClose: () => void; children: R
 };
 
 export const Breadcrumbs: React.FC<{ items: { label: string; onClick?: () => void }[] }> = ({ items }) => (
-  <nav className="flex text-[11px] font-bold text-gray-400 mb-6 items-center flex-wrap gap-2">
+  <nav className="flex text-[11px] font-bold text-gray-500 mb-6 items-center flex-wrap gap-2">
     {items.map((item, index) => (
       <React.Fragment key={index}>
         {index > 0 && <span className="text-gray-200">/</span>}
@@ -101,7 +101,7 @@ export const SafeImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement> & { f
   const [errored, setErrored] = useState(false);
   if (!src || errored) {
     return (
-      <div className={`bg-gray-100 flex items-center justify-center text-gray-300 ${className}`}>
+      <div className={`bg-gray-100 flex items-center justify-center text-gray-500 ${className}`}>
         {fallbackIcon || <ImageOff size={22} strokeWidth={1.5} />}
       </div>
     );
@@ -126,7 +126,7 @@ export const SectionHeader: React.FC<{
       {icon}
       <div className="min-w-0">
         <h3 className="font-display font-bold text-lg text-kubwa-ink tracking-tight leading-tight truncate">{title}</h3>
-        {subtitle && <p className="text-xs font-semibold text-gray-400 mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="text-xs font-semibold text-gray-500 mt-0.5">{subtitle}</p>}
       </div>
     </div>
     {action && (

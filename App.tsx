@@ -183,7 +183,7 @@ function App() {
          <div className="w-16 h-16 bg-kubwa-primary rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
             <span className="text-white font-display text-2xl font-bold">KC</span>
          </div>
-         <p className="mt-6 text-xs font-bold text-gray-400">Syncing app state...</p>
+         <p className="mt-6 text-xs font-bold text-gray-500">Syncing app state...</p>
       </div>
     );
   }
@@ -211,7 +211,7 @@ function App() {
       <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">
          <Suspense fallback={
            <div className="h-full flex items-center justify-center">
-             <Loader2 className="animate-spin text-gray-300" size={32} />
+             <Loader2 className="animate-spin text-kubwa-primary" size={32} />
            </div>
          }>
            {renderContent()}
@@ -234,9 +234,9 @@ function App() {
               className="flex flex-col items-center gap-1 transition-all"
             >
               <div className={`p-2.5 rounded-2xl transition-all ${isActive ? 'bg-kubwa-primary/10' : ''}`}>
-                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-kubwa-primary' : 'text-gray-400'} />
+                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-kubwa-primary' : 'text-gray-500'} />
               </div>
-              <span className={`text-[10px] transition-all ${isActive ? 'font-bold text-kubwa-primary' : 'font-semibold text-gray-400'}`}>{item.label}</span>
+              <span className={`text-[11px] transition-all ${isActive ? 'font-bold text-kubwa-primary' : 'font-semibold text-gray-500'}`}>{item.label}</span>
             </button>
           );
         })}

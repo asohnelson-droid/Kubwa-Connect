@@ -272,7 +272,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             <div className="flex justify-center py-6"><Loader2 className="animate-spin text-kubwa-primary" size={24} /></div>
           ) : myBookings.length === 0 ? (
             <Card className="py-8 text-center rounded-[1.75rem] border-dashed border-2">
-              <p className="text-xs font-semibold text-gray-400">No booking requests yet</p>
+              <p className="text-xs font-semibold text-gray-500">No booking requests yet</p>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -315,7 +315,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       )}
 
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
         <input 
           type="text" 
           placeholder="What do you need fixed?" 
@@ -339,7 +339,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
 
       <div className="grid grid-cols-1 gap-4">
         {contextLoading && providers.length === 0 ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-kubwa-primary" /></div> : 
-          filteredProviders.length === 0 ? <div className="text-center py-20 text-gray-400 font-semibold text-sm">No providers found</div> :
+          filteredProviders.length === 0 ? <div className="text-center py-20 text-gray-500 font-semibold text-sm">No providers found</div> :
           filteredProviders.map(provider => (
             <Card key={provider.id} className="p-4 flex gap-4 hover:shadow-lg transition-all cursor-pointer border-none shadow-sm" onClick={() => setSelectedProvider(provider)}>
               <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 shrink-0">
@@ -357,7 +357,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
                 </div>
                 <div className="flex items-center justify-between mt-2">
                    <span className="text-sm font-bold text-kubwa-ink">₦{provider.rate.toLocaleString()}/hr</span>
-                   <Badge color={provider.available ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'}>
+                   <Badge color={provider.available ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'}>
                      {provider.available ? 'Online' : 'Away'}
                    </Badge>
                 </div>
@@ -383,12 +383,12 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
               <div>
                 <p className="text-xs font-bold text-kubwa-fixit">{selectedProvider.category}</p>
                 {selectedProvider.location && (
-                  <p className="text-xs text-gray-400 font-semibold flex items-center gap-1 mt-1"><MapPin size={12} /> {selectedProvider.location}</p>
+                  <p className="text-xs text-gray-500 font-semibold flex items-center gap-1 mt-1"><MapPin size={12} /> {selectedProvider.location}</p>
                 )}
               </div>
               <div className="flex items-center gap-1 font-bold text-sm">
                 <Star size={16} className="text-kubwa-amber fill-kubwa-amber" /> {selectedProvider.rating}
-                <span className="text-gray-300 font-semibold">({selectedProvider.reviews})</span>
+                <span className="text-gray-500 font-semibold">({selectedProvider.reviews})</span>
               </div>
             </div>
 
@@ -405,9 +405,9 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             )}
 
             <div className="border-t border-gray-100 pt-4 mb-6">
-              <h4 className="text-xs font-bold text-gray-400 mb-3">Reviews</h4>
+              <h4 className="text-xs font-bold text-gray-500 mb-3">Reviews</h4>
               {providerReviews.length === 0 ? (
-                <p className="text-xs text-gray-400 font-semibold">No reviews yet.</p>
+                <p className="text-xs text-gray-500 font-semibold">No reviews yet.</p>
               ) : (
                 <div className="space-y-4">
                   {providerReviews.map(review => (
@@ -425,8 +425,8 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             </div>
 
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold text-gray-400">Rate</span>
-              <span className="text-xl font-bold text-kubwa-mart">₦{selectedProvider.rate.toLocaleString()}<span className="text-xs text-gray-400">/hr</span></span>
+              <span className="text-xs font-bold text-gray-500">Rate</span>
+              <span className="text-xl font-bold text-kubwa-mart">₦{selectedProvider.rate.toLocaleString()}<span className="text-xs text-gray-500">/hr</span></span>
             </div>
 
             <Button className="w-full h-14" onClick={handleHireClick} disabled={!selectedProvider.available}>
@@ -451,7 +451,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             </Card>
 
             <div>
-              <p className="text-xs font-bold text-gray-400 mb-2">When do you need this?</p>
+              <p className="text-xs font-bold text-gray-500 mb-2">When do you need this?</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setBookingTimeMode('ASAP')}
@@ -476,7 +476,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             )}
 
             <div>
-              <p className="text-xs font-bold text-gray-400 mb-2">Estimated duration</p>
+              <p className="text-xs font-bold text-gray-500 mb-2">Estimated duration</p>
               <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-2">
                 <button
                   onClick={() => setEstimatedDuration(d => Math.max(1, d - 1))}
@@ -495,7 +495,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-              <span className="text-xs font-bold text-gray-400">Estimated total</span>
+              <span className="text-xs font-bold text-gray-500">Estimated total</span>
               <span className="text-2xl font-bold text-kubwa-mart">₦{(selectedProvider.rate * estimatedDuration).toLocaleString()}</span>
             </div>
 
@@ -526,7 +526,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
         <div className="space-y-4 pb-6">
           <Input placeholder="Your name / business name" value={setupName} onChange={e => setSetupName(e.target.value)} />
           <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 ml-2">Service category</label>
+            <label className="text-xs font-bold text-gray-500 ml-2">Service category</label>
             <select
               className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none"
               value={setupCategory}

@@ -330,21 +330,21 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
       <div className="flex bg-gray-100 p-1.5 rounded-[1.75rem] mb-8 overflow-x-auto no-scrollbar gap-1">
         <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex-1 py-3 text-xs font-bold rounded-2xl transition-all whitespace-nowrap px-4 ${activeTab === 'profile' ? 'bg-white shadow-sm text-kubwa-ink' : 'text-gray-400'}`}
+          className={`flex-1 py-3 text-xs font-bold rounded-2xl transition-all whitespace-nowrap px-4 ${activeTab === 'profile' ? 'bg-white shadow-sm text-kubwa-ink' : 'text-gray-500'}`}
         >
           Profile
         </button>
         {isVendor && (
           <button 
             onClick={() => setActiveTab('dashboard')}
-            className={`flex-1 py-3 text-xs font-bold rounded-2xl transition-all whitespace-nowrap px-4 flex items-center justify-center gap-2 ${activeTab === 'dashboard' ? 'bg-white shadow-sm text-kubwa-mart' : 'text-gray-400'}`}
+            className={`flex-1 py-3 text-xs font-bold rounded-2xl transition-all whitespace-nowrap px-4 flex items-center justify-center gap-2 ${activeTab === 'dashboard' ? 'bg-white shadow-sm text-kubwa-mart' : 'text-gray-500'}`}
           >
             <Store size={14}/> Dashboard
           </button>
         )}
         <button 
           onClick={() => setActiveTab('activity')}
-          className={`flex-1 py-3 text-xs font-bold rounded-2xl transition-all whitespace-nowrap px-4 ${activeTab === 'activity' ? 'bg-white shadow-sm text-kubwa-ink' : 'text-gray-400'}`}
+          className={`flex-1 py-3 text-xs font-bold rounded-2xl transition-all whitespace-nowrap px-4 ${activeTab === 'activity' ? 'bg-white shadow-sm text-kubwa-ink' : 'text-gray-500'}`}
         >
           History
         </button>
@@ -373,13 +373,13 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
 
           <div className="grid grid-cols-2 gap-4">
               <Card className="p-6 text-center border-none shadow-sm rounded-[1.75rem]">
-                 <p className="text-xs font-bold text-gray-400 mb-1.5">Status</p>
+                 <p className="text-xs font-bold text-gray-500 mb-1.5">Status</p>
                  <Badge color={isApproved ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'} className="mx-auto">
                     {isApproved ? 'Verified' : 'Pending'}
                  </Badge>
               </Card>
               <Card className="p-6 text-center border-none shadow-sm rounded-[1.75rem]">
-                 <p className="text-xs font-bold text-gray-400 mb-1.5">Wallet</p>
+                 <p className="text-xs font-bold text-gray-500 mb-1.5">Wallet</p>
                  <p className="font-bold text-kubwa-ink">₦0.00</p>
               </Card>
           </div>
@@ -393,7 +393,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                   <div className={`p-3 rounded-xl ${link.bg} ${link.color}`}><link.icon size={20} /></div>
                   <div className="flex-1">
                      <p className="text-sm font-bold text-kubwa-ink">{link.label}</p>
-                     <p className="text-xs font-semibold text-gray-400">{link.sub}</p>
+                     <p className="text-xs font-semibold text-gray-500">{link.sub}</p>
                   </div>
                   <ChevronRight className="text-gray-200" size={18} />
                </div>
@@ -409,7 +409,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                <div>
                <SectionHeader title="Recent Mart Orders" />
                {orders.length === 0 ? (
-                 <div className="text-center py-10 text-gray-300 text-xs font-bold bg-gray-50 rounded-[1.75rem] border border-dashed">No orders yet</div>
+                 <div className="text-center py-10 text-gray-500 text-xs font-bold bg-gray-50 rounded-[1.75rem] border border-dashed">No orders yet</div>
                ) : (
                  <div className="space-y-3">
                     {orders.map(order => (
@@ -418,7 +418,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                             <div className="p-3 bg-kubwa-mart/10 text-kubwa-mart rounded-xl"><PackageCheck size={20} /></div>
                             <div>
                                <p className="text-sm font-bold text-kubwa-ink">Order #{order.id.slice(0, 5)}</p>
-                               <p className="text-xs font-semibold text-gray-400">{new Date(order.created_at).toLocaleDateString()}</p>
+                               <p className="text-xs font-semibold text-gray-500">{new Date(order.created_at).toLocaleDateString()}</p>
                             </div>
                          </div>
                          <div className="text-right">
@@ -439,7 +439,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                <div>
                <SectionHeader title="Delivery History" />
                {deliveries.length === 0 ? (
-                 <div className="text-center py-10 text-gray-300 text-xs font-bold bg-gray-50 rounded-[1.75rem] border border-dashed">No deliveries yet</div>
+                 <div className="text-center py-10 text-gray-500 text-xs font-bold bg-gray-50 rounded-[1.75rem] border border-dashed">No deliveries yet</div>
                ) : (
                  <div className="space-y-3">
                     {deliveries.map(delivery => (
@@ -448,7 +448,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                             <div className="p-3 bg-kubwa-ride/10 text-kubwa-ride rounded-xl shrink-0"><Truck size={20} /></div>
                             <div className="min-w-0">
                                <p className="text-sm font-bold text-kubwa-ink truncate">{delivery.pickup} → {delivery.dropoff}</p>
-                               <p className="text-xs font-semibold text-gray-400">{delivery.itemType}</p>
+                               <p className="text-xs font-semibold text-gray-500">{delivery.itemType}</p>
                             </div>
                          </div>
                          <div className="text-right shrink-0">
@@ -465,7 +465,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                <div>
                <SectionHeader title="FixIt Bookings" />
                {serviceBookings.length === 0 ? (
-                 <div className="text-center py-10 text-gray-300 text-xs font-bold bg-gray-50 rounded-[1.75rem] border border-dashed">No bookings yet</div>
+                 <div className="text-center py-10 text-gray-500 text-xs font-bold bg-gray-50 rounded-[1.75rem] border border-dashed">No bookings yet</div>
                ) : (
                  <div className="space-y-3">
                     {serviceBookings.map(booking => {
@@ -479,7 +479,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                                  </div>
                                  <div className="min-w-0">
                                     <p className="text-sm font-bold text-kubwa-ink truncate">{booking.providers?.name || 'Provider'}</p>
-                                    <p className="text-xs font-semibold text-gray-400">{booking.providers?.category}</p>
+                                    <p className="text-xs font-semibold text-gray-500">{booking.providers?.category}</p>
                                  </div>
                               </div>
                               <div className="text-right shrink-0">
@@ -555,7 +555,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
           <div className="p-6 pb-8 space-y-6">
             <div className="flex flex-col items-center gap-2">
               <label className="relative w-24 h-24 rounded-full cursor-pointer group shrink-0">
-                <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center text-2xl font-bold text-gray-400">
+                <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center text-2xl font-bold text-gray-500">
                   {editAvatarPreview ? (
                     <SafeImage src={editAvatarPreview} className="w-full h-full object-cover" alt="" />
                   ) : (
@@ -571,11 +571,11 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                 <input type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
               </label>
               {avatarError && <p className="text-[11px] font-semibold text-red-500 text-center">{avatarError}</p>}
-              <p className="text-[11px] font-semibold text-gray-400">Tap to {user.avatar ? 'change' : 'add'} photo</p>
+              <p className="text-[11px] font-semibold text-gray-500">Tap to {user.avatar ? 'change' : 'add'} photo</p>
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-400 ml-1">Your details</p>
+              <p className="text-xs font-bold text-gray-500 ml-1">Your details</p>
               <Input placeholder="Full name" value={editName} onChange={e => setEditName(e.target.value)} />
               <Input placeholder="Phone number" type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
               <Input placeholder="Address" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
@@ -585,7 +585,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
             </div>
 
             <div className="pt-6 border-t border-gray-100 space-y-3">
-              <p className="text-xs font-bold text-gray-400 ml-1">Change email</p>
+              <p className="text-xs font-bold text-gray-500 ml-1">Change email</p>
               <p className="text-xs font-medium text-gray-500">Current: {user.email}</p>
               {emailChangeRequested ? (
                 <div className="bg-green-50 text-green-700 rounded-2xl p-4 text-xs font-semibold flex items-center gap-2">

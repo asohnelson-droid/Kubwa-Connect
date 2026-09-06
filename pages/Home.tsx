@@ -128,11 +128,11 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
 
           <div className="bg-white rounded-3xl p-3 shadow-2xl flex flex-col gap-3">
              <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-2xl">
-                <Search className="text-gray-400" size={20} />
+                <Search className="text-gray-500" size={20} />
                 <input
                   type="text"
                   placeholder="What are you looking for?"
-                  className="flex-1 bg-transparent text-kubwa-ink placeholder-gray-400 text-sm font-semibold focus:outline-none"
+                  className="flex-1 bg-transparent text-kubwa-ink placeholder-gray-500 text-sm font-semibold focus:outline-none"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -200,17 +200,17 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
       {/* Main Categories Grid */}
       <div className="px-6 mt-10 grid grid-cols-3 gap-4">
          {[
-           { section: AppSection.MART, icon: ShoppingBag, label: 'Mart', color: 'bg-kubwa-mart/10 text-kubwa-mart', border: 'border-kubwa-mart/15' },
-           { section: AppSection.FIXIT, icon: Wrench, label: 'FixIt', color: 'bg-kubwa-fixit/10 text-kubwa-fixit', border: 'border-kubwa-fixit/15' },
-           { section: AppSection.RIDE, icon: Truck, label: 'Ride', color: 'bg-kubwa-ride/10 text-kubwa-ride', border: 'border-kubwa-ride/15' }
+           { section: AppSection.MART, icon: ShoppingBag, label: 'Mart', bg: 'bg-kubwa-mart/10', text: 'text-kubwa-martText', border: 'border-kubwa-mart/15' },
+           { section: AppSection.FIXIT, icon: Wrench, label: 'FixIt', bg: 'bg-kubwa-fixit/10', text: 'text-kubwa-fixitText', border: 'border-kubwa-fixit/15' },
+           { section: AppSection.RIDE, icon: Truck, label: 'Ride', bg: 'bg-kubwa-ride/10', text: 'text-kubwa-rideText', border: 'border-kubwa-ride/15' }
          ].map((cat) => (
            <button
             key={cat.label}
             onClick={() => setSection(cat.section)}
-            className={`${cat.color} ${cat.border} p-5 rounded-[1.75rem] border-2 flex flex-col items-center gap-3 hover:scale-[1.03] active:scale-[0.98] transition-all group`}
+            className={`${cat.bg} ${cat.border} p-5 rounded-[1.75rem] border-2 flex flex-col items-center gap-3 hover:scale-[1.03] active:scale-[0.98] transition-all group`}
            >
-              <div className="bg-white p-3.5 rounded-2xl shadow-sm group-hover:shadow-md transition-all"><cat.icon size={22} /></div>
-              <span className="text-xs font-bold">{cat.label}</span>
+              <div className={`bg-white p-3.5 rounded-2xl shadow-sm group-hover:shadow-md transition-all ${cat.text}`}><cat.icon size={22} /></div>
+              <span className={`text-xs font-bold ${cat.text}`}>{cat.label}</span>
            </button>
          ))}
       </div>
@@ -230,8 +230,8 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${opt.bg}`}>
                      <opt.icon size={18} className={opt.color} />
                    </div>
-                   <h4 className="font-bold text-[11px] leading-tight text-kubwa-ink">{opt.title}</h4>
-                   <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{opt.sub}</p>
+                   <h4 className="font-bold text-xs leading-tight text-kubwa-ink">{opt.title}</h4>
+                   <p className="text-[11px] text-gray-500 font-semibold mt-0.5">{opt.sub}</p>
                 </div>
               );
             })}

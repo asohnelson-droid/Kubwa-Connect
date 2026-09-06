@@ -285,7 +285,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
 
        {loading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary"/></div> : (
            <div className="space-y-3">
-              {products.length === 0 && <p className="text-center text-gray-400 py-6 text-xs font-medium">No products listed.</p>}
+              {products.length === 0 && <p className="text-center text-gray-500 py-6 text-xs font-medium">No products listed.</p>}
               {products.map(p => (
                 <Card key={p.id} className="p-4 flex items-center justify-between border-none shadow-sm rounded-2xl">
                    <div className="flex items-center gap-4 min-w-0">
@@ -310,7 +310,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
        {/* Orders Section */}
        <h3 className="font-display text-lg font-bold text-kubwa-ink mt-8">Recent Orders</h3>
        <div className="space-y-3">
-          {orders.length === 0 && !loading && <p className="text-center text-gray-400 py-6 text-xs font-medium">No orders yet.</p>}
+          {orders.length === 0 && !loading && <p className="text-center text-gray-500 py-6 text-xs font-medium">No orders yet.</p>}
           {orders.map(o => (
             <Card key={o.id} className="p-4 border-none shadow-sm rounded-2xl">
                <div className="flex justify-between mb-2">
@@ -389,12 +389,12 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
                    ))}
                    {imageEntries.length < MAX_PRODUCT_IMAGES && (
                       <label className="relative aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center cursor-pointer hover:border-gray-300">
-                         <ImageIcon className="text-gray-300" size={18} />
+                         <ImageIcon className="text-gray-500" size={18} />
                          <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
                       </label>
                    )}
                 </div>
-                <p className="text-[11px] font-semibold text-gray-400 ml-1">Up to {MAX_PRODUCT_IMAGES} photos. First photo is the cover image.</p>
+                <p className="text-[11px] font-semibold text-gray-500 ml-1">Up to {MAX_PRODUCT_IMAGES} photos. First photo is the cover image.</p>
              </div>
              <Input placeholder="Product name" value={editingProduct?.name || ''} onChange={e => setEditingProduct(prev => ({...prev || {}, name: e.target.value}))} />
              <div className="grid grid-cols-2 gap-3">
@@ -402,7 +402,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
                 <Input placeholder="Stock quantity" type="number" min="0" value={editingProduct?.stock ?? ''} onChange={e => setEditingProduct(prev => ({...prev || {}, stock: Number(e.target.value)}))} />
              </div>
              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 ml-2">Category</label>
+                <label className="text-xs font-bold text-gray-500 ml-2">Category</label>
                 <select 
                   className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none"
                   value={editingProduct?.category}
@@ -433,7 +433,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
              <Card className="w-full max-w-sm p-8 text-center animate-zoom-in rounded-[2.25rem] border-none shadow-2xl relative">
                 <button 
                   onClick={() => setIsUpgradeModalOpen(false)} 
-                  className="absolute top-6 right-6 p-2 bg-gray-50 rounded-full hover:bg-gray-100 text-gray-400 hover:text-kubwa-ink transition-colors"
+                  className="absolute top-6 right-6 p-2 bg-gray-50 rounded-full hover:bg-gray-100 text-gray-500 hover:text-kubwa-ink transition-colors"
                 >
                   <X size={20} />
                 </button>
@@ -446,7 +446,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
                 <p className="text-gray-500 font-medium text-sm max-w-xs mx-auto mb-6 leading-relaxed">
                    You've hit the limit of 4 products on the Free tier. Unlock unlimited listings and a verified badge today.
                 </p>
-                <p className="text-2xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-400">/month</span></p>
+                <p className="text-2xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-500">/month</span></p>
                 
                 <Button onClick={handleUpgradePayment} disabled={upgradingPlan} className="w-full h-14 shadow-xl">
                    {upgradingPlan ? <Loader2 className="animate-spin" /> : 'Upgrade now'}
@@ -460,7 +460,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
           <div className="pb-6">
              {dispatchingOrder && (
                 <div className="bg-gray-50 rounded-2xl p-4 mb-5">
-                   <p className="text-xs font-bold text-gray-400">Delivering to</p>
+                   <p className="text-xs font-bold text-gray-500">Delivering to</p>
                    <p className="text-sm font-bold text-kubwa-ink mt-0.5">{dispatchingOrder.deliveryAddress}</p>
                 </div>
              )}
@@ -470,7 +470,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
              ) : (
                 <>
                   {availableRiders.length === 0 && (
-                     <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl mb-4">
+                     <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-2xl mb-4">
                         <Bike size={32} className="mx-auto mb-2 opacity-20" />
                         <p className="text-sm font-semibold">No riders online right now.</p>
                         {offlineRiders.length > 0 && <p className="text-xs mt-1">Call one of your riders below to ask them to go online.</p>}
@@ -511,16 +511,16 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
 
                   {availableRiders.length === 0 && offlineRiders.length > 0 && (
                     <div className="space-y-3">
-                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide ml-1">Other approved riders (offline)</p>
+                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide ml-1">Other approved riders (offline)</p>
                        {offlineRiders.map(rider => (
                           <Card key={rider.id} className="p-4 border-none shadow-sm rounded-2xl flex items-center justify-between gap-3 opacity-75">
                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
                                    <Bike size={18} />
                                 </div>
                                 <div className="min-w-0">
                                    <p className="font-bold text-sm text-kubwa-ink truncate">{rider.name}</p>
-                                   <p className="text-xs font-semibold text-gray-400">Offline</p>
+                                   <p className="text-xs font-semibold text-gray-500">Offline</p>
                                 </div>
                              </div>
                              {rider.phoneNumber ? (
@@ -528,7 +528,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
                                    <Phone size={14} /> Call
                                 </a>
                              ) : (
-                                <span className="text-[10px] font-semibold text-gray-300 shrink-0">No phone on file</span>
+                                <span className="text-[10px] font-semibold text-gray-500 shrink-0">No phone on file</span>
                              )}
                           </Card>
                        ))}
@@ -536,7 +536,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
                   )}
 
                   {availableRiders.length === 0 && offlineRiders.length === 0 && (
-                    <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
+                    <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-2xl">
                        <p className="text-xs font-semibold">No approved riders on the platform yet.</p>
                     </div>
                   )}

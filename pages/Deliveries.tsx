@@ -348,7 +348,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
             
             {loading ? <Loader2 className="animate-spin mx-auto text-kubwa-ride" /> : (
                availableJobs.length === 0 ? (
-                  <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
+                  <div className="text-center py-10 text-gray-500 border-2 border-dashed border-gray-200 rounded-2xl">
                      <Package size={40} className="mx-auto mb-2 opacity-20" />
                      <p className="text-sm font-semibold">No pending jobs right now.</p>
                      <p className="text-xs">Check back in a few minutes.</p>
@@ -359,7 +359,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
                      <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
                         <div>
                            <Badge color="bg-kubwa-ride/10 text-kubwa-ride">{job.itemType}</Badge>
-                           <p className="text-[11px] text-gray-400 mt-1 font-medium">{new Date(job.created_at).toLocaleTimeString()}</p>
+                           <p className="text-[11px] text-gray-500 mt-1 font-medium">{new Date(job.created_at).toLocaleTimeString()}</p>
                         </div>
                         <span className="font-bold text-xl text-kubwa-mart">₦{job.price.toLocaleString()}</span>
                      </div>
@@ -367,14 +367,14 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
                         <div className="flex gap-3 items-start">
                            <div className="mt-1 w-2 h-2 rounded-full bg-kubwa-mart shadow-sm shrink-0"></div>
                            <div>
-                              <p className="text-xs text-gray-400 font-bold">Pickup from</p>
+                              <p className="text-xs text-gray-500 font-bold">Pickup from</p>
                               <p className="font-bold text-kubwa-ink">{job.pickup}</p>
                            </div>
                         </div>
                         <div className="flex gap-3 items-start">
                            <div className="mt-1 w-2 h-2 rounded-full bg-kubwa-primary shadow-sm shrink-0"></div>
                            <div>
-                              <p className="text-xs text-gray-400 font-bold">Deliver to</p>
+                              <p className="text-xs text-gray-500 font-bold">Deliver to</p>
                               <p className="font-bold text-kubwa-ink">{job.dropoff}</p>
                            </div>
                         </div>
@@ -491,7 +491,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
               </Card>
             ))
           )}
-          {!loading && deliveries.length === 0 && <p className="text-center text-gray-400 py-8 text-sm font-medium">No active deliveries.</p>}
+          {!loading && deliveries.length === 0 && <p className="text-center text-gray-500 py-8 text-sm font-medium">No active deliveries.</p>}
         </div>
       )}
 

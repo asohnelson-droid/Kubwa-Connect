@@ -186,7 +186,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
 
       {renderContent()}
 
-      <div className="mt-12 pt-8 border-t border-gray-100 text-center text-gray-400 text-xs font-medium">
+      <div className="mt-12 pt-8 border-t border-gray-100 text-center text-gray-500 text-xs font-medium">
         <p>&copy; {new Date().getFullYear()} Kubwa Connect. All rights reserved.</p>
       </div>
     </div>

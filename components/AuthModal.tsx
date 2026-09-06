@@ -177,7 +177,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <div className="fixed inset-0 z-[200] bg-kubwa-ink/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
       <Card className="w-full max-w-sm relative animate-zoom-in rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
-        <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-kubwa-ink transition-colors z-10">
+        <button onClick={onClose} className="absolute top-8 right-8 text-gray-500 hover:text-kubwa-ink transition-colors z-10">
           <X size={22} strokeWidth={2.5} />
         </button>
         <form onSubmit={handleSubmit} className="p-10 max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -188,7 +188,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
              <h3 className="font-display text-3xl font-bold text-kubwa-ink mb-1 leading-none">
                {mode === 'LOGIN' ? 'Welcome' : mode === 'SIGNUP' ? 'Join us' : mode === 'FORGOT' ? 'Recovery' : 'New password'}
              </h3>
-             <p className="text-xs font-bold text-gray-400">
+             <p className="text-xs font-bold text-gray-500">
                {mode === 'FORGOT' ? 'Reset your password' : mode === 'UPDATE_PASSWORD' ? 'Set your new password' : 'Kubwa Connect Community'}
              </p>
           </div>
@@ -196,7 +196,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           <div className="space-y-4">
               {mode === 'SIGNUP' && (
                 <div className="mb-2">
-                  <p className="text-xs font-bold text-gray-400 mb-3 text-center">How will you use Kubwa Connect?</p>
+                  <p className="text-xs font-bold text-gray-500 mb-3 text-center">How will you use Kubwa Connect?</p>
                   <div className="grid grid-cols-2 gap-3">
                     {SIGNUP_ROLE_OPTIONS.map(opt => (
                       <button
@@ -205,9 +205,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                         onClick={() => setSelectedRole(opt.role)}
                         className={`p-4 rounded-2xl border-2 text-left transition-all ${selectedRole === opt.role ? opt.activeClasses : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}
                       >
-                        <opt.icon size={18} className={selectedRole === opt.role ? opt.iconActive : 'text-gray-400'} />
+                        <opt.icon size={18} className={selectedRole === opt.role ? opt.iconActive : 'text-gray-500'} />
                         <p className="text-xs font-bold text-kubwa-ink mt-2">{opt.label}</p>
-                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{opt.sub}</p>
+                        <p className="text-[10px] font-semibold text-gray-500 mt-0.5">{opt.sub}</p>
                       </button>
                     ))}
                   </div>
@@ -216,21 +216,21 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
               {mode === 'SIGNUP' && (
                 <div className="relative">
-                  <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                  <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                   <Input className="pl-14 h-14" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" required />
                 </div>
               )}
               
               {mode !== 'UPDATE_PASSWORD' && (
                 <div className="relative">
-                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                   <Input className="pl-14 h-14" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" required />
                 </div>
               )}
 
               {mode !== 'FORGOT' && (
                 <div className="relative">
-                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                   <Input className="pl-14 h-14" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'UPDATE_PASSWORD' ? "New password" : "Password"} required />
                 </div>
               )}
@@ -259,7 +259,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   
                   {isNetworkError && (
                     <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-red-100/50">
-                       <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                       <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
                          <HelpCircle size={12} /> Diagnostic tools
                        </div>
                        
@@ -320,7 +320,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                       setConnectionResult(null);
                       if (mode === 'LOGIN') setMode('SIGNUP');
                       else setMode('LOGIN');
-                    }} className="text-xs font-bold text-gray-400 hover:text-kubwa-primary transition-colors">
+                    }} className="text-xs font-bold text-gray-500 hover:text-kubwa-primary transition-colors">
                         {mode === 'LOGIN' ? "New here? Create account" : "Back to sign in"}
                     </button>
                   )}

@@ -229,7 +229,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       </div>
 
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
         <input 
           type="text" 
           placeholder="Search items in Kubwa..." 
@@ -256,7 +256,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
       <div className="grid grid-cols-2 gap-4">
         {contextLoading && products.length === 0 ? <div className="col-span-2 flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-primary"/></div> : 
-          filteredProducts.length === 0 ? <div className="col-span-2 text-center py-20 text-gray-400 font-semibold text-sm">No matches found</div> :
+          filteredProducts.length === 0 ? <div className="col-span-2 text-center py-20 text-gray-500 font-semibold text-sm">No matches found</div> :
           filteredProducts.map(product => (
             <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group border-none shadow-sm" onClick={() => setSelectedProduct(product)}>
               <div className="h-40 bg-gray-100 overflow-hidden relative">
@@ -277,12 +277,12 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-kubwa-mart text-xs">₦{product.price.toLocaleString()}</span>
                   {isDemoProduct(product) ? (
-                    <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wide">Sample</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Sample</span>
                   ) : isOutOfStock(product) ? (
-                    <span className="text-[9px] font-bold text-red-300 uppercase tracking-wide">Sold out</span>
+                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Sold out</span>
                   ) : (
                     <div
-                      className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-kubwa-ink group-hover:text-white transition-colors"
+                      className="bg-gray-100 p-1.5 rounded-lg text-gray-500 group-hover:bg-kubwa-ink group-hover:text-white transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         const inCart = cart.find(c => c.id === product.id)?.quantity || 0;
@@ -312,7 +312,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               </div>
               
               <h3 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight leading-none">Limit reached</h3>
-              <p className="text-xs font-semibold text-gray-400 mt-3 mb-8">Free tier cap: 4 products</p>
+              <p className="text-xs font-semibold text-gray-500 mt-3 mb-8">Free tier cap: 4 products</p>
               
               <div className="space-y-4 mb-6 text-left bg-gray-50 p-6 rounded-[1.75rem]">
                  {[
@@ -327,13 +327,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  ))}
               </div>
 
-              <p className="text-3xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-400">/month</span></p>
+              <p className="text-3xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-500">/month</span></p>
               
               <div className="space-y-3">
                 <Button onClick={handleUpgradePayment} disabled={upgrading} className="w-full h-16 shadow-xl shadow-kubwa-primary/20">
                   {upgrading ? <Loader2 className="animate-spin" /> : 'Upgrade shop now'}
                 </Button>
-                <button onClick={() => setShowUpgradeModal(false)} className="text-xs font-bold text-gray-300 hover:text-kubwa-ink transition-colors py-2">
+                <button onClick={() => setShowUpgradeModal(false)} className="text-xs font-bold text-gray-500 hover:text-kubwa-ink transition-colors py-2">
                   Maybe later
                 </button>
               </div>
@@ -371,7 +371,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
              <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Quality product from a verified Kubwa merchant.'}</p>
              {isDemoProduct(selectedProduct) ? (
                <div className="bg-gray-50 rounded-2xl p-4 text-center">
-                 <p className="text-xs font-bold text-gray-400">Sample listing for browsing only — not available to order.</p>
+                 <p className="text-xs font-bold text-gray-500">Sample listing for browsing only — not available to order.</p>
                </div>
              ) : isOutOfStock(selectedProduct) ? (
                <div className="bg-red-50 rounded-2xl p-4 text-center">
@@ -402,7 +402,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
             {cart.length === 0 ? (
               <div className="text-center py-20 flex flex-col items-center gap-4">
                  <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-200"><ShoppingCart size={32} /></div>
-                 <p className="text-gray-400 font-bold text-sm">Your cart is empty</p>
+                 <p className="text-gray-500 font-bold text-sm">Your cart is empty</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -420,7 +420,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
                  {/* Checkout Form */}
                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
-                    <p className="font-bold text-xs text-gray-400 flex items-center gap-1.5">
+                    <p className="font-bold text-xs text-gray-500 flex items-center gap-1.5">
                         <MapPin size={12} /> Fulfillment
                     </p>
                     <div className="flex gap-2">
@@ -450,14 +450,14 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                     ) : (
                       <div className="bg-white rounded-xl p-3 text-xs">
                          {loadingPickupInfo ? (
-                            <span className="text-gray-400 font-semibold">Loading pickup location...</span>
+                            <span className="text-gray-500 font-semibold">Loading pickup location...</span>
                          ) : pickupInfo ? (
                             <>
                                <p className="font-bold text-kubwa-ink">{pickupInfo.storeName || 'Vendor location'}</p>
                                <p className="text-gray-500 font-medium mt-0.5">{pickupInfo.address || pickupInfo.location || 'Address not set by vendor yet — confirm with them directly.'}</p>
                             </>
                          ) : (
-                            <span className="text-gray-400 font-semibold">Pickup location unavailable — confirm with the vendor directly.</span>
+                            <span className="text-gray-500 font-semibold">Pickup location unavailable — confirm with the vendor directly.</span>
                          )}
                       </div>
                     )}
@@ -472,7 +472,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  </div>
 
                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
-                    <p className="font-bold text-xs text-gray-400">Payment</p>
+                    <p className="font-bold text-xs text-gray-500">Payment</p>
                     <div className="flex gap-2">
                        <button
                           type="button"
@@ -492,7 +492,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  </div>
 
                  <div className="pt-4 flex justify-between items-center">
-                    <span className="font-bold text-xs text-gray-400">Grand total</span>
+                    <span className="font-bold text-xs text-gray-500">Grand total</span>
                     <span className="font-bold text-2xl text-kubwa-mart">₦{calculateTotal().toLocaleString()}</span>
                  </div>
                  <Button className="w-full h-16 mt-4 shadow-xl shadow-kubwa-primary/10" onClick={handleCheckout} disabled={placingOrder}>

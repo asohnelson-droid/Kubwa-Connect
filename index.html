@@ -32,6 +32,17 @@
                 ride: '#2563EB',
                 amber: '#FBBF24',
                 surface: '#FAFAF8',
+                /* Text-safe variants: the base mart/fixit tones above are
+                   right for icon fills, borders, and tinted backgrounds
+                   (WCAG treats those more leniently), but measured well
+                   below the 4.5:1 minimum for small text -- fixit in
+                   particular was only ~2.2:1 on a light background, genuinely
+                   hard to read. These darker tones keep the same hue/brand
+                   identity but clear AA for actual text. Ride's blue already
+                   passed (~5.2:1) so its text variant is unchanged. */
+                martText: '#15803D',
+                fixitText: '#B45309',
+                rideText: '#2563EB',
                 /* Aliases: 127 existing usages across the app still reference
                    these old names. Keeping them pointed at the right values
                    so nothing breaks while each page gets migrated in turn. */
