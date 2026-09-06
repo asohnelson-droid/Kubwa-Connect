@@ -180,8 +180,14 @@ function App() {
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-         <div className="w-16 h-16 bg-kubwa-primary rounded-3xl animate-bounce flex items-center justify-center shadow-xl">
-            <span className="text-white font-display text-2xl font-bold">KC</span>
+         <div className="w-16 h-16 bg-kubwa-ink rounded-3xl animate-bounce flex items-center justify-center shadow-xl p-3.5">
+            <svg viewBox="0 0 200 200" className="w-full h-full">
+              <g stroke="currentColor" strokeLinecap="round" fill="none">
+                <path d="M 55 30 L 55 170" stroke="#16A34A" strokeWidth="38"/>
+                <path d="M 55 100 L 155 30" stroke="#F59E0B" strokeWidth="38"/>
+                <path d="M 55 100 L 155 170" stroke="#2563EB" strokeWidth="38"/>
+              </g>
+            </svg>
          </div>
          <p className="mt-6 text-xs font-bold text-gray-500">Syncing app state...</p>
       </div>

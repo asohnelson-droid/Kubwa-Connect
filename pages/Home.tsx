@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Wrench, Truck, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Briefcase, Loader2, CheckCircle, Zap, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Wrench, Truck, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Briefcase, Loader2, CheckCircle, ShieldCheck } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
 import { Button, Sheet, SafeImage, SectionHeader } from '../components/ui';
 import { KUBWA_AREAS, api } from '../services/data';
@@ -116,7 +116,15 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full -ml-24 -mb-24 blur-3xl" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-8">
-             <div className="bg-white p-2.5 rounded-2xl shadow-xl transform -rotate-6"><Zap size={22} className="text-kubwa-primary fill-kubwa-primary" /></div>
+             <div className="bg-white p-2 rounded-2xl shadow-xl transform -rotate-6">
+                <svg viewBox="0 0 200 200" className="w-[22px] h-[22px]">
+                  <g strokeLinecap="round" fill="none">
+                    <path d="M 55 30 L 55 170" stroke="#16A34A" strokeWidth="38"/>
+                    <path d="M 55 100 L 155 30" stroke="#F59E0B" strokeWidth="38"/>
+                    <path d="M 55 100 L 155 170" stroke="#2563EB" strokeWidth="38"/>
+                  </g>
+                </svg>
+             </div>
              <span className="font-display text-lg font-bold tracking-tight">Kubwa Connect</span>
           </div>
 
