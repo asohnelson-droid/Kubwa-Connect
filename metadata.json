@@ -1,6 +1,6 @@
 {
   "name": "KubwaConnect",
-  "description": "A community super app for Kubwa residents to shop, hire services, and book deliveries.",
+  "description": "A super app for Nigerians to shop from local vendors, hire artisans, and book deliveries in their city.",
   "requestFramePermissions": [
     "geolocation"
   ]

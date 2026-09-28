@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Check, ArrowRight, User, Loader2, Store, Phone, MapPin, Search, Navigation, AlertTriangle } from 'lucide-react';
 import { Button, Input, Card } from './ui';
-import { api, KUBWA_AREAS } from '../services/data';
+import { api } from '../services/data';
+import LocationPicker, { LocationValue } from './LocationPicker';
 import { User as UserType } from '../types';
 
 interface SetupWizardProps {
@@ -10,56 +11,65 @@ interface SetupWizardProps {
   onComplete: (updatedUser: UserType) => void; 
 }
 
-const KUBWA_LANDMARKS = [
-    "Arab Road, Kubwa Village", "Byazhin Across, Phase 4", "Dantata Estate, Phase 3", "Deidei Road, Phase 2",
-    "FHA, Phase 2", "Fo1, Kubwa", "Gado Nasko Road", "NYSC Camp Road", "PW Bridge", "Total Station"
-];
-
 const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [bio, setBio] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
-  const [area, setArea] = useState(KUBWA_AREAS[0]);
+  const [location, setLocation] = useState<LocationValue>({ stateId: user.stateId, lgaId: user.lgaId, area: user.area || '' });
+  const [formError, setFormError] = useState('');
   const [imageError, setImageError] = useState('');
 
   const isVendor = user.role === 'VENDOR';
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError('');
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      // Increased limit to 500KB
-      if (file.size > 500 * 1024) { 
-        setImageError("This photo is too large. Please use a file smaller than 500KB.");
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onloadend = () => setAvatarPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // No size gate here at all -- the real phone-camera file gets
+    // compressed down before it's ever actually uploaded, so an arbitrary
+    // raw-file-size cutoff on the original photo no longer serves any
+    // purpose and was exactly what caused most uploads to be rejected.
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleFinish = async () => {
     if (loading) return;
+    setFormError('');
+    if (!location.lgaId) {
+      setFormError('Please choose your state and local government area.');
+      return;
+    }
     setLoading(true);
     try {
+      let avatarUrl: string | undefined;
+      if (avatarFile) {
+        const uploaded = await api.storage.uploadAvatar(user.id, avatarFile);
+        if (!uploaded) {
+          setImageError("Your photo couldn't be uploaded. Please try a different one.");
+          setLoading(false);
+          return;
+        }
+        avatarUrl = uploaded;
+      }
       const updatedUser = await api.users.completeSetup(user.id, {
         bio: bio.trim(),
-        avatar: avatarPreview,
+        avatar: avatarUrl,
         phoneNumber: phoneNumber.trim(),
-        address: `${address.trim()}, ${area}`,
+        address: [address.trim(), location.area.trim()].filter(Boolean).join(', '),
+        lgaId: location.lgaId,
+        area: location.area.trim() || undefined,
         storeName: isVendor ? storeName.trim() : undefined,
       });
       if (updatedUser) {
         onComplete(updatedUser);
       } else {
-        alert("Memory Full: We couldn't save your profile because your phone's memory is full. Try using a smaller photo.");
+        alert("We couldn't save your profile. Please check your connection and try again.");
       }
     } catch (err) {
       alert("Error saving profile. Check your connection.");
@@ -82,7 +92,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
           {step === 1 ? (
             <div className="text-center animate-fade-in">
                <div className="relative w-32 h-32 rounded-[2rem] bg-gray-50 mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-gray-100">
-                  {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={30} />}
+                  {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <Camera className="text-gray-500" size={30} />}
                   <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
                </div>
                
@@ -92,8 +102,8 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                  </div>
                )}
 
-               <h3 className="font-display text-xl font-bold mb-2 text-kubwa-ink">Your passport <span className="text-gray-400 text-sm font-medium">(optional)</span></h3>
-               <p className="text-gray-400 text-xs font-bold mb-8">Upload a photo for identification.</p>
+               <h3 className="font-display text-xl font-bold mb-2 text-kubwa-ink">Your passport <span className="text-gray-500 text-sm font-medium">(optional)</span></h3>
+               <p className="text-gray-500 text-xs font-bold mb-8">Upload a photo for identification.</p>
                <textarea className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold h-32 resize-none outline-none focus:ring-2 focus:ring-kubwa-primary/20" placeholder="A short bio about you or your business..." value={bio} onChange={e => setBio(e.target.value)} />
             </div>
           ) : (
@@ -103,13 +113,13 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                </div>
                {isVendor && <Input placeholder="Business name" value={storeName} onChange={e => setStoreName(e.target.value)} />}
                <Input placeholder="Active phone number" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
-               <Input placeholder="Main street address" value={address} onChange={e => setAddress(e.target.value)} />
-               <div className="space-y-1">
-                 <label className="text-xs font-bold text-gray-400 ml-2">Area district</label>
-                 <select className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-kubwa-primary/20" value={area} onChange={e => setArea(e.target.value)}>
-                   {KUBWA_AREAS.map(a => <option key={a}>{a}</option>)}
-                 </select>
-               </div>
+               <LocationPicker value={location} onChange={setLocation} role={user.role} />
+               <Input placeholder="House number and street" value={address} onChange={e => setAddress(e.target.value)} />
+               {formError && (
+                 <div className="p-2.5 bg-red-50 text-red-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                   <AlertTriangle size={14} /> {formError}
+                 </div>
+               )}
             </div>
           )}
         </div>

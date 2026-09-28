@@ -23,7 +23,7 @@ export interface PaymentResult {
 
 const TIER_PRICES: Record<PaymentIntent, number> = {
   VENDOR_VERIFIED: 2000,
-  VENDOR_FEATURED: 5000,
+  VENDOR_FEATURED: 3000,
   FIXIT_VERIFIED: 2000,
 };
 
@@ -46,6 +46,7 @@ export const PaymentService = {
     deliveryOption: string;
     deliveryAddress?: string;
     contactPhone: string;
+    dropoffLgaId?: number;
   }): Promise<PaymentResult & { orderId?: string }> {
     if (!PAYSTACK_PUBLIC_KEY) {
       return { success: false, error: "Online payment isn't set up yet. Please choose Pay on Delivery." };
@@ -86,7 +87,8 @@ export const PaymentService = {
         items: params.items,
         deliveryOption: params.deliveryOption,
         deliveryAddress: params.deliveryAddress,
-        contactPhone: params.contactPhone
+        contactPhone: params.contactPhone,
+        dropoffLgaId: params.dropoffLgaId ?? null
       }
     });
 

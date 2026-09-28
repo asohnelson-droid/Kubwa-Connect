@@ -36,6 +36,12 @@ export interface User {
   phoneNumber?: string;
   storeName?: string;
   address?: string;
+
+  // Location (server-derived: stateId and cityId always follow lgaId)
+  stateId?: number;
+  lgaId?: number;
+  cityId?: number;
+  area?: string;
   
   // Monetisation & Payment State
   tier: MonetisationTier;
@@ -68,6 +74,10 @@ export interface Product {
   rejectionReason?: string;
   description?: string;
   isPromoted?: boolean; 
+  stateId?: number;
+  lgaId?: number;
+  cityId?: number;
+  cityName?: string;
 }
 
 export enum AppSection {
@@ -96,6 +106,7 @@ export interface MartOrder {
   riderId?: string;
   deliveryAddress?: string;
   contactPhone?: string;
+  dropoffLgaId?: number;
   refundStatus?: 'NONE' | 'REFUNDED';
   refundReason?: string;
   refundedAt?: string;
@@ -107,8 +118,19 @@ export interface Address { id: string; userId: string; title: string; details: s
 export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; created_at: string; }
 export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; revenueByDay?: { name: string; rev: number }[]; userStats?: any; }
 export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolean; allowAdminPromotions: boolean; supportEmail: string; supportPhone: string; minVersion: string; }
-export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; }
+export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; stateId?: number; lgaId?: number; cityId?: number; cityName?: string; lgaName?: string; }
 export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; created_at: string; }
-export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; created_at: string; phoneNumber?: string; rider?: { name: string; phoneNumber?: string }; }
+export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; created_at: string; phoneNumber?: string; rider?: { name: string; phoneNumber?: string }; pickupLgaId?: number; dropoffLgaId?: number; cityId?: number; }
 export interface ServiceOrder { id: string; userId: string; serviceId: string; amount: number; status: ServiceOrderStatus; created_at: string; providers?: { userId: string; name: string; image: string; category: string }; }
 export interface PushNotification { title: string; body: string; }
+
+// Nigerian locations
+export interface NgState { id: number; name: string; }
+export interface Lga { id: number; name: string; stateId: number; cityId: number | null; }
+export interface City {
+  id: number; name: string; stateId: number; isLive: boolean; launchedAt?: string | null;
+  sameLgaFee: number; crossLgaFee: number; minVendors: number; minRiders: number; minProviders: number;
+}
+export interface CityReadiness extends City { vendors: number; riders: number; providers: number; pending: number; buyers: number; }
+export type DiscoveryScope = 'CITY' | 'STATE' | 'NATIONAL';
+export interface BrowseLocation { scope: DiscoveryScope; cityId?: number; stateId?: number; label: string; }

@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle, ShieldCheck, TrendingUp, CheckCircle, MapPin } from 'lucide-react';
 import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
 import { PaymentService } from '../services/payments';
-import { Product, CartItem, User, AppSection } from '../types';
+import { Product, CartItem, User, AppSection, Lga } from '../types';
+import ScopeChip from '../components/ScopeChip';
 import { Button, Badge, Card, Breadcrumbs, Sheet, Input, BackButton, SafeImage } from '../components/ui';
 import { useData } from '../contexts/DataContext';
 
@@ -26,7 +27,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [selectedParentCategory, setSelectedParentCategory] = useState('All'); 
   
   // Use DataContext for products
-  const { products, loading: contextLoading, fetchProducts } = useData();
+  const { products, loading: contextLoading, fetchProducts, hasMoreProducts, loadMoreProducts, browse } = useData();
+  const [loadingMore, setLoadingMore] = useState(false);
   
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -43,7 +45,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const [deliveryOption, setDeliveryOption] = useState<'DISPATCH' | 'PICKUP'>('DISPATCH');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [pickupInfo, setPickupInfo] = useState<{ storeName?: string; address?: string; location?: string } | null>(null);
+  const [pickupInfo, setPickupInfo] = useState<{ storeName?: string; address?: string; location?: string; area?: string; lgaId?: number; stateId?: number; cityId?: number } | null>(null);
+  // Rider delivery is only offered inside the vendor's live city.
+  const [dropoffOptions, setDropoffOptions] = useState<Lga[]>([]);
+  const [dropoffLgaId, setDropoffLgaId] = useState<number | undefined>(undefined);
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
+  const [vendorCityName, setVendorCityName] = useState<string>('');
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [loadingPickupInfo, setLoadingPickupInfo] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CONTACT' | 'ONLINE'>('CONTACT');
 
@@ -63,15 +71,47 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     if (cart.length === 0) setPickupInfo(null);
   }, [cart.length]);
 
+  const cartVendorId = cart[0]?.vendorId;
   useEffect(() => {
-    if (deliveryOption === 'PICKUP' && cart.length > 0 && !pickupInfo) {
-      setLoadingPickupInfo(true);
-      api.getVendorPickupInfo(cart[0].vendorId).then(info => {
-        setPickupInfo(info);
-        setLoadingPickupInfo(false);
+    if (!isCartOpen || !cartVendorId || cartVendorId.startsWith('demo_')) return;
+    let cancelled = false;
+    setLoadingPickupInfo(true);
+    setCheckingDelivery(true);
+    (async () => {
+      const info = await api.getVendorPickupInfo(cartVendorId);
+      if (cancelled) return;
+      setPickupInfo(info);
+      setLoadingPickupInfo(false);
+      let options: Lga[] = [];
+      let cityName = '';
+      if (info?.cityId && info.stateId) {
+        const cities = await api.locations.getCities();
+        const city = cities.find(c => c.id === info.cityId);
+        cityName = city?.name || '';
+        if (city?.isLive) {
+          const lgas = await api.locations.getLgas(info.stateId);
+          options = lgas.filter(l => l.cityId === info.cityId);
+        }
+      }
+      if (cancelled) return;
+      setVendorCityName(cityName);
+      setDropoffOptions(options);
+      setDropoffLgaId(prev => {
+        if (prev && options.some(o => o.id === prev)) return prev;
+        return user?.lgaId && options.some(o => o.id === user.lgaId) ? user.lgaId : undefined;
       });
-    }
-  }, [deliveryOption, cart]);
+      if (options.length === 0) setDeliveryOption('PICKUP');
+      setCheckingDelivery(false);
+    })();
+    return () => { cancelled = true; };
+  }, [isCartOpen, cartVendorId, user?.lgaId]);
+
+  useEffect(() => {
+    if (deliveryOption !== 'DISPATCH' || !pickupInfo?.lgaId || !dropoffLgaId) { setDeliveryFee(null); return; }
+    api.quoteDeliveryFee(pickupInfo.lgaId, dropoffLgaId).then(setDeliveryFee);
+  }, [deliveryOption, pickupInfo?.lgaId, dropoffLgaId]);
+
+  const dispatchAvailable = dropoffOptions.length > 0;
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -99,7 +139,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     }
   };
 
-  const handleAddProductClick = () => {
+  const handleAddProductClick = async () => {
     if (!user) { 
       onRequireAuth(); 
       return; 
@@ -110,8 +150,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       return;
     }
     
-    // Count user's current products
-    const myProductsCount = products.filter(p => p.vendorId === user.id).length;
+    // Count the vendor's own listings (including ones still in review)
+    const myProductsCount = (await api.products.getByVendor(user.id)).length;
     
     // Enforcement Logic: Use dynamic limit from user object
     const limit = user.productLimit || 4; 
@@ -142,6 +182,14 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     }
 
     // Production-Ready Validation
+    if (deliveryOption === 'DISPATCH' && !dispatchAvailable) {
+        alert("Rider delivery isn't available for this vendor's city. Please choose pickup.");
+        return;
+    }
+    if (deliveryOption === 'DISPATCH' && !dropoffLgaId) {
+        alert("Please choose the area (LGA) to deliver to.");
+        return;
+    }
     if (deliveryOption === 'DISPATCH' && !deliveryAddress.trim()) {
         alert("Please enter a delivery address.");
         return;
@@ -161,7 +209,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
           total: calculateTotal(),
           deliveryOption,
           deliveryAddress: deliveryOption === 'DISPATCH' ? deliveryAddress.trim() : undefined,
-          contactPhone: contactPhone.trim()
+          contactPhone: contactPhone.trim(),
+          dropoffLgaId: deliveryOption === 'DISPATCH' ? dropoffLgaId : undefined
         });
 
         if (result.success) {
@@ -183,7 +232,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         deliveryOption,
         vendorId: cart[0].vendorId,
         deliveryAddress: deliveryOption === 'DISPATCH' ? deliveryAddress.trim() : undefined,
-        contactPhone: contactPhone.trim()
+        contactPhone: contactPhone.trim(),
+        dropoffLgaId: deliveryOption === 'DISPATCH' ? dropoffLgaId : undefined
       });
 
       if (result.success) {
@@ -192,10 +242,10 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         setSection(AppSection.HOME);
         alert(deliveryOption === 'PICKUP'
           ? "Success! Your order has been placed. Head to the vendor to pick it up once confirmed."
-          : "Success! Your order has been placed. We'll contact you shortly.");
+          : `Success! Your order has been placed.${deliveryFee ? ` The rider's fee of ₦${deliveryFee.toLocaleString()} is paid on delivery.` : ''}`);
       } else {
         console.error("[Mart] placeOrder failed:", result.error);
-        alert(result.error?.includes('Not enough stock') ? result.error : "Failed to place order. Please try again.");
+        alert(result.error && (result.error.includes('Not enough stock') || result.error.includes('same city')) ? result.error : "Failed to place order. Please try again.");
       }
     } catch (err) {
       console.error(err);
@@ -210,7 +260,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
       {user && goBack && <BackButton onClick={goBack} />}
       
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Kubwa Mart</h2>
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Mart</h2>
         <div className="flex items-center gap-2">
            {user?.role === 'VENDOR' && (
              <button 
@@ -228,11 +278,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         </div>
       </div>
 
+      <ScopeChip user={user} className="w-full mb-3" />
+
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
         <input 
           type="text" 
-          placeholder="Search items in Kubwa..." 
+          placeholder={`Search products in ${browse.label}...`} 
           className="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-kubwa-primary/20 outline-none font-semibold" 
           value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)} 
@@ -256,7 +308,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
       <div className="grid grid-cols-2 gap-4">
         {contextLoading && products.length === 0 ? <div className="col-span-2 flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-primary"/></div> : 
-          filteredProducts.length === 0 ? <div className="col-span-2 text-center py-20 text-gray-400 font-semibold text-sm">No matches found</div> :
+          filteredProducts.length === 0 ? <div className="col-span-2 text-center py-20 text-gray-500 font-semibold text-sm">No products found in {browse.label} yet. Try a wider area from the location button above.</div> :
           filteredProducts.map(product => (
             <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group border-none shadow-sm" onClick={() => setSelectedProduct(product)}>
               <div className="h-40 bg-gray-100 overflow-hidden relative">
@@ -274,15 +326,18 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               </div>
               <div className="p-4">
                 <h3 className="font-bold text-kubwa-ink text-xs mb-1 line-clamp-1">{product.name}</h3>
+                {product.cityName && browse.scope !== 'CITY' && (
+                  <p className="text-[10px] font-semibold text-gray-500 mb-1 flex items-center gap-1"><MapPin size={10} /> {product.cityName}</p>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-kubwa-mart text-xs">₦{product.price.toLocaleString()}</span>
                   {isDemoProduct(product) ? (
-                    <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wide">Sample</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Sample</span>
                   ) : isOutOfStock(product) ? (
-                    <span className="text-[9px] font-bold text-red-300 uppercase tracking-wide">Sold out</span>
+                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Sold out</span>
                   ) : (
                     <div
-                      className="bg-gray-100 p-1.5 rounded-lg text-gray-400 group-hover:bg-kubwa-ink group-hover:text-white transition-colors"
+                      className="bg-gray-100 p-1.5 rounded-lg text-gray-500 group-hover:bg-kubwa-ink group-hover:text-white transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         const inCart = cart.find(c => c.id === product.id)?.quantity || 0;
@@ -302,6 +357,19 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
           ))}
       </div>
 
+      {hasMoreProducts && (
+        <div className="flex justify-center mt-6">
+          <Button
+            variant="outline"
+            className="text-xs py-3"
+            disabled={loadingMore}
+            onClick={async () => { setLoadingMore(true); await loadMoreProducts(); setLoadingMore(false); }}
+          >
+            {loadingMore ? <Loader2 className="animate-spin" size={16} /> : 'Load more products'}
+          </Button>
+        </div>
+      )}
+
       {showUpgradeModal && (
         <div className="fixed inset-0 z-[150] bg-kubwa-ink/80 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
            <Card className="w-full max-w-sm p-10 text-center animate-zoom-in rounded-[2.5rem] border-none shadow-2xl relative overflow-hidden">
@@ -312,7 +380,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
               </div>
               
               <h3 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight leading-none">Limit reached</h3>
-              <p className="text-xs font-semibold text-gray-400 mt-3 mb-8">Free tier cap: 4 products</p>
+              <p className="text-xs font-semibold text-gray-500 mt-3 mb-8">Free tier cap: 4 products</p>
               
               <div className="space-y-4 mb-6 text-left bg-gray-50 p-6 rounded-[1.75rem]">
                  {[
@@ -327,13 +395,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  ))}
               </div>
 
-              <p className="text-3xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-400">/month</span></p>
+              <p className="text-3xl font-bold text-kubwa-ink mb-8">₦{PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()}<span className="text-xs font-semibold text-gray-500">/month</span></p>
               
               <div className="space-y-3">
                 <Button onClick={handleUpgradePayment} disabled={upgrading} className="w-full h-16 shadow-xl shadow-kubwa-primary/20">
                   {upgrading ? <Loader2 className="animate-spin" /> : 'Upgrade shop now'}
                 </Button>
-                <button onClick={() => setShowUpgradeModal(false)} className="text-xs font-bold text-gray-300 hover:text-kubwa-ink transition-colors py-2">
+                <button onClick={() => setShowUpgradeModal(false)} className="text-xs font-bold text-gray-500 hover:text-kubwa-ink transition-colors py-2">
                   Maybe later
                 </button>
               </div>
@@ -368,10 +436,10 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                 );
              })()}
              <p className="font-bold text-2xl text-kubwa-mart mb-4">₦{selectedProduct.price.toLocaleString()}</p>
-             <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Quality product from a verified Kubwa merchant.'}</p>
+             <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Quality product from a verified vendor.'}</p>
              {isDemoProduct(selectedProduct) ? (
                <div className="bg-gray-50 rounded-2xl p-4 text-center">
-                 <p className="text-xs font-bold text-gray-400">Sample listing for browsing only — not available to order.</p>
+                 <p className="text-xs font-bold text-gray-500">Sample listing for browsing only — not available to order.</p>
                </div>
              ) : isOutOfStock(selectedProduct) ? (
                <div className="bg-red-50 rounded-2xl p-4 text-center">
@@ -402,7 +470,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
             {cart.length === 0 ? (
               <div className="text-center py-20 flex flex-col items-center gap-4">
                  <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-200"><ShoppingCart size={32} /></div>
-                 <p className="text-gray-400 font-bold text-sm">Your cart is empty</p>
+                 <p className="text-gray-500 font-bold text-sm">Your cart is empty</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -420,14 +488,15 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
 
                  {/* Checkout Form */}
                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
-                    <p className="font-bold text-xs text-gray-400 flex items-center gap-1.5">
+                    <p className="font-bold text-xs text-gray-500 flex items-center gap-1.5">
                         <MapPin size={12} /> Fulfillment
                     </p>
                     <div className="flex gap-2">
                        <button
                           type="button"
+                          disabled={!dispatchAvailable || checkingDelivery}
                           onClick={() => setDeliveryOption('DISPATCH')}
-                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${deliveryOption === 'DISPATCH' ? 'bg-kubwa-ink text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${deliveryOption === 'DISPATCH' ? 'bg-kubwa-ink text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
                        >
                           Delivery
                        </button>
@@ -440,24 +509,45 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                        </button>
                     </div>
 
+                    {!checkingDelivery && !dispatchAvailable && (
+                      <p className="text-[11px] font-semibold text-gray-500">
+                        {vendorCityName
+                          ? `Rider delivery isn't available in ${vendorCityName} yet. Pick up from the vendor or arrange delivery with them.`
+                          : "This vendor isn't in a live delivery city. Pick up from the vendor or arrange delivery with them."}
+                      </p>
+                    )}
+
                     {deliveryOption === 'DISPATCH' ? (
-                      <Input 
-                          placeholder="Delivery address (e.g. 5 Arab Road)" 
-                          value={deliveryAddress} 
-                          onChange={e => setDeliveryAddress(e.target.value)} 
-                          className="bg-white"
-                      />
+                      <>
+                        <select
+                          className="w-full px-4 py-4 rounded-2xl border-2 border-gray-100 bg-white text-sm font-semibold text-kubwa-ink outline-none"
+                          value={dropoffLgaId ?? ''}
+                          onChange={e => setDropoffLgaId(e.target.value ? Number(e.target.value) : undefined)}
+                        >
+                          <option value="">Deliver to which area in {vendorCityName}?</option>
+                          {dropoffOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                        <Input 
+                            placeholder="House number, street and landmark" 
+                            value={deliveryAddress} 
+                            onChange={e => setDeliveryAddress(e.target.value)} 
+                            className="bg-white"
+                        />
+                        {deliveryFee !== null && (
+                          <p className="text-[11px] font-semibold text-gray-600">Rider fee: <span className="font-bold text-kubwa-ink">₦{deliveryFee.toLocaleString()}</span>, paid to the rider on delivery.</p>
+                        )}
+                      </>
                     ) : (
                       <div className="bg-white rounded-xl p-3 text-xs">
                          {loadingPickupInfo ? (
-                            <span className="text-gray-400 font-semibold">Loading pickup location...</span>
+                            <span className="text-gray-500 font-semibold">Loading pickup location...</span>
                          ) : pickupInfo ? (
                             <>
                                <p className="font-bold text-kubwa-ink">{pickupInfo.storeName || 'Vendor location'}</p>
                                <p className="text-gray-500 font-medium mt-0.5">{pickupInfo.address || pickupInfo.location || 'Address not set by vendor yet — confirm with them directly.'}</p>
                             </>
                          ) : (
-                            <span className="text-gray-400 font-semibold">Pickup location unavailable — confirm with the vendor directly.</span>
+                            <span className="text-gray-500 font-semibold">Pickup location unavailable — confirm with the vendor directly.</span>
                          )}
                       </div>
                     )}
@@ -472,7 +562,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  </div>
 
                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
-                    <p className="font-bold text-xs text-gray-400">Payment</p>
+                    <p className="font-bold text-xs text-gray-500">Payment</p>
                     <div className="flex gap-2">
                        <button
                           type="button"
@@ -492,7 +582,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                  </div>
 
                  <div className="pt-4 flex justify-between items-center">
-                    <span className="font-bold text-xs text-gray-400">Grand total</span>
+                    <span className="font-bold text-xs text-gray-500">{deliveryOption === 'DISPATCH' && deliveryFee ? 'Items total (rider fee paid separately)' : 'Grand total'}</span>
                     <span className="font-bold text-2xl text-kubwa-mart">₦{calculateTotal().toLocaleString()}</span>
                  </div>
                  <Button className="w-full h-16 mt-4 shadow-xl shadow-kubwa-primary/10" onClick={handleCheckout} disabled={placingOrder}>
