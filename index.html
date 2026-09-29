@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kubwa Connect - Shop. Fix. Deliver.</title>
+    <title>Sell Am Here | Buy, sell and get it done near you</title>
+    <meta name="description" content="Sell Am Here: shop from local vendors, hire trusted artisans and send packages across your city, anywhere in Nigeria.">
+    <meta name="theme-color" content="#161A2B">
+    <meta property="og:title" content="Sell Am Here">
+    <meta property="og:description" content="Buy, sell and get it done near you, anywhere in Nigeria.">
+    <meta property="og:url" content="https://sellamhere.com">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -11,91 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://checkout.flutterwave.com/v3.js"></script>
     <script src="https://js.paystack.co/v1/inline.js"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              display: ['"Space Grotesk"', 'sans-serif'],
-              sans: ['Inter', 'sans-serif'],
-            },
-            colors: {
-              kubwa: {
-                /* Honest names, real roles -- a category color actually means
-                   something now: mart is always green, fixit always amber,
-                   ride always blue, primary is the one flame accent that cuts
-                   across all of them. */
-                primary: '#FF5A36',
-                primaryDark: '#E2431F',
-                ink: '#161A2B',
-                mart: '#16A34A',
-                fixit: '#F59E0B',
-                ride: '#2563EB',
-                amber: '#FBBF24',
-                surface: '#FAFAF8',
-                /* Text-safe variants: the base mart/fixit tones above are
-                   right for icon fills, borders, and tinted backgrounds
-                   (WCAG treats those more leniently), but measured well
-                   below the 4.5:1 minimum for small text -- fixit in
-                   particular was only ~2.2:1 on a light background, genuinely
-                   hard to read. These darker tones keep the same hue/brand
-                   identity but clear AA for actual text. Ride's blue already
-                   passed (~5.2:1) so its text variant is unchanged. */
-                martText: '#15803D',
-                fixitText: '#B45309',
-                rideText: '#2563EB',
-                /* Aliases: 127 existing usages across the app still reference
-                   these old names. Keeping them pointed at the right values
-                   so nothing breaks while each page gets migrated in turn. */
-                green: '#FF5A36',
-                orange: '#F97316',
-                dark: '#161A2B',
-                light: '#F3F4F6'
-              }
-            },
-            keyframes: {
-              'slide-in-right': {
-                '0%': { transform: 'translateX(100%)' },
-                '100%': { transform: 'translateX(0)' },
-              },
-              'fade-in': {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              'zoom-in': {
-                '0%': { opacity: '0', transform: 'scale(0.95)' },
-                '100%': { opacity: '1', transform: 'scale(1)' },
-              },
-              'slide-in-bottom': {
-                '0%': { transform: 'translateY(100%)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              }
-            },
-            animation: {
-              'slide-in-right': 'slide-in-right 0.3s ease-out',
-              'fade-in': 'fade-in 0.2s ease-out',
-              'zoom-in': 'zoom-in 0.2s ease-out',
-              'slide-in-bottom': 'slide-in-bottom 0.3s ease-out',
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      body {
-        font-family: 'Inter', sans-serif;
-      }
-    </style>
   </head>
   <body class="bg-kubwa-surface text-slate-800">
     <div id="root"></div>

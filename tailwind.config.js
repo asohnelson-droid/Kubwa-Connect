@@ -1,0 +1,81 @@
+/** @type {import('tailwindcss').Config} */
+// Compiled at build time (previously loaded from cdn.tailwindcss.com in the browser).
+export default Object.assign({
+        theme: {
+          extend: {
+            fontFamily: {
+              display: ['"Space Grotesk"', 'sans-serif'],
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              kubwa: {
+                /* Honest names, real roles -- a category color actually means
+                   something now: mart is always green, fixit always amber,
+                   ride always blue, primary is the one flame accent that cuts
+                   across all of them. */
+                primary: '#FF5A36',
+                primaryDark: '#E2431F',
+                ink: '#161A2B',
+                mart: '#16A34A',
+                fixit: '#F59E0B',
+                ride: '#2563EB',
+                amber: '#FBBF24',
+                surface: '#FAFAF8',
+                /* Text-safe variants: the base mart/fixit tones above are
+                   right for icon fills, borders, and tinted backgrounds
+                   (WCAG treats those more leniently), but measured well
+                   below the 4.5:1 minimum for small text -- fixit in
+                   particular was only ~2.2:1 on a light background, genuinely
+                   hard to read. These darker tones keep the same hue/brand
+                   identity but clear AA for actual text. Ride's blue already
+                   passed (~5.2:1) so its text variant is unchanged. */
+                martText: '#15803D',
+                fixitText: '#B45309',
+                rideText: '#2563EB',
+                /* Aliases: 127 existing usages across the app still reference
+                   these old names. Keeping them pointed at the right values
+                   so nothing breaks while each page gets migrated in turn. */
+                green: '#FF5A36',
+                orange: '#F97316',
+                dark: '#161A2B',
+                light: '#F3F4F6'
+              }
+            },
+            keyframes: {
+              'slide-in-right': {
+                '0%': { transform: 'translateX(100%)' },
+                '100%': { transform: 'translateX(0)' },
+              },
+              'fade-in': {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              'zoom-in': {
+                '0%': { opacity: '0', transform: 'scale(0.95)' },
+                '100%': { opacity: '1', transform: 'scale(1)' },
+              },
+              'slide-in-bottom': {
+                '0%': { transform: 'translateY(100%)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            },
+            animation: {
+              'slide-in-right': 'slide-in-right 0.3s ease-out',
+              'fade-in': 'fade-in 0.2s ease-out',
+              'zoom-in': 'zoom-in 0.2s ease-out',
+              'slide-in-bottom': 'slide-in-bottom 0.3s ease-out',
+            }
+          }
+        }
+      }, {
+  content: [
+    './index.html',
+    './App.tsx',
+    './index.tsx',
+    './components/**/*.{ts,tsx}',
+    './pages/**/*.{ts,tsx}',
+    './contexts/**/*.{ts,tsx}',
+    './services/**/*.{ts,tsx}',
+    './config/**/*.{ts,tsx}',
+  ],
+});
