@@ -10,4 +10,8 @@ export const BRAND = {
   country: 'Nigeria',
   supportEmail: 'support@sellamhere.com',
   partnersEmail: 'partners@sellamhere.com',
+  privacyEmail: 'privacy@sellamhere.com',
+  /** Update to the exact CAC-registered name once registration is complete. */
+  legalName: 'Sell Am Here',
+  city: 'Abuja',
 } as const;

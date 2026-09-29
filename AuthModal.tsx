@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
+import { BRAND } from '../config/brand';
 import { X, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle, RefreshCw, Lock, User as UserIcon, UserPlus, Info, KeyRound, ShieldAlert, WifiOff, ExternalLink, HelpCircle, Activity, Store, Wrench, Truck, Zap } from 'lucide-react';
 import { Button, Card, Input } from './ui';
 import { api } from '../services/data';
 import { testSupabaseConnection } from '../services/supabase';
-import { User as UserType, UserRole } from '../types';
+import { User as UserType, UserRole, AppSection } from '../types';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -12,6 +13,8 @@ interface AuthModalProps {
   onSuccess?: (user: UserType) => void;
   initialRole?: UserRole;
   initialMode?: 'LOGIN' | 'SIGNUP' | 'FORGOT' | 'UPDATE_PASSWORD';
+  /** Opens the Terms or Privacy page from the sign-up notice. */
+  onOpenLegal?: (section: AppSection) => void;
 }
 
 // The only roles a person can choose for themselves at signup. ADMIN/SUPER_ADMIN
@@ -19,7 +22,7 @@ interface AuthModalProps {
 // api.auth.signUp and the handle_new_user DB trigger.
 const SIGNUP_ROLE_OPTIONS: { role: UserRole; label: string; sub: string; icon: React.ElementType; activeClasses: string; iconActive: string }[] = [
   { role: 'USER', label: 'Just Browsing', sub: 'Shop & book services', icon: UserIcon, activeClasses: 'border-kubwa-primary bg-kubwa-primary/5', iconActive: 'text-kubwa-primary' },
-  { role: 'VENDOR', label: 'Start a Shop', sub: 'Sell in Kubwa Mart', icon: Store, activeClasses: 'border-kubwa-mart bg-kubwa-mart/5', iconActive: 'text-kubwa-mart' },
+  { role: 'VENDOR', label: 'Start a Shop', sub: 'Sell in the Mart', icon: Store, activeClasses: 'border-kubwa-mart bg-kubwa-mart/5', iconActive: 'text-kubwa-mart' },
   { role: 'PROVIDER', label: 'List a Skill', sub: 'Offer repairs & services', icon: Wrench, activeClasses: 'border-kubwa-fixit bg-kubwa-fixit/5', iconActive: 'text-kubwa-fixit' },
   { role: 'RIDER', label: 'Become a Rider', sub: 'Deliver orders & earn', icon: Truck, activeClasses: 'border-kubwa-ride bg-kubwa-ride/5', iconActive: 'text-kubwa-ride' },
 ];
@@ -29,7 +32,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
   onClose, 
   onSuccess, 
   initialRole = 'USER',
-  initialMode = 'LOGIN'
+  initialMode = 'LOGIN',
+  onOpenLegal
 }) => {
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT' | 'UPDATE_PASSWORD'>(initialMode);
   const [selectedRole, setSelectedRole] = useState<UserRole>(PUBLIC_SIGNUP_ROLES.includes(initialRole) ? initialRole : 'USER');
@@ -189,14 +193,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
                {mode === 'LOGIN' ? 'Welcome' : mode === 'SIGNUP' ? 'Join us' : mode === 'FORGOT' ? 'Recovery' : 'New password'}
              </h3>
              <p className="text-xs font-bold text-gray-500">
-               {mode === 'FORGOT' ? 'Reset your password' : mode === 'UPDATE_PASSWORD' ? 'Set your new password' : 'Kubwa Connect Community'}
+               {mode === 'FORGOT' ? 'Reset your password' : mode === 'UPDATE_PASSWORD' ? 'Set your new password' : `Join ${BRAND.name}`}
              </p>
           </div>
 
           <div className="space-y-4">
               {mode === 'SIGNUP' && (
                 <div className="mb-2">
-                  <p className="text-xs font-bold text-gray-500 mb-3 text-center">How will you use Kubwa Connect?</p>
+                  <p className="text-xs font-bold text-gray-500 mb-3 text-center">How will you use {BRAND.name}?</p>
                   <div className="grid grid-cols-2 gap-3">
                     {SIGNUP_ROLE_OPTIONS.map(opt => (
                       <button
@@ -297,6 +301,15 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   <CheckCircle size={18} className="shrink-0" />
                   <p className="text-xs font-bold leading-tight">{successMsg}</p>
                 </div>
+              )}
+
+              {mode === 'SIGNUP' && (
+                <p className="text-[11px] font-medium text-gray-500 text-center leading-relaxed">
+                  By creating an account, you agree to our{' '}
+                  <button type="button" onClick={() => onOpenLegal?.(AppSection.TERMS)} className="font-bold text-kubwa-ink underline">Terms of Service</button>
+                  {' '}and{' '}
+                  <button type="button" onClick={() => onOpenLegal?.(AppSection.PRIVACY)} className="font-bold text-kubwa-ink underline">Privacy Policy</button>.
+                </p>
               )}
 
               <Button type="submit" disabled={loading} className="w-full h-16 shadow-xl mt-4">

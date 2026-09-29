@@ -6,6 +6,9 @@ import { api } from '../services/data';
 import { supabase } from '../services/supabase';
 import { Button, Card, Badge, BackButton, Sheet, Input, SafeImage, SectionHeader } from '../components/ui';
 import AuthModal from '../components/AuthModal';
+import HelpLinks from '../components/HelpLinks';
+import LocationPicker, { LocationValue } from '../components/LocationPicker';
+import { BRAND } from '../config/brand';
 import VendorDashboard from '../components/VendorDashboard';
 import { 
   LogOut, 
@@ -58,6 +61,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editLocation, setEditLocation] = useState<LocationValue>({ area: '' });
   const [savingProfile, setSavingProfile] = useState(false);
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
@@ -133,6 +137,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
     setEditName(user.name || '');
     setEditPhone(user.phoneNumber || '');
     setEditAddress(user.address || '');
+    setEditLocation({ stateId: user.stateId, lgaId: user.lgaId, area: user.area || '' });
     setEditEmail('');
     setEmailChangeRequested(false);
     setEditAvatarFile(null);
@@ -151,6 +156,10 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
 
   const handleSaveProfile = async () => {
     if (!user || !editName.trim()) return;
+    if (!editLocation.lgaId) {
+      alert('Please choose your state and local government area.');
+      return;
+    }
     setSavingProfile(true);
 
     let avatarUrl: string | undefined;
@@ -168,6 +177,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
       name: editName.trim(),
       phoneNumber: editPhone.trim(),
       address: editAddress.trim(),
+      lgaId: editLocation.lgaId,
+      area: editLocation.area.trim(),
       ...(avatarUrl ? { avatar: avatarUrl } : {})
     });
     setSavingProfile(false);
@@ -233,9 +244,9 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
           <UserIcon size={52} className="text-kubwa-primary relative z-10" />
         </div>
         
-        <h2 className="font-display text-3xl font-bold text-kubwa-ink mb-4 leading-none">Connect to Kubwa</h2>
+        <h2 className="font-display text-3xl font-bold text-kubwa-ink mb-4 leading-none">Join {BRAND.name}</h2>
         <p className="text-gray-500 font-medium text-sm max-w-xs mb-12 leading-relaxed">
-          The heart of your community. Join thousands of residents shopping and earning in Kubwa.
+          Shop from local vendors, hire trusted artisans and send packages across your city.
         </p>
 
         <div className="w-full space-y-4 max-w-sm">
@@ -260,6 +271,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
           >
             <ShieldAlert size={14} /> Admin staff portal
           </button>
+
+          <HelpLinks setSection={setSection} className="mt-10" />
         </div>
 
         {isAuthModalOpen && (
@@ -271,6 +284,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                clearAuthIntent();
             }}
             onSuccess={handleAuthSuccess}
+            onOpenLegal={(section) => { setIsAuthModalOpen(false); setSection(section); }}
           />
         )}
       </div>
@@ -515,6 +529,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
         </div>
       )}
 
+      <HelpLinks setSection={setSection} className="mt-10 mb-4" />
+
       <Sheet isOpen={!!reviewingBooking} onClose={() => setReviewingBooking(null)} title="Rate Your Experience">
         {reviewingBooking && (
           <div className="pb-6 space-y-5">
@@ -578,7 +594,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
               <p className="text-xs font-bold text-gray-500 ml-1">Your details</p>
               <Input placeholder="Full name" value={editName} onChange={e => setEditName(e.target.value)} />
               <Input placeholder="Phone number" type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-              <Input placeholder="Address" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+              <LocationPicker value={editLocation} onChange={setEditLocation} role={user.role} />
+              <Input placeholder="House number and street" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
               <Button className="w-full h-14" onClick={handleSaveProfile} disabled={savingProfile || !editName.trim()}>
                 {savingProfile ? <Loader2 className="animate-spin" /> : 'Save changes'}
               </Button>
@@ -590,7 +607,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
               {emailChangeRequested ? (
                 <div className="bg-green-50 text-green-700 rounded-2xl p-4 text-xs font-semibold flex items-center gap-2">
                   <CheckCircle size={16} className="shrink-0" />
-                  Check your new inbox for a confirmation link — the change won't take effect until you click it.
+                  Check your new inbox for a confirmation link. The change won't take effect until you click it.
                 </div>
               ) : (
                 <>
