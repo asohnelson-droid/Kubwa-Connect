@@ -171,7 +171,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 min-h-screen bg-kubwa-surface">
+    <div className="pb-24 pt-4 px-4 min-h-screen bg-kubwa-surface md:max-w-3xl md:mx-auto md:px-0 md:pt-8 md:pb-0 md:min-h-0">
       {user && goBack ? (
         <BackButton onClick={goBack} />
       ) : (

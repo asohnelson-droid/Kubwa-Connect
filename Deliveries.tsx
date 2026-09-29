@@ -5,7 +5,7 @@ import { Truck, Package, MapPin, Clock, Navigation, Loader2, Crown, CheckCircle,
 import { api } from '../services/data';
 import { supabase } from '../services/supabase';
 import { Button, Card, Input, Badge, Breadcrumbs, BackButton, SectionHeader } from '../components/ui';
-import { User, DeliveryRequest, Address, AppSection, DeliveryStatus } from '../types';
+import { User, DeliveryRequest, Address, AppSection, DeliveryStatus, Lga } from '../types';
 
 interface DeliveriesProps {
   user: User | null;
@@ -34,6 +34,14 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   const [acceptingJob, setAcceptingJob] = useState<string | null>(null);
   const [newJobAlert, setNewJobAlert] = useState<DeliveryRequest | null>(null);
 
+  // Riders deliver inside one city: pickup and drop-off are chosen from that city's LGAs.
+  const [cityLgas, setCityLgas] = useState<Lga[]>([]);
+  const [cityName, setCityName] = useState('');
+  const [cityLive, setCityLive] = useState<boolean | null>(null);
+  const [pickupLgaId, setPickupLgaId] = useState<number | undefined>(undefined);
+  const [dropoffLgaId, setDropoffLgaId] = useState<number | undefined>(undefined);
+  const [fare, setFare] = useState<number | null>(null);
+
   // Saved Addresses
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
 
@@ -47,6 +55,30 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   // SECURITY: Ensure only approved riders can access jobs
   // Fix: Comparison between status and 'APPROVED' (since types match)
   const isApprovedRider = isRider && user?.status === 'APPROVED';
+
+  useEffect(() => {
+    if (!user?.cityId || !user.stateId) { setCityLive(user ? false : null); setCityLgas([]); return; }
+    let cancelled = false;
+    (async () => {
+      const cities = await api.locations.getCities();
+      const city = cities.find(c => c.id === user.cityId);
+      if (cancelled) return;
+      setCityName(city?.name || '');
+      setCityLive(!!city?.isLive);
+      if (city?.isLive) {
+        const lgas = (await api.locations.getLgas(user.stateId!)).filter(l => l.cityId === city.id);
+        if (cancelled) return;
+        setCityLgas(lgas);
+        setPickupLgaId(prev => prev ?? user.lgaId);
+        setDropoffLgaId(prev => prev ?? user.lgaId);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.cityId, user?.stateId, user?.lgaId]);
+
+  useEffect(() => {
+    api.quoteDeliveryFee(pickupLgaId, dropoffLgaId).then(setFare);
+  }, [pickupLgaId, dropoffLgaId]);
 
   useEffect(() => {
     // Determine default tab based on role
@@ -147,14 +179,16 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
       onRequireAuth();
       return; 
     }
-    if (!pickup || !dropoff) { alert("Enter locations."); return; }
+    if (!cityLive) { alert("Rider delivery isn't available in your area yet."); return; }
+    if (!pickupLgaId || !dropoffLgaId) { alert("Choose the pickup and drop-off areas."); return; }
+    if (!pickup || !dropoff) { alert("Enter the pickup and drop-off addresses."); return; }
     if (!phoneNumber) { alert("Please enter a phone number."); return; }
     setIsSearching(true);
-    const success = await api.requestDelivery({ userId: user.id, pickup, dropoff, itemType: itemType.split(' (')[0], phoneNumber });
-    if (success) {
+    const result = await api.requestDelivery({ userId: user.id, pickup, dropoff, itemType: itemType.split(' (')[0], phoneNumber, pickupLgaId, dropoffLgaId });
+    if (result.success) {
        setRiderFound(true);
        setTimeout(() => { setIsSearching(false); setRiderFound(false); setPickup(''); setDropoff(''); setPhoneNumber(''); setActiveTab('track'); }, 2000);
-    } else { setIsSearching(false); alert("Failed."); }
+    } else { setIsSearching(false); alert(result.error || "We couldn't book this delivery. Please try again."); }
   };
   
   // Rider Actions
@@ -191,7 +225,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   }
 
   return (
-    <div className="pb-24 pt-4 px-4 relative">
+    <div className="pb-24 pt-4 px-4 relative md:max-w-3xl md:mx-auto md:px-0 md:pt-8 md:pb-0">
       {user && goBack ? (
         <BackButton onClick={goBack} />
       ) : (
@@ -219,7 +253,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Kubwa Ride</h2>
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Ride</h2>
         {!isRider && isElite && <Badge color="bg-kubwa-ink text-kubwa-amber border border-kubwa-amber/40">Elite Benefits</Badge>}
         {isRider && (
            <button 
@@ -257,7 +291,15 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
         </button>
       </div>
 
-      {activeTab === 'request' && !isRider && (
+      {activeTab === 'request' && !isRider && user && cityLive === false && (
+        <Card className="animate-fade-in text-center py-10 px-6">
+          <Truck size={32} className="mx-auto mb-3 text-kubwa-ride" />
+          <p className="font-bold text-kubwa-ink mb-1">Rider delivery isn't in {cityName || 'your area'} yet</p>
+          <p className="text-xs text-gray-500 font-medium">We're opening city by city. You'll be among the first to know when riders go live near you. You can update your location in Account.</p>
+        </Card>
+      )}
+
+      {activeTab === 'request' && !isRider && (!user || cityLive !== false) && (
         <Card className="space-y-6 animate-fade-in">
           <div>
             <label className="flex items-center justify-between text-sm font-bold text-kubwa-ink mb-2">
@@ -266,7 +308,13 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
                 {isLocating ? <Loader2 size={12} className="animate-spin" /> : <Navigation size={12} />} My location
               </button>
             </label>
-            <Input placeholder="e.g. Phase 4" value={pickup} onChange={(e) => setPickup(e.target.value)} />
+            <Input placeholder="House number, street and landmark" value={pickup} onChange={(e) => setPickup(e.target.value)} />
+            {cityLgas.length > 0 && (
+              <select className="w-full mt-2 px-4 py-3 rounded-2xl border-2 border-gray-100 bg-gray-50/60 text-sm font-semibold outline-none" value={pickupLgaId ?? ''} onChange={(e) => setPickupLgaId(e.target.value ? Number(e.target.value) : undefined)} aria-label="Pickup area">
+                <option value="">Pickup area in {cityName}</option>
+                {cityLgas.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            )}
             {savedAddresses.length > 0 && (
               <div className="flex gap-2 mt-2 overflow-x-auto no-scrollbar">
                 {savedAddresses.map(addr => (
@@ -280,7 +328,13 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
           
           <div>
             <label className="flex items-center gap-2 text-sm font-bold text-kubwa-ink mb-2"><MapPin size={16} className="text-kubwa-primary" /> Drop-off</label>
-            <Input placeholder="e.g. Gwarinpa" value={dropoff} onChange={(e) => setDropoff(e.target.value)} />
+            <Input placeholder="House number, street and landmark" value={dropoff} onChange={(e) => setDropoff(e.target.value)} />
+            {cityLgas.length > 0 && (
+              <select className="w-full mt-2 px-4 py-3 rounded-2xl border-2 border-gray-100 bg-gray-50/60 text-sm font-semibold outline-none" value={dropoffLgaId ?? ''} onChange={(e) => setDropoffLgaId(e.target.value ? Number(e.target.value) : undefined)} aria-label="Drop-off area">
+                <option value="">Drop-off area in {cityName}</option>
+                {cityLgas.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            )}
             {savedAddresses.length > 0 && (
               <div className="flex gap-2 mt-2 overflow-x-auto no-scrollbar">
                 {savedAddresses.map(addr => (
@@ -316,7 +370,9 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
           <div className="bg-kubwa-ride/5 p-4 rounded-2xl flex justify-between items-center">
             <div>
               <p className="text-xs text-kubwa-ride font-bold">Estimated fare</p>
-              {isElite ? <p className="text-xl font-bold text-kubwa-mart">₦0 <span className="text-xs text-gray-500 font-medium">(Elite)</span></p> : <p className="text-xl font-bold text-kubwa-ink">₦800 - ₦1,200</p>}
+              {isElite ? <p className="text-xl font-bold text-kubwa-mart">₦0 <span className="text-xs text-gray-500 font-medium">(Elite)</span></p>
+                : fare !== null ? <p className="text-xl font-bold text-kubwa-ink">₦{fare.toLocaleString()}</p>
+                : <p className="text-sm font-bold text-gray-500">{user ? 'Choose both areas to see the fare' : 'Sign in to see the fare'}</p>}
             </div>
             <Clock className="text-kubwa-ride/30" />
           </div>
@@ -412,7 +468,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
                 {d.status === 'IN_TRANSIT' && (
                   <div className="mb-4 relative h-48 w-full bg-gray-200 rounded-2xl overflow-hidden border border-gray-300">
                      {/* Fake Map Background */}
-                     <div className="absolute inset-0 opacity-40 bg-[url('https://upload.wikimedia.org/wikipedia/commons/e/ec/Map_of_Abuja.png')] bg-cover bg-center"></div>
+                     <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'linear-gradient(#d1d5db 1px, transparent 1px), linear-gradient(90deg, #d1d5db 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
                      
                      <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded-md text-xs font-bold shadow flex items-center gap-1 text-green-600 animate-pulse">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div> Live tracking

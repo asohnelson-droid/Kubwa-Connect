@@ -1,6 +1,6 @@
 import { cn } from './cn';
 import React, { useState } from 'react';
-import { ArrowLeft, ImageOff, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ImageOff, ChevronRight, X } from 'lucide-react';
 
 export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' }> = ({
   children, variant = 'primary', className = '', ...props
@@ -44,10 +44,13 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ c
 export const Sheet: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode; title?: string }> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center md:items-center md:p-6 animate-fade-in">
       <div className="absolute inset-0 bg-kubwa-ink/60 backdrop-blur-md" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] overflow-hidden flex flex-col max-h-[94vh] shadow-2xl animate-slide-in-bottom">
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full z-10" />
+      <div className="relative w-full max-w-md md:max-w-lg bg-white rounded-t-[2.5rem] md:rounded-[2rem] overflow-hidden flex flex-col max-h-[94vh] md:max-h-[88vh] shadow-2xl animate-slide-in-bottom md:animate-zoom-in">
+        <div className="md:hidden absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full z-10" />
+        <button type="button" onClick={onClose} aria-label="Close" className="hidden md:flex absolute top-5 right-5 z-10 w-9 h-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200">
+          <X size={18} />
+        </button>
         {title && (
           <div className="pt-10 px-8 pb-3">
             <h3 className="font-display text-xl font-bold text-kubwa-ink tracking-tight">{title}</h3>

@@ -6,6 +6,7 @@ import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Loader2, X } from '
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
 import SetupWizard from './components/SetupWizard';
 import LocationPrompt from './components/LocationPrompt';
+import DesktopNav from './components/DesktopNav';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
 import { useData } from './contexts/DataContext';
@@ -213,7 +214,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-kubwa-surface max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100">
+    <div className="min-h-screen bg-kubwa-surface max-w-md mx-auto relative shadow-2xl overflow-hidden font-sans border-x border-gray-100 md:max-w-none md:shadow-none md:border-x-0 md:h-screen md:flex md:flex-col">
+      <DesktopNav user={user} currentSection={currentSection} navigateTo={navigateTo} />
+
       <Suspense fallback={
          <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center">
            <Loader2 className="animate-spin text-kubwa-primary" size={40} />
@@ -236,17 +239,19 @@ function App() {
         <LocationPrompt user={user} onSaved={() => refreshUser()} />
       )}
 
-      <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">
+      <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32 md:h-auto md:flex-1 md:pb-0 md:bg-kubwa-surface">
          <Suspense fallback={
            <div className="h-full flex items-center justify-center">
              <Loader2 className="animate-spin text-kubwa-primary" size={32} />
            </div>
          }>
-           {renderContent()}
+           <div className="md:max-w-6xl md:mx-auto md:px-6 lg:px-8 md:pb-16">
+             {renderContent()}
+           </div>
          </Suspense>
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-4 py-3 flex justify-between items-center z-40 rounded-t-[2rem] shadow-2xl">
+      <div className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-xl border-t border-gray-100 px-4 py-3 flex justify-between items-center z-40 rounded-t-[2rem] shadow-2xl">
         {[
           { id: AppSection.HOME, icon: HomeIcon, label: 'Home' },
           { id: AppSection.MART, icon: ShoppingBag, label: 'Mart' },

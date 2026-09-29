@@ -237,7 +237,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
   });
 
   return (
-    <div className="pb-24 pt-4 px-4">
+    <div className="pb-24 pt-4 px-4 md:px-0 md:pt-8 md:pb-0">
       {user && goBack ? (
         <BackButton onClick={goBack} />
       ) : (
@@ -332,7 +332,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
       )}
 
       <div className="flex gap-2 mb-3">
-        <ScopeChip user={user} className="flex-1" />
+        <ScopeChip user={user} className="flex-1 lg:hidden" />
         {areaOptions.length > 1 && (
           <select
             className="flex-1 min-w-0 rounded-2xl px-3 py-3 bg-white border border-gray-200 text-xs font-bold text-kubwa-ink outline-none"
@@ -369,7 +369,7 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {contextLoading && providers.length === 0 ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-kubwa-primary" /></div> : 
           filteredProviders.length === 0 ? <div className="text-center py-20 text-gray-500 font-semibold text-sm">No artisans found in {browse.label} yet. Try a wider area from the location button above.</div> :
           filteredProviders.map(provider => (
