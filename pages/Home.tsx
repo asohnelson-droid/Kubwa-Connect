@@ -1,10 +1,14 @@
 
 
+import BrandMark from '../components/BrandMark';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Wrench, Truck, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Briefcase, Loader2, CheckCircle, ShieldCheck } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
 import { Button, Sheet, SafeImage, SectionHeader } from '../components/ui';
-import { KUBWA_AREAS, api } from '../services/data';
+import { api } from '../services/data';
+import { BRAND } from '../config/brand';
+import { useData } from '../contexts/DataContext';
+import ScopeChip from '../components/ScopeChip';
 
 interface HomeProps {
   setSection: (section: AppSection) => void;
@@ -15,16 +19,17 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchLocation, setSearchLocation] = useState('All Kubwa');
+  const { browse } = useData();
   const [visibleAnnouncement, setVisibleAnnouncement] = useState<Announcement | null>(null);
   const [featuredVendors, setFeaturedVendors] = useState<UserType[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
 
   const heroMessages = [
-    "Find trusted artisans in Kubwa, in minutes.",
+    "Got something to sell? Sell am here.",
+    "Find trusted artisans near you, in minutes.",
     "Order quality products from local vendors.",
-    "Send and track packages across Kubwa instantly."
+    "Send and track packages across your city."
   ];
 
   useEffect(() => {
@@ -34,22 +39,26 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
 
   useEffect(() => {
     api.admin.getAnnouncements().then(data => data.length && setVisibleAnnouncement(data[0]));
+  }, []);
 
+  useEffect(() => {
     // For demo/mock purposes, we simulate some featured vendors if the list is empty
-    api.users.getFeaturedVendors().then(data => {
+    api.users.getFeaturedVendors(browse.scope === 'CITY' ? browse.cityId : undefined).then(data => {
       if (data.length === 0) {
         setFeaturedVendors([
           { id: 'f1', name: 'Musa Repairs', storeName: 'Musa Gadgets', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=musa', status: 'APPROVED' },
           { id: 'f2', name: 'Sarah Bakes', storeName: 'Sarah’s Delights', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=sarah', status: 'APPROVED' },
-          { id: 'f3', name: 'John Doe', storeName: 'Tech Hub Kubwa', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=john', status: 'APPROVED' }
+          { id: 'f3', name: 'John Doe', storeName: 'Tech Hub', role: 'VENDOR', tier: 'FEATURED', avatar: 'https://i.pravatar.cc/150?u=john', status: 'APPROVED' }
         ] as any);
       } else {
         setFeaturedVendors(data);
       }
     });
 
-    api.getProducts().then(all => setRecentProducts(all.filter(p => p.status === 'APPROVED').slice(0, 4)));
-  }, []);
+    api.getProducts(browse, 0)
+      .then(({ items }) => setRecentProducts(items.filter(p => p.status === 'APPROVED').slice(0, 4)))
+      .catch(() => setRecentProducts([]));
+  }, [browse]);
 
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
@@ -63,9 +72,9 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
   const [upgradeSubmitted, setUpgradeSubmitted] = useState(false);
 
   const UPGRADE_OPTIONS: Record<'VENDOR' | 'PROVIDER' | 'RIDER', { section: AppSection; title: string; sub: string; desc: string; icon: React.ElementType; color: string; bg: string }> = {
-    VENDOR: { section: AppSection.MART, title: 'Become a Vendor', sub: 'Sell to Kubwa', desc: "Sell your products to residents across Kubwa. Your application will be reviewed before your shop goes live.", icon: Store, color: 'text-kubwa-mart', bg: 'bg-kubwa-mart/10' },
+    VENDOR: { section: AppSection.MART, title: 'Become a Vendor', sub: 'Sell near you', desc: "Sell your products to buyers in your city and beyond. Your application will be reviewed before your shop goes live.", icon: Store, color: 'text-kubwa-mart', bg: 'bg-kubwa-mart/10' },
     PROVIDER: { section: AppSection.FIXIT, title: 'Hire out Skills', sub: 'Find FixIt jobs', desc: "Offer repairs and home services through FixIt. Your application will be reviewed before you can start receiving bookings.", icon: Briefcase, color: 'text-kubwa-fixit', bg: 'bg-kubwa-fixit/10' },
-    RIDER: { section: AppSection.RIDE, title: 'Become a Rider', sub: 'Deliver & earn', desc: "Deliver orders across Kubwa and earn. Your application will be reviewed before you can start accepting jobs.", icon: Bike, color: 'text-kubwa-ride', bg: 'bg-kubwa-ride/10' },
+    RIDER: { section: AppSection.RIDE, title: 'Become a Rider', sub: 'Deliver & earn', desc: "Deliver orders across your city and earn. Your application will be reviewed before you can start accepting jobs.", icon: Bike, color: 'text-kubwa-ride', bg: 'bg-kubwa-ride/10' },
   };
 
   const handleRoleAction = (role: 'VENDOR' | 'PROVIDER' | 'RIDER') => {
@@ -117,15 +126,9 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-8">
              <div className="bg-white p-2 rounded-2xl shadow-xl transform -rotate-6">
-                <svg viewBox="0 0 200 200" className="w-[22px] h-[22px]">
-                  <g strokeLinecap="round" fill="none">
-                    <path d="M 55 30 L 55 170" stroke="#16A34A" strokeWidth="38"/>
-                    <path d="M 55 100 L 155 30" stroke="#F59E0B" strokeWidth="38"/>
-                    <path d="M 55 100 L 155 170" stroke="#2563EB" strokeWidth="38"/>
-                  </g>
-                </svg>
+                <BrandMark className="w-[22px] h-[22px]" />
              </div>
-             <span className="font-display text-lg font-bold tracking-tight">Kubwa Connect</span>
+             <span className="font-display text-lg font-bold tracking-tight">{BRAND.name}</span>
           </div>
 
           <div className="min-h-[4.5rem] mb-6">
@@ -147,16 +150,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
                 />
              </div>
              <div className="flex gap-2">
-                <div className="flex-1 bg-gray-50 rounded-2xl px-4 py-3 flex items-center gap-2 min-w-0">
-                   <MapPin size={16} className="text-kubwa-primary shrink-0" />
-                   <select
-                     className="bg-transparent text-xs font-bold text-kubwa-ink outline-none w-full appearance-none truncate"
-                     value={searchLocation}
-                     onChange={(e) => setSearchLocation(e.target.value)}
-                   >
-                      {['All Kubwa', ...KUBWA_AREAS].map(loc => <option key={loc}>{loc}</option>)}
-                   </select>
-                </div>
+                <ScopeChip user={user} tone="dark" className="flex-1" />
                 <Button onClick={handleSearch} className="px-8 shadow-none h-12 shrink-0">Search</Button>
              </div>
           </div>

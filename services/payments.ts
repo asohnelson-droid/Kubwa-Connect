@@ -46,6 +46,7 @@ export const PaymentService = {
     deliveryOption: string;
     deliveryAddress?: string;
     contactPhone: string;
+    dropoffLgaId?: number;
   }): Promise<PaymentResult & { orderId?: string }> {
     if (!PAYSTACK_PUBLIC_KEY) {
       return { success: false, error: "Online payment isn't set up yet. Please choose Pay on Delivery." };
@@ -61,7 +62,7 @@ export const PaymentService = {
           email: params.user.email,
           amount: Math.round(params.total * 100),
           currency: 'NGN',
-          ref: `KC-ORDER-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          ref: `SAH-ORDER-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
           callback: (response: any) => {
             resolve({ success: true, reference: response.reference });
           },
@@ -86,7 +87,8 @@ export const PaymentService = {
         items: params.items,
         deliveryOption: params.deliveryOption,
         deliveryAddress: params.deliveryAddress,
-        contactPhone: params.contactPhone
+        contactPhone: params.contactPhone,
+        dropoffLgaId: params.dropoffLgaId ?? null
       }
     });
 
@@ -123,7 +125,7 @@ export const PaymentService = {
           email: user.email,
           amount: amount * 100, // Paystack expects kobo
           currency: 'NGN',
-          ref: `KC-${intent}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          ref: `SAH-${intent}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
           metadata: {
             custom_fields: [
               { display_name: "Payment Intent", variable_name: "intent", value: intent },

@@ -140,12 +140,21 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
     loadData();
   };
 
+  const [cityStatus, setCityStatus] = useState<{ live: boolean; name: string } | null>(null);
+  useEffect(() => {
+    if (!user.cityId) { setCityStatus({ live: false, name: '' }); return; }
+    api.locations.getCities().then(cities => {
+      const city = cities.find(c => c.id === user.cityId);
+      setCityStatus({ live: !!city?.isLive, name: city?.name || '' });
+    });
+  }, [user.cityId]);
+
   const openDispatchSheet = async (order: MartOrder) => {
     setDispatchingOrder(order);
     setLoadingRiders(true);
     const [online, all] = await Promise.all([
-      api.riders.getAvailable(),
-      api.riders.getAllApproved()
+      api.riders.getAvailable(user.cityId),
+      api.riders.getAllApproved(user.cityId)
     ]);
     setAvailableRiders(online);
     setOfflineRiders(all.filter(r => !online.some(o => o.id === r.id)));
@@ -223,6 +232,13 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
 
   return (
     <div className="space-y-6 animate-fade-in">
+       {cityStatus && !cityStatus.live && (
+          <div className="p-4 bg-kubwa-fixit/10 text-kubwa-fixitText rounded-2xl text-xs font-semibold">
+             {cityStatus.name
+               ? `We're not live in ${cityStatus.name} yet. You can add products now; buyers will see them the day ${cityStatus.name} opens.`
+               : "Your area isn't in one of our launch cities yet. You can add products now; buyers will see them once your area opens."}
+          </div>
+       )}
        {newOrderAlert && (
           <div className="bg-kubwa-ink text-white p-5 rounded-[1.75rem] flex items-center justify-between gap-4 animate-slide-in-bottom shadow-xl">
              <div className="flex items-center gap-4 min-w-0">

@@ -1,3 +1,4 @@
+import { BRAND } from '../config/brand';
 import React, { useState } from 'react';
 import { ShoppingBag, Wrench, Truck, ArrowRight, Check, MapPin } from 'lucide-react';
 import { Button } from '../components/ui';
@@ -11,8 +12,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   const steps = [
     {
-      title: "Welcome to Kubwa Connect",
-      desc: "The Super App for every resident of Kubwa. Shop, hire services, and book deliveries—all in one place.",
+      title: `Welcome to ${BRAND.name}`,
+      desc: "Shop from local vendors, hire trusted artisans, and book deliveries in your city, all in one place.",
       icon: <div className="w-40 h-40 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-zoom-in"><MapPin size={80} className="text-white drop-shadow-lg" /></div>,
       color: "bg-kubwa-primary"
     },

@@ -28,11 +28,12 @@ import {
   Plus,
   PackageCheck,
   RotateCcw,
+  MapPin,
   // Add User icon import with alias to avoid conflict with User type from types.ts
   User as UserIcon
 } from 'lucide-react';
 import { api } from '../services/data';
-import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement, MartOrder } from '../types';
+import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement, MartOrder, CityReadiness, City } from '../types';
 import { 
   LineChart, 
   Line, 
@@ -49,7 +50,12 @@ import {
 } from 'recharts';
 
 const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'orders' | 'billing' | 'users' | 'announcements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cities' | 'approvals' | 'products' | 'orders' | 'billing' | 'users' | 'announcements'>('overview');
+  const [cityReadiness, setCityReadiness] = useState<CityReadiness[]>([]);
+  const [stateDemand, setStateDemand] = useState<{ stateId: number; name: string; people: number }[]>([]);
+  const [allCities, setAllCities] = useState<City[]>([]);
+  const [approvalCityFilter, setApprovalCityFilter] = useState<number | 'ALL' | 'NONE'>('ALL');
+  const [togglingCity, setTogglingCity] = useState<number | null>(null);
   const [pendingEntities, setPendingEntities] = useState<User[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -82,9 +88,14 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
         const statsData = await api.admin.getPlatformStats();
         setStats(statsData);
 
-        if (activeTab === 'approvals') {
-            const data = await api.admin.getPendingEntities();
+        if (activeTab === 'cities') {
+            const [readiness, demand] = await Promise.all([api.admin.getCityReadiness(), api.admin.getStateDemand()]);
+            setCityReadiness(readiness);
+            setStateDemand(demand);
+        } else if (activeTab === 'approvals') {
+            const [data, cities] = await Promise.all([api.admin.getPendingEntities(), api.locations.getCities()]);
             setPendingEntities(data);
+            setAllCities(cities);
         } else if (activeTab === 'products') {
             const data = await api.admin.getPendingProducts();
             setPendingProducts(data);
@@ -106,6 +117,26 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
     }
     setLoading(false);
   };
+
+  const handleToggleCityLive = async (city: CityReadiness) => {
+    const opening = !city.isLive;
+    const message = opening
+      ? `Open ${city.name}? Listings, artisans and rider delivery there become visible to buyers immediately.` +
+        (city.vendors < city.minVendors || city.riders < city.minRiders || city.providers < city.minProviders
+          ? `\n\nIt hasn't met the launch threshold yet (${city.vendors}/${city.minVendors} vendors, ${city.riders}/${city.minRiders} riders, ${city.providers}/${city.minProviders} artisans).`
+          : '')
+      : `Pause ${city.name}? Its listings will be hidden from buyers and riders there stop receiving new jobs.`;
+    if (!window.confirm(message)) return;
+    setTogglingCity(city.id);
+    const result = await api.admin.setCityLive(city.id, opening);
+    setTogglingCity(null);
+    if (!result.success) { alert(result.error || "Couldn't update the city."); return; }
+    loadData();
+  };
+
+  const cityNameById = (id?: number) => allCities.find(c => c.id === id)?.name;
+  const visiblePendingEntities = pendingEntities.filter(e =>
+    approvalCityFilter === 'ALL' ? true : approvalCityFilter === 'NONE' ? !e.cityId : e.cityId === approvalCityFilter);
 
   const handleUserStatusUpdate = async (userId: string, newStatus: ApprovalStatus) => {
     setActionLoading(userId);
@@ -214,7 +245,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
          <div>
             <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="text-kubwa-primary" size={18} />
-                <span className="text-xs font-bold text-gray-500">Kubwa Central Governance</span>
+                <span className="text-xs font-bold text-gray-500">National operations</span>
             </div>
             <h2 className="font-display text-3xl font-bold text-kubwa-ink tracking-tight leading-none">Admin Console</h2>
          </div>
@@ -232,12 +263,13 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
       <div className="flex gap-2 mb-10 bg-gray-100 p-1.5 rounded-[1.75rem] overflow-x-auto no-scrollbar">
          {[
            { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
+           { id: 'cities', label: 'Cities', icon: MapPin },
            { id: 'approvals', label: 'Entities', icon: Clock },
            { id: 'products', label: 'Inventory', icon: ShoppingBag },
            { id: 'orders', label: 'Orders', icon: PackageCheck },
            { id: 'announcements', label: 'Announcements', icon: Bell },
            { id: 'billing', label: 'Revenue', icon: DollarSign },
-           { id: 'users', label: 'Residents', icon: Users }
+           { id: 'users', label: 'Members', icon: Users }
          ].map(tab => (
            <button 
              key={tab.id} 
@@ -338,16 +370,93 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             </div>
           )}
 
+          {activeTab === 'cities' && (
+            <div className="space-y-6">
+               <h3 className="text-xs font-bold text-gray-500 ml-2">Launch readiness by city</h3>
+               {loading ? (
+                 <div className="py-20 flex justify-center text-gray-500"><Loader2 className="animate-spin" size={40} /></div>
+               ) : (
+                 <div className="grid grid-cols-1 gap-4">
+                   {cityReadiness.map(city => {
+                     const ready = city.vendors >= city.minVendors && city.riders >= city.minRiders && city.providers >= city.minProviders;
+                     const stat = (label: string, have: number, need: number) => (
+                       <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                         <p className={`text-lg font-bold ${have >= need ? 'text-kubwa-martText' : 'text-kubwa-ink'}`}>{have}<span className="text-xs text-gray-500 font-semibold">/{need}</span></p>
+                         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">{label}</p>
+                       </div>
+                     );
+                     return (
+                       <Card key={city.id} className="p-6 border-none shadow-sm rounded-[2rem]">
+                         <div className="flex justify-between items-start gap-4 mb-4">
+                           <div>
+                             <div className="flex items-center gap-2">
+                               <h4 className="text-base font-bold text-kubwa-ink">{city.name}</h4>
+                               <Badge color={city.isLive ? 'bg-green-100 text-green-700' : ready ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}>
+                                 {city.isLive ? 'Live' : ready ? 'Ready to open' : 'Recruiting'}
+                               </Badge>
+                             </div>
+                             <p className="text-xs font-semibold text-gray-500 mt-1">
+                               {city.buyers} buyers · {city.pending} applications pending · rider fee ₦{Number(city.sameLgaFee).toLocaleString()} same area, ₦{Number(city.crossLgaFee).toLocaleString()} across areas
+                             </p>
+                           </div>
+                           <Button
+                             variant={city.isLive ? 'outline' : 'primary'}
+                             className="h-10 text-xs px-4 shrink-0"
+                             disabled={togglingCity === city.id}
+                             onClick={() => handleToggleCityLive(city)}
+                           >
+                             {togglingCity === city.id ? <Loader2 size={14} className="animate-spin" /> : city.isLive ? 'Pause' : 'Open city'}
+                           </Button>
+                         </div>
+                         <div className="grid grid-cols-3 gap-2">
+                           {stat('Vendors', city.vendors, city.minVendors)}
+                           {stat('Riders', city.riders, city.minRiders)}
+                           {stat('Artisans', city.providers, city.minProviders)}
+                         </div>
+                       </Card>
+                     );
+                   })}
+                   {stateDemand.length > 0 && (
+                     <Card className="p-6 border-none shadow-sm rounded-[2rem]">
+                       <h4 className="text-sm font-bold text-kubwa-ink mb-1">Sign-ups outside launch cities</h4>
+                       <p className="text-xs font-semibold text-gray-500 mb-4">Members whose area isn't part of any city yet, by state. Use this to pick the next city.</p>
+                       <div className="space-y-2">
+                         {stateDemand.map(d => (
+                           <div key={d.stateId} className="flex justify-between text-sm font-semibold">
+                             <span className="text-kubwa-ink">{d.name}</span>
+                             <span className="text-gray-500">{d.people}</span>
+                           </div>
+                         ))}
+                       </div>
+                     </Card>
+                   )}
+                 </div>
+               )}
+            </div>
+          )}
+
           {activeTab === 'approvals' && (
             <div className="space-y-6">
-               <h3 className="text-xs font-bold text-gray-500 ml-2">Verification queue</h3>
+               <div className="flex items-center justify-between gap-3">
+                 <h3 className="text-xs font-bold text-gray-500 ml-2">Verification queue</h3>
+                 <select
+                   className="px-4 py-2.5 bg-gray-100 rounded-2xl text-xs font-bold text-kubwa-ink outline-none"
+                   value={approvalCityFilter}
+                   onChange={e => setApprovalCityFilter(e.target.value === 'ALL' || e.target.value === 'NONE' ? e.target.value : Number(e.target.value))}
+                   aria-label="Filter applications by city"
+                 >
+                   <option value="ALL">All cities</option>
+                   {allCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                   <option value="NONE">Outside launch cities</option>
+                 </select>
+               </div>
                
                {loading ? (
                  <div className="py-20 flex flex-col items-center justify-center gap-4 text-gray-500">
                     <Loader2 className="animate-spin" size={44} />
                     <p className="text-xs font-bold">Processing entity data...</p>
                  </div>
-               ) : pendingEntities.length === 0 ? (
+               ) : visiblePendingEntities.length === 0 ? (
                  <Card className="py-20 border-dashed border-2 flex flex-col items-center justify-center text-center rounded-[2.5rem]">
                     <div className="w-20 h-20 bg-green-50 text-green-600 rounded-[1.75rem] flex items-center justify-center mb-6">
                         <CheckCircle size={36} />
@@ -357,7 +466,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                  </Card>
                ) : (
                  <div className="grid grid-cols-1 gap-4">
-                    {pendingEntities.map(entity => (
+                    {visiblePendingEntities.map(entity => (
                       <Card key={entity.id} className="p-6 border-none shadow-sm hover:shadow-md transition-all rounded-[2rem] flex flex-col md:flex-row justify-between items-center gap-6">
                          <div className="flex items-center gap-5 w-full md:w-auto">
                             <div className="w-16 h-16 rounded-[1.5rem] bg-gray-50 flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden border border-gray-100 shrink-0">
@@ -370,7 +479,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                      {entity.role}
                                   </Badge>
                                </div>
-                               <p className="text-xs font-semibold text-gray-500 mb-2">{entity.email}</p>
+                               <p className="text-xs font-semibold text-gray-500 mb-2">{entity.email}{' · '}{cityNameById(entity.cityId) || 'Outside launch cities'}</p>
                                <div className="flex gap-2">
                                   <button 
                                     onClick={() => handleToggleFeature(entity.id, !!entity.isFeatured)}
@@ -531,7 +640,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             <div className="space-y-4">
                 <div className="relative mb-6">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                    <input className="w-full pl-12 pr-6 py-4 bg-gray-100 border-none rounded-[1.75rem] text-sm font-semibold outline-none" placeholder="Search Kubwa resident directory..." />
+                    <input className="w-full pl-12 pr-6 py-4 bg-gray-100 border-none rounded-[1.75rem] text-sm font-semibold outline-none" placeholder="Search members..." />
                 </div>
                 {loading ? (
                    <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" /></div>

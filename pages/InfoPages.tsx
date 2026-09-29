@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AppSection, User } from '../types';
 import { ArrowLeft, Mail, MapPin, Phone, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { BackButton } from '../components/ui';
+import { BRAND } from '../config/brand';
 
 interface InfoPagesProps {
   section: AppSection;
@@ -24,29 +25,29 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
       case AppSection.ABOUT:
         return (
           <div className="space-y-4 animate-fade-in">
-            <h2 className="font-display text-2xl font-bold text-kubwa-primary">About Kubwa Connect</h2>
+            <h2 className="font-display text-2xl font-bold text-kubwa-primary">About {BRAND.name}</h2>
             <div className="bg-kubwa-mart/5 p-5 rounded-2xl border border-kubwa-mart/10">
               <p className="text-gray-700 leading-relaxed mb-4 text-sm font-medium">
-                Kubwa Connect is the first community super app designed specifically for the residents of Kubwa, Abuja. 
-                Our mission is to bridge the gap between local vendors, skilled artisans, logistics providers, and the everyday people who need their services.
+                {BRAND.name} is a super app for everyday life in Nigeria. It started in Kubwa, Abuja, and is opening city by city.
+                Our mission is to connect local vendors, skilled artisans and delivery riders with the people near them who need their services.
               </p>
               <p className="text-gray-700 leading-relaxed text-sm font-medium">
                 Whether you need fresh groceries from the market, a reliable plumber to fix a leak, or a rider to deliver a package across town, 
-                Kubwa Connect brings it all to your fingertips. We are built for the community, by the community.
+                {BRAND.name} brings it all to your fingertips, from people in your own city.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center mt-6">
               <div className="p-4 bg-white shadow-sm rounded-2xl border border-gray-100">
-                <h3 className="font-display font-bold text-xl text-kubwa-fixit">500+</h3>
-                <p className="text-xs text-gray-500 font-semibold mt-0.5">Vendors</p>
+                <h3 className="font-display font-bold text-base text-kubwa-martText">Mart</h3>
+                <p className="text-xs text-gray-500 font-semibold mt-0.5">Local vendors</p>
               </div>
               <div className="p-4 bg-white shadow-sm rounded-2xl border border-gray-100">
-                <h3 className="font-display font-bold text-xl text-kubwa-mart">1k+</h3>
-                <p className="text-xs text-gray-500 font-semibold mt-0.5">Daily users</p>
+                <h3 className="font-display font-bold text-base text-kubwa-fixitText">FixIt</h3>
+                <p className="text-xs text-gray-500 font-semibold mt-0.5">Vetted artisans</p>
               </div>
               <div className="p-4 bg-white shadow-sm rounded-2xl border border-gray-100">
-                <h3 className="font-display font-bold text-xl text-kubwa-ride">24/7</h3>
-                <p className="text-xs text-gray-500 font-semibold mt-0.5">Support</p>
+                <h3 className="font-display font-bold text-base text-kubwa-rideText">Ride</h3>
+                <p className="text-xs text-gray-500 font-semibold mt-0.5">City delivery</p>
               </div>
             </div>
           </div>
@@ -65,7 +66,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
                 </div>
                 <div>
                   <h3 className="font-bold text-kubwa-ink text-sm">Visit us</h3>
-                  <p className="text-gray-500 text-sm font-medium mt-0.5">FCDA Extension,<br/>Kubwa, Abuja, Nigeria</p>
+                  <p className="text-gray-500 text-sm font-medium mt-0.5">Abuja, Nigeria</p>
                 </div>
               </div>
 
@@ -75,21 +76,11 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
                 </div>
                 <div>
                   <h3 className="font-bold text-kubwa-ink text-sm">Email us</h3>
-                  <p className="text-gray-500 text-sm font-medium mt-0.5">support@kubwaconnect.com</p>
-                  <p className="text-gray-500 text-sm font-medium">partners@kubwaconnect.com</p>
+                  <p className="text-gray-500 text-sm font-medium mt-0.5">{BRAND.supportEmail}</p>
+                  <p className="text-gray-500 text-sm font-medium">{BRAND.partnersEmail}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                <div className="bg-kubwa-fixit/10 p-3 rounded-2xl text-kubwa-fixit shrink-0">
-                  <Phone size={22} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-kubwa-ink text-sm">Call us</h3>
-                  <p className="text-gray-500 text-sm font-medium mt-0.5">+234 800 KUBWA HELP</p>
-                  <p className="text-gray-500 text-sm font-medium">+234 900 123 4567</p>
-                </div>
-              </div>
             </div>
           </div>
         );
@@ -132,7 +123,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
             <h2 className="font-display text-2xl font-bold text-kubwa-primary">Privacy Policy</h2>
             <div className="prose prose-sm text-gray-600 text-sm font-medium leading-relaxed">
               <p className="font-bold text-kubwa-ink">Last updated: October 2023</p>
-              <p>At Kubwa Connect, we prioritize your privacy. This policy outlines how we collect, use, and protect your personal information.</p>
+              <p>At {BRAND.name}, we prioritize your privacy. This policy outlines how we collect, use, and protect your personal information.</p>
               
               <h4 className="font-bold text-kubwa-ink mt-4">1. Information we collect</h4>
               <p>We collect information you provide directly to us, such as when you create an account, make a purchase, or contact support. This includes your name, email, phone number, and location data for deliveries.</p>
@@ -152,7 +143,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
             <h2 className="font-display text-2xl font-bold text-kubwa-primary">Terms of Service</h2>
             <div className="prose prose-sm text-gray-600 text-sm font-medium leading-relaxed">
               <p className="font-bold text-kubwa-ink">Last updated: October 2023</p>
-              <p>By using Kubwa Connect, you agree to these terms. Please read them carefully.</p>
+              <p>By using {BRAND.name}, you agree to these terms. Please read them carefully.</p>
               
               <h4 className="font-bold text-kubwa-ink mt-4">1. Acceptable use</h4>
               <p>You agree not to use the app for any illegal purposes. Vendors must ensure all listed products comply with local laws.</p>
@@ -161,7 +152,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
               <p>You are responsible for maintaining the confidentiality of your account password. Any activity under your account is your responsibility.</p>
 
               <h4 className="font-bold text-kubwa-ink mt-4">3. Limitation of liability</h4>
-              <p>Kubwa Connect acts as a platform connecting users. We are not liable for the quality of services provided by independent artisans or vendors, though we strive to vet all providers.</p>
+              <p>{BRAND.name} acts as a platform connecting users. We are not liable for the quality of services provided by independent artisans or vendors, though we strive to vet all providers.</p>
             </div>
           </div>
         );
@@ -187,7 +178,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
       {renderContent()}
 
       <div className="mt-12 pt-8 border-t border-gray-100 text-center text-gray-500 text-xs font-medium">
-        <p>&copy; {new Date().getFullYear()} Kubwa Connect. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
       </div>
     </div>
   );

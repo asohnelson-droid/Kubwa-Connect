@@ -2,9 +2,19 @@
 
 import { supabase } from './supabase';
 import { compressImage } from './imageUtils';
-import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus } from '../types';
+import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus, NgState, Lga, City, CityReadiness, BrowseLocation } from '../types';
 
-export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin', 'FCDA', 'Chikakore', 'Kubwa Village', 'Deidei', 'Galadinma', 'FOI', 'Federal Housing', 'Phase 2 Site 1', 'Phase 2 Site 2', 'Kagini', 'Karsana'];
+/**
+ * Neighbourhood suggestions shown under the free-text "Area" field, keyed by
+ * LGA name. Only a hint list: people anywhere can type their own area.
+ */
+export const AREA_SUGGESTIONS: Record<string, string[]> = {
+    'Bwari': ['Kubwa Phase 1', 'Kubwa Phase 2', 'Kubwa Phase 3', 'Kubwa Phase 4', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin', 'FCDA Quarters', 'Chikakore', 'Kubwa Village', 'Deidei', 'Galadinma', 'FOI', 'Federal Housing', 'Phase 2 Site 1', 'Phase 2 Site 2', 'Kagini', 'Karsana', 'Bwari Town', 'Ushafa'],
+    'Abuja Municipal (AMAC)': ['Gwarinpa', 'Wuse', 'Wuse 2', 'Maitama', 'Asokoro', 'Garki', 'Jabi', 'Utako', 'Life Camp', 'Lugbe', 'Kado', 'Karu', 'Nyanya', 'Apo', 'Lokogoma', 'Galadimawa', 'Katampe', 'Jahi', 'Mabushi', 'Durumi'],
+};
+
+/** How many listings are fetched per page in Mart and FixIt. */
+export const PAGE_SIZE = 40;
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
 export const PRODUCT_CATEGORIES = [
@@ -26,7 +36,7 @@ export const getParentCategory = (category: string) => {
 const mapUserMetadata = (sessionUser: any): User => {
     if (!sessionUser) return null as any;
     const meta = sessionUser.user_metadata || {};
-    const name = meta.full_name || meta.name || 'Kubwa Resident';
+    const name = meta.full_name || meta.name || 'Member';
     
     // Determine Role
     const role = (meta.role || 'USER') as UserRole;
@@ -72,7 +82,7 @@ const mapUserMetadata = (sessionUser: any): User => {
 const overlayProfileData = async (appUser: User): Promise<User> => {
     const { data: profile } = await supabase
         .from('profiles')
-        .select('avatar, "productLimit", tier, "verificationStatus", "paymentStatus", status, "isFeatured"')
+        .select('avatar, "productLimit", tier, "verificationStatus", "paymentStatus", status, "isFeatured", "stateId", "lgaId", "cityId", area, address, "phoneNumber", "storeName"')
         .eq('id', appUser.id)
         .maybeSingle();
 
@@ -84,9 +94,22 @@ const overlayProfileData = async (appUser: User): Promise<User> => {
         if (profile.paymentStatus) appUser.paymentStatus = profile.paymentStatus;
         if (profile.status) appUser.status = profile.status as ApprovalStatus;
         appUser.isFeatured = !!profile.isFeatured || appUser.tier === 'FEATURED';
+        appUser.stateId = profile.stateId ?? undefined;
+        appUser.lgaId = profile.lgaId ?? undefined;
+        appUser.cityId = profile.cityId ?? undefined;
+        appUser.area = profile.area ?? undefined;
+        if (profile.address) appUser.address = profile.address;
+        if (profile.phoneNumber) appUser.phoneNumber = profile.phoneNumber;
+        if (profile.storeName) appUser.storeName = profile.storeName;
     }
 
     return appUser;
+};
+
+const locationCache: { states: NgState[] | null; cities: City[] | null; lgas: Map<number, Lga[]> } = {
+    states: null,
+    cities: null,
+    lgas: new Map(),
 };
 
 const MOCK_PRODUCTS: Product[] = [
@@ -98,7 +121,7 @@ const MOCK_PRODUCTS: Product[] = [
     // Fashion & Style
     { id: 'demo_c1', vendorId: 'demo_v2', name: 'Ankara Shift Dress', price: 8000, category: 'Fashion', image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=500', stock: 15, rating: 4.9, status: 'APPROVED', isPromoted: true, description: 'Stylish Ankara dress for casual outings.' },
     { id: 'demo_c2', vendorId: 'demo_v2', name: 'Men\'s Leather Sandals', price: 5000, category: 'Fashion', image: 'https://images.unsplash.com/photo-1621251676678-70135c345b5c?auto=format&fit=crop&q=80&w=500', stock: 30, rating: 4.2, status: 'APPROVED', description: 'Handmade leather sandals, durable and comfortable.' },
-    { id: 'demo_c3', vendorId: 'demo_v2', name: 'Kubwa Connect Hoodie', price: 6500, category: 'Fashion', image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&q=80&w=500', stock: 100, rating: 5.0, status: 'APPROVED', description: 'Official community hoodie. High quality cotton.' },
+    { id: 'demo_c3', vendorId: 'demo_v2', name: 'Classic Pullover Hoodie', price: 6500, category: 'Fashion', image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&q=80&w=500', stock: 100, rating: 5.0, status: 'APPROVED', description: 'Heavyweight cotton hoodie, unisex fit.' },
 
     // Tech & Gadgets
     { id: 'demo_e1', vendorId: 'demo_v3', name: 'Wireless Earbuds', price: 4500, category: 'Electronics', image: 'https://images.unsplash.com/photo-1572569028738-411a29635331?auto=format&fit=crop&q=80&w=500', stock: 25, rating: 4.4, status: 'APPROVED', description: 'Deep bass, noise cancelling wireless earbuds.' },
@@ -209,9 +232,10 @@ export const api = {
             const { error } = await supabase.rpc('request_role_upgrade', { new_role: newRole });
             return { success: !error, error: error?.message };
         },
-        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string; avatar?: string }): Promise<{ success: boolean; error?: string }> => {
+        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string; avatar?: string; lgaId?: number; area?: string }): Promise<{ success: boolean; error?: string }> => {
             try {
-                const { avatar, ...syncableData } = data;
+                // Location lives only in profiles: the database derives state and city from the LGA.
+                const { avatar, lgaId, area, ...syncableData } = data;
                 const metaData: any = { ...syncableData };
                 if (syncableData.name) metaData.full_name = syncableData.name;
 
@@ -220,6 +244,8 @@ export const api = {
 
                 const profileUpdate: any = { ...syncableData };
                 if (avatar !== undefined) profileUpdate.avatar = avatar;
+                if (lgaId !== undefined) profileUpdate.lgaId = lgaId;
+                if (area !== undefined) profileUpdate.area = area;
 
                 const { error: profileError } = await supabase.from('profiles').update(profileUpdate).eq('id', userId);
                 if (profileError) throw profileError;
@@ -242,7 +268,8 @@ export const api = {
                 p_total: orderData.total,
                 p_delivery_option: orderData.deliveryOption,
                 p_delivery_address: orderData.deliveryAddress || null,
-                p_contact_phone: orderData.contactPhone
+                p_contact_phone: orderData.contactPhone,
+                p_dropoff_lga_id: orderData.dropoffLgaId ?? null
             });
             return { success: !error, orderId: data as string | undefined, error: error?.message };
         },
@@ -268,7 +295,7 @@ export const api = {
             try {
                 // FIX: Separate avatar (large) from metadata (small) to prevent 413 Header Overflow
                 // Auth Metadata cannot store large base64 strings
-                const { avatar, ...metaData } = data;
+                const { avatar, lgaId, area, ...metaData } = data;
 
                 // 1. Sync Auth Metadata (Exclude Avatar)
                 const { data: { user }, error } = await supabase.auth.updateUser({ 
@@ -294,28 +321,30 @@ export const api = {
                         const { error: retryError } = await supabase.from('profiles').upsert({ 
                             id: userId,
                             ...metaData, // Send only metadata, no avatar
+                            lgaId,
+                            area,
                             isSetupComplete: true 
                         });
                         
                         if (retryError) throw retryError;
                         
                         // Return user with metadata but without avatar (since it failed)
-                        const appUser = mapUserMetadata(user);
-                        return { ...appUser };
+                        return await overlayProfileData(mapUserMetadata(user));
                     }
                     throw profileErr;
                 }
 
                 // 3. Return user with avatar injected (since it was stripped from auth user but saved in profile)
-                const appUser = mapUserMetadata(user);
-                return { ...appUser, avatar: data.avatar };
+                return await overlayProfileData({ ...mapUserMetadata(user), avatar: data.avatar });
             } catch (err) { 
                 console.error("[Setup] Finalization Error:", err);
                 return null; 
             }
         },
-        getFeaturedVendors: async () => {
-            const { data } = await supabase.from('profiles').select('*').eq('tier', 'FEATURED');
+        getFeaturedVendors: async (cityId?: number) => {
+            let q = supabase.from('profiles').select('*').eq('tier', 'FEATURED').eq('role', 'VENDOR').eq('status', 'APPROVED');
+            if (cityId) q = q.eq('cityId', cityId);
+            const { data } = await q;
             return (data as any) || [];
         },
         getAddresses: async (userId: string): Promise<Address[]> => {
@@ -338,12 +367,16 @@ export const api = {
         },
     },
     riders: {
-        getAvailable: async (): Promise<{ id: string; name: string; phoneNumber?: string }[]> => {
-            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber"').eq('role', 'RIDER').eq('status', 'APPROVED').eq('available', true);
+        // Riders are matched by city: a vendor only ever sees riders who work in their city.
+        // The database enforces the same rule when a rider is assigned.
+        getAvailable: async (cityId?: number): Promise<{ id: string; name: string; phoneNumber?: string }[]> => {
+            if (!cityId) return [];
+            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber"').eq('role', 'RIDER').eq('status', 'APPROVED').eq('available', true).eq('cityId', cityId);
             return (data as any) || [];
         },
-        getAllApproved: async (): Promise<{ id: string; name: string; phoneNumber?: string; available: boolean }[]> => {
-            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber", available').eq('role', 'RIDER').eq('status', 'APPROVED');
+        getAllApproved: async (cityId?: number): Promise<{ id: string; name: string; phoneNumber?: string; available: boolean }[]> => {
+            if (!cityId) return [];
+            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber", available').eq('role', 'RIDER').eq('status', 'APPROVED').eq('cityId', cityId);
             return (data as any) || [];
         },
         getMyAvailability: async (userId: string): Promise<boolean> => {
@@ -421,23 +454,55 @@ export const api = {
             await supabase.storage.from('avatars').remove([path]);
         }
     },
-    getProducts: async (): Promise<Product[]> => {
-        const { data } = await supabase.from('products').select('*');
-        const dbProducts = (data as Product[]) || [];
-        return [...dbProducts, ...MOCK_PRODUCTS];
+    /**
+     * Approved listings from live cities, narrowed to the buyer's chosen area.
+     * Paged on the server so the app never downloads the whole catalogue.
+     * Sample listings are only added while an area has almost nothing real to show.
+     */
+    getProducts: async (browse?: BrowseLocation, page = 0): Promise<{ items: Product[]; hasMore: boolean }> => {
+        let q = supabase
+            .from('products')
+            .select('*, city:cities!inner(name, "isLive")')
+            .eq('status', 'APPROVED')
+            .eq('city.isLive', true);
+        if (browse?.scope === 'CITY' && browse.cityId) q = q.eq('cityId', browse.cityId);
+        if (browse?.scope === 'STATE' && browse.stateId) q = q.eq('stateId', browse.stateId);
+        const from = page * PAGE_SIZE;
+        const { data, error } = await q
+            .order('isPromoted', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        const items: Product[] = (data || []).map((p: any) => {
+            const { city, ...rest } = p;
+            return { ...rest, cityName: city?.name } as Product;
+        });
+        const hasMore = items.length === PAGE_SIZE;
+        if (page === 0 && items.length < 8) return { items: [...items, ...MOCK_PRODUCTS], hasMore };
+        return { items, hasMore };
     },
-    getVendorPickupInfo: async (vendorId: string): Promise<{ storeName?: string; address?: string; location?: string } | null> => {
-        const { data } = await supabase.from('profiles').select('storeName, address, location').eq('id', vendorId).maybeSingle();
+    getVendorPickupInfo: async (vendorId: string): Promise<{ storeName?: string; address?: string; location?: string; area?: string; lgaId?: number; stateId?: number; cityId?: number } | null> => {
+        const { data } = await supabase.from('profiles').select('storeName, address, location, area, "lgaId", "stateId", "cityId"').eq('id', vendorId).maybeSingle();
         return data || null;
     },
-    getProviders: async (): Promise<ServiceProvider[]> => {
-        const { data } = await supabase.from('providers').select('*');
-        return (data as any) || [];
-    },
-    getMockContext: async () => {
-        const products = await api.getProducts();
-        const providers = await api.getProviders();
-        return { products, providers };
+    getProviders: async (browse?: BrowseLocation, page = 0): Promise<{ items: ServiceProvider[]; hasMore: boolean }> => {
+        let q = supabase
+            .from('providers')
+            .select('*, city:cities!inner(name, "isLive"), lga:lgas(name)')
+            .eq('city.isLive', true);
+        if (browse?.scope === 'CITY' && browse.cityId) q = q.eq('cityId', browse.cityId);
+        if (browse?.scope === 'STATE' && browse.stateId) q = q.eq('stateId', browse.stateId);
+        const from = page * PAGE_SIZE;
+        const { data, error } = await q
+            .order('isVerified', { ascending: false, nullsFirst: false })
+            .order('rating', { ascending: false, nullsFirst: false })
+            .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        const items: ServiceProvider[] = (data || []).map((p: any) => {
+            const { city, lga, ...rest } = p;
+            return { ...rest, cityName: city?.name, lgaName: lga?.name } as ServiceProvider;
+        });
+        return { items, hasMore: items.length === PAGE_SIZE };
     },
     getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => {
         let query = supabase.from('deliveries').select('*, rider:profiles!deliveries_riderid_fkey(name, phoneNumber)');
@@ -445,17 +510,26 @@ export const api = {
         const { data } = await query;
         return (data as any) || [];
     },
-    requestDelivery: async (data: any): Promise<boolean> => {
+    // The fee is set by the database from the city's zone prices; the client never sends one.
+    requestDelivery: async (data: { userId: string; pickup: string; dropoff: string; itemType: string; phoneNumber: string; pickupLgaId: number; dropoffLgaId: number }): Promise<{ success: boolean; error?: string }> => {
         const { error } = await supabase.from('deliveries').insert([{
             userId: data.userId,
             pickup: data.pickup,
             dropoff: data.dropoff,
             itemType: data.itemType,
             phoneNumber: data.phoneNumber,
-            status: 'PENDING',
-            price: 1000
+            pickupLgaId: data.pickupLgaId,
+            dropoffLgaId: data.dropoffLgaId,
+            status: 'PENDING'
         }]);
-        return !error;
+        return { success: !error, error: error?.message };
+    },
+    /** Delivery fee between two LGAs, or null when no rider can do that trip. */
+    quoteDeliveryFee: async (pickupLgaId?: number, dropoffLgaId?: number): Promise<number | null> => {
+        if (!pickupLgaId || !dropoffLgaId) return null;
+        const { data, error } = await supabase.rpc('quote_delivery_fee', { p_pickup_lga: pickupLgaId, p_dropoff_lga: dropoffLgaId });
+        if (error || data === null || data === undefined) return null;
+        return Number(data);
     },
     deliveries: {
         getAvailableJobs: async (): Promise<DeliveryRequest[]> => {
@@ -470,6 +544,29 @@ export const api = {
             const { error } = await supabase.from('deliveries').update({ status }).eq('id', jobId);
             return !error;
         }
+    },
+    locations: {
+        getStates: async (): Promise<NgState[]> => {
+            if (locationCache.states) return locationCache.states;
+            const { data } = await supabase.from('states').select('id, name').order('name');
+            locationCache.states = (data as NgState[]) || [];
+            return locationCache.states;
+        },
+        getLgas: async (stateId: number): Promise<Lga[]> => {
+            const cached = locationCache.lgas.get(stateId);
+            if (cached) return cached;
+            const { data } = await supabase.from('lgas').select('id, name, "stateId", "cityId"').eq('stateId', stateId).order('name');
+            const list = (data as Lga[]) || [];
+            if (list.length) locationCache.lgas.set(stateId, list);
+            return list;
+        },
+        getCities: async (): Promise<City[]> => {
+            if (locationCache.cities) return locationCache.cities;
+            const { data } = await supabase.from('cities').select('*').order('name');
+            locationCache.cities = (data as City[]) || [];
+            return locationCache.cities;
+        },
+        clearCache: () => { locationCache.states = null; locationCache.cities = null; locationCache.lgas.clear(); }
     },
     payments: { 
         fulfillIntent: async (userId, intent, ref) => {
@@ -601,6 +698,21 @@ export const api = {
         getAllOrders: async (): Promise<MartOrder[]> => {
             const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
             return (data as any) || [];
+        },
+        getCityReadiness: async (): Promise<CityReadiness[]> => {
+            const { data } = await supabase.from('city_readiness').select('*').order('isLive', { ascending: false }).order('name');
+            return (data as any) || [];
+        },
+        getStateDemand: async (): Promise<{ stateId: number; name: string; people: number }[]> => {
+            const { data } = await supabase.from('state_demand').select('*').order('people', { ascending: false });
+            return (data as any) || [];
+        },
+        setCityLive: async (cityId: number, isLive: boolean): Promise<{ success: boolean; error?: string }> => {
+            const update: any = { isLive };
+            if (isLive) update.launchedAt = new Date().toISOString();
+            const { error } = await supabase.from('cities').update(update).eq('id', cityId);
+            api.locations.clearCache();
+            return { success: !error, error: error?.message };
         },
         issueRefund: async (orderId: string, reason: string): Promise<{ success: boolean; error?: string }> => {
             const { error } = await supabase.rpc('issue_refund', { p_order_id: orderId, p_reason: reason });

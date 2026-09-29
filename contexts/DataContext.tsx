@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Product, ServiceProvider, CartItem, MartOrder, DeliveryRequest } from '../types';
+import { Product, ServiceProvider, CartItem, MartOrder, DeliveryRequest, BrowseLocation } from '../types';
 import { api } from '../services/data';
 
 interface DataContextType {
@@ -25,6 +25,14 @@ interface DataContextType {
 
   fetchProducts: () => Promise<void>;
   fetchServices: () => Promise<void>;
+  loadMoreProducts: () => Promise<void>;
+  loadMoreServices: () => Promise<void>;
+  hasMoreProducts: boolean;
+  hasMoreServices: boolean;
+
+  /** Where Mart, FixIt and Home are browsing: the buyer's city, their state, or all of Nigeria. */
+  browse: BrowseLocation;
+  setBrowse: (browse: BrowseLocation) => void;
   fetchOrders: (userId: string) => Promise<void>;
   fetchDeliveries: (userId: string) => Promise<void>;
 
@@ -44,6 +52,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [services, setServices] = useState<ServiceProvider[]>([]);
   const [orders, setOrders] = useState<MartOrder[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
+  const [browse, setBrowseState] = useState<BrowseLocation>(() => {
+    try {
+      const saved = localStorage.getItem('kc_browse');
+      if (saved) return JSON.parse(saved);
+    } catch { /* storage unavailable */ }
+    return { scope: 'NATIONAL', label: 'All Nigeria' };
+  });
+  const [productPage, setProductPage] = useState(0);
+  const [servicePage, setServicePage] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(false);
+  const [hasMoreServices, setHasMoreServices] = useState(false);
+
+  const setBrowse = useCallback((next: BrowseLocation) => {
+    setBrowseState(prev => (prev.scope === next.scope && prev.cityId === next.cityId && prev.stateId === next.stateId && prev.label === next.label) ? prev : next);
+    try { localStorage.setItem('kc_browse', JSON.stringify(next)); } catch { /* storage unavailable */ }
+  }, []);
   
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -86,30 +110,56 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchProducts = useCallback(async () => {
     setLoading(prev => ({ ...prev, products: true }));
     try {
-      const data = await api.getProducts();
-      // Sort: Promoted first
-      const sorted = [...data].sort((a, b) => (b.isPromoted ? 1 : 0) - (a.isPromoted ? 1 : 0));
-      setProducts(sorted);
+      const { items, hasMore } = await api.getProducts(browse, 0);
+      setProducts(items);
+      setProductPage(0);
+      setHasMoreProducts(hasMore);
       setErrors(prev => ({ ...prev, products: null }));
     } catch (err: any) {
       setErrors(prev => ({ ...prev, products: err.message || 'Failed to fetch products' }));
     } finally {
       setLoading(prev => ({ ...prev, products: false }));
     }
-  }, []);
+  }, [browse]);
+
+  const loadMoreProducts = useCallback(async () => {
+    const next = productPage + 1;
+    try {
+      const { items, hasMore } = await api.getProducts(browse, next);
+      setProducts(prev => [...prev.filter(p => !p.vendorId?.startsWith('demo_')), ...items]);
+      setProductPage(next);
+      setHasMoreProducts(hasMore);
+    } catch (err: any) {
+      setErrors(prev => ({ ...prev, products: err.message || 'Failed to load more products' }));
+    }
+  }, [browse, productPage]);
 
   const fetchServices = useCallback(async () => {
     setLoading(prev => ({ ...prev, services: true }));
     try {
-      const data = await api.getProviders();
-      setServices(data);
+      const { items, hasMore } = await api.getProviders(browse, 0);
+      setServices(items);
+      setServicePage(0);
+      setHasMoreServices(hasMore);
       setErrors(prev => ({ ...prev, services: null }));
     } catch (err: any) {
       setErrors(prev => ({ ...prev, services: err.message || 'Failed to fetch services' }));
     } finally {
       setLoading(prev => ({ ...prev, services: false }));
     }
-  }, []);
+  }, [browse]);
+
+  const loadMoreServices = useCallback(async () => {
+    const next = servicePage + 1;
+    try {
+      const { items, hasMore } = await api.getProviders(browse, next);
+      setServices(prev => [...prev, ...items]);
+      setServicePage(next);
+      setHasMoreServices(hasMore);
+    } catch (err: any) {
+      setErrors(prev => ({ ...prev, services: err.message || 'Failed to load more services' }));
+    }
+  }, [browse, servicePage]);
 
   const fetchOrders = useCallback(async (userId: string) => {
     setLoading(prev => ({ ...prev, orders: true }));
@@ -167,6 +217,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       products, services, cart, orders, deliveries,
       loading, errors,
       fetchProducts, fetchServices, fetchOrders, fetchDeliveries,
+      loadMoreProducts, loadMoreServices, hasMoreProducts, hasMoreServices,
+      browse, setBrowse,
       addToCart, removeFromCart, clearCart, setCart,
       createOrder
     }}>

@@ -2,18 +2,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Check, ArrowRight, User, Loader2, Store, Phone, MapPin, Search, Navigation, AlertTriangle } from 'lucide-react';
 import { Button, Input, Card } from './ui';
-import { api, KUBWA_AREAS } from '../services/data';
+import { api } from '../services/data';
+import LocationPicker, { LocationValue } from './LocationPicker';
 import { User as UserType } from '../types';
 
 interface SetupWizardProps {
   user: UserType;
   onComplete: (updatedUser: UserType) => void; 
 }
-
-const KUBWA_LANDMARKS = [
-    "Arab Road, Kubwa Village", "Byazhin Across, Phase 4", "Dantata Estate, Phase 3", "Deidei Road, Phase 2",
-    "FHA, Phase 2", "Fo1, Kubwa", "Gado Nasko Road", "NYSC Camp Road", "PW Bridge", "Total Station"
-];
 
 const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const [step, setStep] = useState(1);
@@ -24,7 +20,8 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const [storeName, setStoreName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
-  const [area, setArea] = useState(KUBWA_AREAS[0]);
+  const [location, setLocation] = useState<LocationValue>({ stateId: user.stateId, lgaId: user.lgaId, area: user.area || '' });
+  const [formError, setFormError] = useState('');
   const [imageError, setImageError] = useState('');
 
   const isVendor = user.role === 'VENDOR';
@@ -43,6 +40,11 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
 
   const handleFinish = async () => {
     if (loading) return;
+    setFormError('');
+    if (!location.lgaId) {
+      setFormError('Please choose your state and local government area.');
+      return;
+    }
     setLoading(true);
     try {
       let avatarUrl: string | undefined;
@@ -59,7 +61,9 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
         bio: bio.trim(),
         avatar: avatarUrl,
         phoneNumber: phoneNumber.trim(),
-        address: `${address.trim()}, ${area}`,
+        address: [address.trim(), location.area.trim()].filter(Boolean).join(', '),
+        lgaId: location.lgaId,
+        area: location.area.trim() || undefined,
         storeName: isVendor ? storeName.trim() : undefined,
       });
       if (updatedUser) {
@@ -109,13 +113,13 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                </div>
                {isVendor && <Input placeholder="Business name" value={storeName} onChange={e => setStoreName(e.target.value)} />}
                <Input placeholder="Active phone number" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
-               <Input placeholder="Main street address" value={address} onChange={e => setAddress(e.target.value)} />
-               <div className="space-y-1">
-                 <label className="text-xs font-bold text-gray-500 ml-2">Area district</label>
-                 <select className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-kubwa-primary/20" value={area} onChange={e => setArea(e.target.value)}>
-                   {KUBWA_AREAS.map(a => <option key={a}>{a}</option>)}
-                 </select>
-               </div>
+               <LocationPicker value={location} onChange={setLocation} role={user.role} />
+               <Input placeholder="House number and street" value={address} onChange={e => setAddress(e.target.value)} />
+               {formError && (
+                 <div className="p-2.5 bg-red-50 text-red-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                   <AlertTriangle size={14} /> {formError}
+                 </div>
+               )}
             </div>
           )}
         </div>
