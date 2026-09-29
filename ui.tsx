@@ -1,3 +1,4 @@
+import { cn } from './cn';
 import React, { useState } from 'react';
 import { ArrowLeft, ImageOff, ChevronRight } from 'lucide-react';
 
@@ -15,27 +16,27 @@ export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
   };
 
   return (
-    <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
+    <button className={cn(baseStyle, variants[variant], className)} {...props}>
       {children}
     </button>
   );
 };
 
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ children, className = '', ...props }) => (
-  <div className={`bg-white rounded-[1.75rem] shadow-sm shadow-black/[0.03] border border-gray-100 p-6 ${className}`} {...props}>
+  <div className={cn('bg-white rounded-[1.75rem] shadow-sm shadow-black/[0.03] border border-gray-100 p-6', className)} {...props}>
     {children}
   </div>
 );
 
 export const Badge: React.FC<{ children: React.ReactNode; color?: string; className?: string }> = ({ children, color = 'bg-gray-100 text-gray-600', className = '' }) => (
-  <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-transparent flex items-center gap-1.5 w-fit ${color} ${className}`}>
+  <span className={cn('px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-transparent flex items-center gap-1.5 w-fit', color, className)}>
     {children}
   </span>
 );
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className = '', ...props }) => (
   <input
-    className={`w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-kubwa-primary/10 focus:border-kubwa-primary transition-all placeholder:text-gray-500 placeholder:font-medium font-semibold text-kubwa-ink ${className}`}
+    className={cn('w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-kubwa-primary/10 focus:border-kubwa-primary transition-all placeholder:text-gray-500 placeholder:font-medium font-semibold text-kubwa-ink', className)}
     {...props}
   />
 );
@@ -101,7 +102,7 @@ export const SafeImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement> & { f
   const [errored, setErrored] = useState(false);
   if (!src || errored) {
     return (
-      <div className={`bg-gray-100 flex items-center justify-center text-gray-500 ${className}`}>
+      <div className={cn('bg-gray-100 flex items-center justify-center text-gray-500', className)}>
         {fallbackIcon || <ImageOff size={22} strokeWidth={1.5} />}
       </div>
     );
@@ -121,7 +122,7 @@ export const SectionHeader: React.FC<{
   action?: { label: string; onClick: () => void };
   className?: string;
 }> = ({ title, subtitle, icon, action, className = '' }) => (
-  <div className={`flex items-end justify-between gap-4 mb-5 ${className}`}>
+  <div className={cn('flex items-end justify-between gap-4 mb-5', className)}>
     <div className="flex items-center gap-2.5 min-w-0">
       {icon}
       <div className="min-w-0">
