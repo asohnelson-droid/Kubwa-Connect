@@ -4,9 +4,10 @@
  * in /public and the wordmark in index.html).
  */
 export const BRAND = {
-  name: 'Kubwa Connect',
-  tagline: 'Shop. Fix. Deliver.',
+  name: 'Sell Am Here',
+  domain: 'sellamhere.com',
+  tagline: 'Buy, sell and get it done near you.',
   country: 'Nigeria',
-  supportEmail: 'support@kubwaconnect.com',
-  partnersEmail: 'partners@kubwaconnect.com',
+  supportEmail: 'support@sellamhere.com',
+  partnersEmail: 'partners@sellamhere.com',
 } as const;

@@ -1,5 +1,6 @@
 
 
+import BrandMark from '../components/BrandMark';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Wrench, Truck, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Briefcase, Loader2, CheckCircle, ShieldCheck } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
@@ -25,6 +26,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
   const [heroIndex, setHeroIndex] = useState(0);
 
   const heroMessages = [
+    "Got something to sell? Sell am here.",
     "Find trusted artisans near you, in minutes.",
     "Order quality products from local vendors.",
     "Send and track packages across your city."
@@ -124,13 +126,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-8">
              <div className="bg-white p-2 rounded-2xl shadow-xl transform -rotate-6">
-                <svg viewBox="0 0 200 200" className="w-[22px] h-[22px]">
-                  <g strokeLinecap="round" fill="none">
-                    <path d="M 55 30 L 55 170" stroke="#16A34A" strokeWidth="38"/>
-                    <path d="M 55 100 L 155 30" stroke="#F59E0B" strokeWidth="38"/>
-                    <path d="M 55 100 L 155 170" stroke="#2563EB" strokeWidth="38"/>
-                  </g>
-                </svg>
+                <BrandMark className="w-[22px] h-[22px]" />
              </div>
              <span className="font-display text-lg font-bold tracking-tight">{BRAND.name}</span>
           </div>

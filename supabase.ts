@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * KUBWA CONNECT - SUPABASE CLIENT CONFIGURATION
+ * SELL AM HERE - SUPABASE CLIENT CONFIGURATION
  */
 
 const FALLBACK_URL = 'https://espbxsheydqoaeechgln.supabase.co';

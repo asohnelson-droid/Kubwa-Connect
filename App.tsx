@@ -1,5 +1,6 @@
 
 
+import BrandMark from './components/BrandMark';
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
@@ -204,13 +205,7 @@ function App() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
          <div className="w-16 h-16 bg-kubwa-ink rounded-3xl animate-bounce flex items-center justify-center shadow-xl p-3.5">
-            <svg viewBox="0 0 200 200" className="w-full h-full">
-              <g stroke="currentColor" strokeLinecap="round" fill="none">
-                <path d="M 55 30 L 55 170" stroke="#16A34A" strokeWidth="38"/>
-                <path d="M 55 100 L 155 30" stroke="#F59E0B" strokeWidth="38"/>
-                <path d="M 55 100 L 155 170" stroke="#2563EB" strokeWidth="38"/>
-              </g>
-            </svg>
+            <BrandMark className="w-full h-full" />
          </div>
          <p className="mt-6 text-xs font-bold text-gray-500">Syncing app state...</p>
       </div>

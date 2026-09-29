@@ -62,7 +62,7 @@ export const PaymentService = {
           email: params.user.email,
           amount: Math.round(params.total * 100),
           currency: 'NGN',
-          ref: `KC-ORDER-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          ref: `SAH-ORDER-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
           callback: (response: any) => {
             resolve({ success: true, reference: response.reference });
           },
@@ -125,7 +125,7 @@ export const PaymentService = {
           email: user.email,
           amount: amount * 100, // Paystack expects kobo
           currency: 'NGN',
-          ref: `KC-${intent}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          ref: `SAH-${intent}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
           metadata: {
             custom_fields: [
               { display_name: "Payment Intent", variable_name: "intent", value: intent },

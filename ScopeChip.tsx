@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MapPin, ChevronDown, Check } from 'lucide-react';
 import { Sheet } from './ui';
 import { api } from '../services/data';
@@ -57,6 +58,9 @@ const ScopeChip: React.FC<ScopeChipProps> = ({ user, tone = 'light', className =
         <span className="truncate">{browse.label}</span>
         <ChevronDown size={14} className="text-gray-500 shrink-0 ml-auto" />
       </button>
+      {/* Portalled to <body>: the chip sits inside layered hero/card sections whose
+          stacking context would otherwise trap the sheet under the bottom nav. */}
+      {open && createPortal(
       <Sheet isOpen={open} onClose={() => setOpen(false)} title="Where are you shopping?">
         <p className="text-xs text-gray-500 font-medium mb-4">
           Rider delivery works inside one city. Anywhere else, you can arrange pickup with the seller.
@@ -77,7 +81,8 @@ const ScopeChip: React.FC<ScopeChipProps> = ({ user, tone = 'light', className =
         {myCity && !myCity.isLive && (
           <p className="mt-4 text-xs text-gray-500 font-medium">We're not live in {myCity.name} yet. We'll let you know when it opens.</p>
         )}
-      </Sheet>
+      </Sheet>,
+      document.body)}
     </>
   );
 };
