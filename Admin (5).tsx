@@ -26,13 +26,11 @@ import {
   Bell,
   Trash2,
   Plus,
-  PackageCheck,
-  RotateCcw,
   // Add User icon import with alias to avoid conflict with User type from types.ts
   User as UserIcon
 } from 'lucide-react';
 import { api } from '../services/data';
-import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement, MartOrder } from '../types';
+import { User, ApprovalStatus, Transaction, Product, AnalyticsData, Announcement } from '../types';
 import { 
   LineChart, 
   Line, 
@@ -49,20 +47,14 @@ import {
 } from 'recharts';
 
 const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'orders' | 'billing' | 'users' | 'announcements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'products' | 'billing' | 'users' | 'announcements'>('overview');
   const [pendingEntities, setPendingEntities] = useState<User[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [orders, setOrders] = useState<MartOrder[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  // Refunds
-  const [refundingOrder, setRefundingOrder] = useState<MartOrder | null>(null);
-  const [refundReason, setRefundReason] = useState('');
-  const [issuingRefund, setIssuingRefund] = useState(false);
 
   // Announcements tab
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -91,9 +83,6 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
         } else if (activeTab === 'billing') {
             const data = await api.admin.getAllTransactions();
             setTransactions(data);
-        } else if (activeTab === 'orders') {
-            const data = await api.admin.getAllOrders();
-            setOrders(data);
         } else if (activeTab === 'users') {
             const data = await api.admin.getAllUsers();
             setAllUsers(data);
@@ -176,20 +165,6 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
     setActionLoading(null);
   };
 
-  const handleIssueRefund = async () => {
-    if (!refundingOrder || !refundReason.trim()) return;
-    setIssuingRefund(true);
-    const result = await api.admin.issueRefund(refundingOrder.id, refundReason.trim());
-    setIssuingRefund(false);
-    if (result.success) {
-      setOrders(prev => prev.map(o => o.id === refundingOrder.id ? { ...o, refundStatus: 'REFUNDED', refundReason: refundReason.trim() } : o));
-      setRefundingOrder(null);
-      setRefundReason('');
-    } else {
-      alert(result.error || "Couldn't issue the refund. Please try again.");
-    }
-  };
-
   if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'SUPER_ADMIN') return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-12 text-center animate-fade-in">
         <div className="w-24 h-24 bg-red-50 text-red-500 rounded-[2rem] flex items-center justify-center mb-8">
@@ -201,6 +176,16 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
   );
 
   const COLORS = ['#FF5A36', '#16A34A', '#F59E0B', '#2563EB'];
+
+  const revenueData = [
+    { name: 'Mon', rev: 4000 },
+    { name: 'Tue', rev: 3000 },
+    { name: 'Wed', rev: 5000 },
+    { name: 'Thu', rev: 8000 },
+    { name: 'Fri', rev: 6000 },
+    { name: 'Sat', rev: 12000 },
+    { name: 'Sun', rev: 9000 },
+  ];
 
   const ROLE_COLORS: Record<string, string> = {
     VENDOR: 'bg-kubwa-mart/10 text-kubwa-mart',
@@ -214,7 +199,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
          <div>
             <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="text-kubwa-primary" size={18} />
-                <span className="text-xs font-bold text-gray-500">Kubwa Central Governance</span>
+                <span className="text-xs font-bold text-gray-400">Kubwa Central Governance</span>
             </div>
             <h2 className="font-display text-3xl font-bold text-kubwa-ink tracking-tight leading-none">Admin Console</h2>
          </div>
@@ -234,7 +219,6 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
            { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
            { id: 'approvals', label: 'Entities', icon: Clock },
            { id: 'products', label: 'Inventory', icon: ShoppingBag },
-           { id: 'orders', label: 'Orders', icon: PackageCheck },
            { id: 'announcements', label: 'Announcements', icon: Bell },
            { id: 'billing', label: 'Revenue', icon: DollarSign },
            { id: 'users', label: 'Residents', icon: Users }
@@ -258,7 +242,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                       <p className="text-xs font-bold opacity-70 mb-2">Platform revenue</p>
                       <p className="text-4xl font-bold tracking-tight">₦{stats?.revenue.toLocaleString()}</p>
                       <div className="mt-4 flex items-center gap-2 text-xs font-bold">
-                         <span className="bg-white/20 px-2.5 py-1 rounded-lg">{(stats?.conversion ?? 0) >= 0 ? '+' : ''}{stats?.conversion ?? 0}% vs last week</span>
+                         <span className="bg-white/20 px-2.5 py-1 rounded-lg">+{stats?.conversion}% growth</span>
                       </div>
                    </Card>
                    <Card className="p-8 bg-kubwa-ink text-white border-none shadow-xl rounded-[2rem]">
@@ -267,25 +251,22 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                       <p className="text-xs font-semibold text-gray-400 mt-4">Verified business network</p>
                    </Card>
                    <Card className="p-8 bg-white border-none shadow-sm rounded-[2rem]">
-                      <p className="text-xs font-bold text-gray-500 mb-2">Pending tasks</p>
+                      <p className="text-xs font-bold text-gray-400 mb-2">Pending tasks</p>
                       <p className="text-4xl font-bold text-kubwa-ink tracking-tight">{stats?.userStats?.pending || 0}</p>
-                      <p className="text-xs font-semibold text-gray-500 mt-4">Applications awaiting review</p>
+                      <div className="mt-4 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                         <div className="h-full bg-kubwa-fixit" style={{ width: '45%' }} />
+                      </div>
                    </Card>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card className="p-8 rounded-[2rem] border-none shadow-sm bg-white">
-                        <h3 className="text-xs font-bold text-gray-500 mb-8 flex items-center gap-2">
+                        <h3 className="text-xs font-bold text-gray-400 mb-8 flex items-center gap-2">
                            <TrendingUp size={16}/> Revenue velocity (7d)
                         </h3>
                         <div className="h-64 w-full">
-                           {(!stats?.revenueByDay || stats.revenueByDay.every(d => d.rev === 0)) ? (
-                              <div className="h-full flex items-center justify-center text-center px-6">
-                                 <p className="text-xs font-semibold text-gray-500">No subscription revenue in the last 7 days yet.</p>
-                              </div>
-                           ) : (
                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={stats.revenueByDay}>
+                              <LineChart data={revenueData}>
                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 700, fill: '#ccc'}} />
                                  <YAxis hide />
@@ -293,29 +274,24 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                  <Line type="monotone" dataKey="rev" stroke="#FF5A36" strokeWidth={3.5} dot={{r: 4, fill: '#FF5A36', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
                               </LineChart>
                            </ResponsiveContainer>
-                           )}
                         </div>
                     </Card>
 
                     <Card className="p-8 rounded-[2rem] border-none shadow-sm bg-white">
-                        <h3 className="text-xs font-bold text-gray-500 mb-8 flex items-center gap-2">
+                        <h3 className="text-xs font-bold text-gray-400 mb-8 flex items-center gap-2">
                            <Activity size={16}/> Revenue distribution
                         </h3>
                         <div className="h-64 w-full flex items-center">
-                           {(!stats?.revenueSplit || stats.revenueSplit.length === 0) ? (
-                              <p className="text-xs font-semibold text-gray-500 text-center w-full px-6">No subscription revenue in the last 7 days yet.</p>
-                           ) : (
-                           <>
                            <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                  <Pie
-                                    data={stats.revenueSplit}
+                                    data={stats?.revenueSplit || []}
                                     innerRadius={60}
                                     outerRadius={80}
                                     paddingAngle={5}
                                     dataKey="value"
                                  >
-                                    {stats.revenueSplit.map((entry, index) => (
+                                    {stats?.revenueSplit?.map((entry, index) => (
                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                  </Pie>
@@ -323,15 +299,13 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                               </PieChart>
                            </ResponsiveContainer>
                            <div className="space-y-3">
-                              {stats.revenueSplit.map((item, idx) => (
+                              {stats?.revenueSplit?.map((item, idx) => (
                                  <div key={idx} className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[idx % COLORS.length]}} />
                                     <span className="text-xs font-bold text-gray-500">{item.name}</span>
                                  </div>
                               ))}
                            </div>
-                           </>
-                           )}
                         </div>
                     </Card>
                 </div>
@@ -340,10 +314,10 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
 
           {activeTab === 'approvals' && (
             <div className="space-y-6">
-               <h3 className="text-xs font-bold text-gray-500 ml-2">Verification queue</h3>
+               <h3 className="text-xs font-bold text-gray-400 ml-2">Verification queue</h3>
                
                {loading ? (
-                 <div className="py-20 flex flex-col items-center justify-center gap-4 text-gray-500">
+                 <div className="py-20 flex flex-col items-center justify-center gap-4 text-gray-400">
                     <Loader2 className="animate-spin" size={44} />
                     <p className="text-xs font-bold">Processing entity data...</p>
                  </div>
@@ -353,14 +327,14 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                         <CheckCircle size={36} />
                     </div>
                     <h3 className="font-display text-xl font-bold text-kubwa-ink">Queue cleared</h3>
-                    <p className="text-xs font-semibold text-gray-500 mt-2">All business applications have been reviewed.</p>
+                    <p className="text-xs font-semibold text-gray-400 mt-2">All business applications have been reviewed.</p>
                  </Card>
                ) : (
                  <div className="grid grid-cols-1 gap-4">
                     {pendingEntities.map(entity => (
                       <Card key={entity.id} className="p-6 border-none shadow-sm hover:shadow-md transition-all rounded-[2rem] flex flex-col md:flex-row justify-between items-center gap-6">
                          <div className="flex items-center gap-5 w-full md:w-auto">
-                            <div className="w-16 h-16 rounded-[1.5rem] bg-gray-50 flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden border border-gray-100 shrink-0">
+                            <div className="w-16 h-16 rounded-[1.5rem] bg-gray-50 flex items-center justify-center text-xl font-bold text-gray-400 overflow-hidden border border-gray-100 shrink-0">
                                <SafeImage src={entity.avatar} className="w-full h-full object-cover" alt="" fallbackIcon={<span>{entity.name.charAt(0)}</span>} />
                             </div>
                             <div>
@@ -370,11 +344,11 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                      {entity.role}
                                   </Badge>
                                </div>
-                               <p className="text-xs font-semibold text-gray-500 mb-2">{entity.email}</p>
+                               <p className="text-xs font-semibold text-gray-400 mb-2">{entity.email}</p>
                                <div className="flex gap-2">
                                   <button 
                                     onClick={() => handleToggleFeature(entity.id, !!entity.isFeatured)}
-                                    className={`text-[10px] font-bold px-3 py-1 rounded-full border ${entity.isFeatured ? 'bg-kubwa-amber/10 text-kubwa-amber border-kubwa-amber/20' : 'text-gray-500 border-gray-100'}`}
+                                    className={`text-[10px] font-bold px-3 py-1 rounded-full border ${entity.isFeatured ? 'bg-kubwa-amber/10 text-kubwa-amber border-kubwa-amber/20' : 'text-gray-300 border-gray-100'}`}
                                   >
                                     <Star size={10} className={`inline mr-1 ${entity.isFeatured ? 'fill-kubwa-amber' : ''}`} /> Featured
                                   </button>
@@ -407,12 +381,12 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
 
           {activeTab === 'products' && (
             <div className="space-y-6">
-                <h3 className="text-xs font-bold text-gray-500 ml-2">New product listings</h3>
+                <h3 className="text-xs font-bold text-gray-400 ml-2">New product listings</h3>
                 {loading ? (
                     <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" size={36} /></div>
                 ) : pendingProducts.length === 0 ? (
                     <Card className="py-20 text-center rounded-[2.5rem] border-dashed border-2">
-                         <p className="text-xs font-bold text-gray-500">Inventory is clean</p>
+                         <p className="text-xs font-bold text-gray-400">Inventory is clean</p>
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
@@ -425,7 +399,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                     <div className="min-w-0">
                                         <h4 className="font-bold text-kubwa-ink text-sm truncate">{product.name}</h4>
                                         <p className="text-xs font-bold text-kubwa-mart">₦{product.price.toLocaleString()}</p>
-                                        <p className="text-[11px] font-semibold text-gray-500 mt-0.5 truncate">From: {product.vendorId}</p>
+                                        <p className="text-[11px] font-semibold text-gray-400 mt-0.5 truncate">From: {product.vendorId}</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-2 shrink-0">
@@ -442,7 +416,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
           {activeTab === 'announcements' && (
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                    <h3 className="text-xs font-bold text-gray-500 ml-2">Home screen announcements</h3>
+                    <h3 className="text-xs font-bold text-gray-400 ml-2">Home screen announcements</h3>
                     <Button onClick={() => setIsAnnouncementSheetOpen(true)} className="h-11 text-xs px-5">
                         <Plus size={16} /> New announcement
                     </Button>
@@ -452,10 +426,10 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                     <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" size={36} /></div>
                 ) : announcements.length === 0 ? (
                     <Card className="py-20 text-center rounded-[2.5rem] border-dashed border-2">
-                         <div className="w-20 h-20 bg-gray-50 text-gray-500 rounded-[1.75rem] flex items-center justify-center mx-auto mb-6">
+                         <div className="w-20 h-20 bg-gray-50 text-gray-300 rounded-[1.75rem] flex items-center justify-center mx-auto mb-6">
                             <Bell size={36} />
                          </div>
-                         <p className="text-xs font-bold text-gray-500">No announcements yet</p>
+                         <p className="text-xs font-bold text-gray-400">No announcements yet</p>
                     </Card>
                 ) : (
                     <div className="space-y-4">
@@ -469,7 +443,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                                 a.type === 'PROMO' ? 'bg-kubwa-amber/10 text-kubwa-amber' :
                                                 'bg-blue-50 text-blue-600'
                                             }>{a.type}</Badge>
-                                            <Badge color={a.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}>
+                                            <Badge color={a.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}>
                                                 {a.isActive ? 'Live' : 'Hidden'}
                                             </Badge>
                                         </div>
@@ -508,7 +482,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                             onChange={e => setNewMessage(e.target.value)}
                         />
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 ml-2">Type</label>
+                            <label className="text-xs font-bold text-gray-400 ml-2">Type</label>
                             <select
                                 className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none"
                                 value={newType}
@@ -530,7 +504,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
           {activeTab === 'users' && (
             <div className="space-y-4">
                 <div className="relative mb-6">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                     <input className="w-full pl-12 pr-6 py-4 bg-gray-100 border-none rounded-[1.75rem] text-sm font-semibold outline-none" placeholder="Search Kubwa resident directory..." />
                 </div>
                 {loading ? (
@@ -548,7 +522,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
                                          <p className="text-sm font-bold text-kubwa-ink truncate">{user.name}</p>
                                          <Badge color={user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' ? 'bg-indigo-50 text-indigo-600' : ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-500'}>{user.role}</Badge>
                                       </div>
-                                      <p className="text-xs font-semibold text-gray-500 truncate">{user.email} • {new Date(user.joinedAt || '').toLocaleDateString()}</p>
+                                      <p className="text-xs font-semibold text-gray-400 truncate">{user.email} • {new Date(user.joinedAt || '').toLocaleDateString()}</p>
                                   </div>
                               </div>
                               <button className="p-3 text-gray-200 hover:text-kubwa-primary transition-colors shrink-0">
@@ -561,71 +535,25 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             </div>
           )}
 
-          {activeTab === 'orders' && (
-            <div className="space-y-4">
-               <h3 className="text-xs font-bold text-gray-500 ml-2">Recent orders (most recent 100)</h3>
-               {loading ? (
-                  <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" /></div>
-               ) : orders.length === 0 ? (
-                  <div className="text-center py-20 text-gray-500 font-bold text-sm">No orders yet</div>
-               ) : (
-                 orders.map(order => (
-                   <Card key={order.id} className="p-6 border-none shadow-sm rounded-[2rem]">
-                      <div className="flex justify-between items-start gap-4">
-                         <div className="flex items-center gap-4 min-w-0">
-                            <div className="p-3.5 bg-gray-50 rounded-2xl text-gray-500 shrink-0">
-                               <PackageCheck size={22} />
-                            </div>
-                            <div className="min-w-0">
-                               <p className="text-sm font-bold text-kubwa-ink">Order #{order.id.slice(0, 6)}</p>
-                               <p className="text-[11px] font-semibold text-gray-500 mt-0.5">{new Date(order.created_at).toLocaleDateString()} &middot; {order.deliveryOption}</p>
-                               <div className="flex items-center gap-1.5 mt-1.5">
-                                  <Badge color="bg-gray-100 text-gray-600">{order.status.replace('_', ' ')}</Badge>
-                                  {order.refundStatus === 'REFUNDED' && (
-                                     <Badge color="bg-red-50 text-red-500">Refunded</Badge>
-                                  )}
-                               </div>
-                            </div>
-                         </div>
-                         <div className="text-right shrink-0">
-                            <p className="text-lg font-bold text-kubwa-mart">₦{order.total.toLocaleString()}</p>
-                            {order.refundStatus === 'REFUNDED' ? (
-                               <p className="text-[10px] font-semibold text-gray-500 mt-2 max-w-[140px]">{order.refundReason}</p>
-                            ) : (
-                               <button
-                                  onClick={() => { setRefundingOrder(order); setRefundReason(''); }}
-                                  className="mt-2 flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-600 ml-auto"
-                               >
-                                  <RotateCcw size={12} /> Issue refund
-                               </button>
-                            )}
-                         </div>
-                      </div>
-                   </Card>
-                 ))
-               )}
-            </div>
-          )}
-
           {activeTab === 'billing' && (
             <div className="space-y-4">
                <div className="flex justify-between items-center px-2">
-                  <h3 className="text-xs font-bold text-gray-500">Revenue streams</h3>
+                  <h3 className="text-xs font-bold text-gray-400">Revenue streams</h3>
                </div>
                {loading ? (
                   <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-kubwa-primary" /></div>
                ) : transactions.length === 0 ? (
-                  <div className="text-center py-20 text-gray-500 font-bold text-sm">No recent transactions</div>
+                  <div className="text-center py-20 text-gray-400 font-bold text-sm">No recent transactions</div>
                ) : (
                  transactions.map(tx => (
                    <Card key={tx.id} className="flex justify-between items-center p-6 border-none shadow-sm rounded-[2rem]">
                       <div className="flex items-center gap-5">
-                         <div className="p-3.5 bg-gray-50 rounded-2xl text-gray-500">
+                         <div className="p-3.5 bg-gray-50 rounded-2xl text-gray-400">
                             <DollarSign size={22} />
                          </div>
                          <div>
                             <p className="text-sm font-bold text-kubwa-ink">{tx.intent.replace('_', ' ')}</p>
-                            <p className="text-[11px] font-semibold text-gray-500 mt-0.5">Ref: {tx.reference}</p>
+                            <p className="text-[11px] font-semibold text-gray-400 mt-0.5">Ref: {tx.reference}</p>
                          </div>
                       </div>
                       <div className="text-right">
@@ -640,29 +568,6 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
             </div>
           )}
       </div>
-
-      <Sheet isOpen={!!refundingOrder} onClose={() => setRefundingOrder(null)} title="Issue Refund">
-        {refundingOrder && (
-          <div className="p-6 pb-8 space-y-4">
-            <div className="bg-gray-50 rounded-2xl p-4">
-               <p className="text-xs font-bold text-gray-500">Order #{refundingOrder.id.slice(0, 6)}</p>
-               <p className="text-2xl font-bold text-kubwa-ink mt-1">₦{refundingOrder.total.toLocaleString()}</p>
-            </div>
-            <p className="text-xs font-semibold text-gray-500 leading-relaxed">
-               This records the refund for your own tracking and marks the order visibly refunded. It does not move money automatically -- process the actual payment reversal in Paystack yourself.
-            </p>
-            <textarea
-              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold h-24 resize-none outline-none focus:ring-2 focus:ring-kubwa-primary/20"
-              placeholder="Reason for this refund (required)"
-              value={refundReason}
-              onChange={e => setRefundReason(e.target.value)}
-            />
-            <Button onClick={handleIssueRefund} disabled={issuingRefund || !refundReason.trim()} className="w-full h-14 bg-red-500 shadow-red-500/20">
-              {issuingRefund ? <Loader2 className="animate-spin" /> : 'Confirm refund'}
-            </Button>
-          </div>
-        )}
-      </Sheet>
     </div>
   );
 };

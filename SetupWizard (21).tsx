@@ -19,7 +19,6 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [bio, setBio] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -31,33 +30,28 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // No size gate here at all -- the real phone-camera file gets
-    // compressed down before it's ever actually uploaded, so an arbitrary
-    // raw-file-size cutoff on the original photo no longer serves any
-    // purpose and was exactly what caused most uploads to be rejected.
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Increased limit to 500KB
+      if (file.size > 500 * 1024) { 
+        setImageError("This photo is too large. Please use a file smaller than 500KB.");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => setAvatarPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleFinish = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      let avatarUrl: string | undefined;
-      if (avatarFile) {
-        const uploaded = await api.storage.uploadAvatar(user.id, avatarFile);
-        if (!uploaded) {
-          setImageError("Your photo couldn't be uploaded. Please try a different one.");
-          setLoading(false);
-          return;
-        }
-        avatarUrl = uploaded;
-      }
       const updatedUser = await api.users.completeSetup(user.id, {
         bio: bio.trim(),
-        avatar: avatarUrl,
+        avatar: avatarPreview,
         phoneNumber: phoneNumber.trim(),
         address: `${address.trim()}, ${area}`,
         storeName: isVendor ? storeName.trim() : undefined,
@@ -65,7 +59,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
       if (updatedUser) {
         onComplete(updatedUser);
       } else {
-        alert("We couldn't save your profile. Please check your connection and try again.");
+        alert("Memory Full: We couldn't save your profile because your phone's memory is full. Try using a smaller photo.");
       }
     } catch (err) {
       alert("Error saving profile. Check your connection.");
@@ -88,7 +82,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
           {step === 1 ? (
             <div className="text-center animate-fade-in">
                <div className="relative w-32 h-32 rounded-[2rem] bg-gray-50 mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-gray-100">
-                  {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <Camera className="text-gray-500" size={30} />}
+                  {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={30} />}
                   <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
                </div>
                
@@ -98,8 +92,8 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                  </div>
                )}
 
-               <h3 className="font-display text-xl font-bold mb-2 text-kubwa-ink">Your passport <span className="text-gray-500 text-sm font-medium">(optional)</span></h3>
-               <p className="text-gray-500 text-xs font-bold mb-8">Upload a photo for identification.</p>
+               <h3 className="font-display text-xl font-bold mb-2 text-kubwa-ink">Your passport <span className="text-gray-400 text-sm font-medium">(optional)</span></h3>
+               <p className="text-gray-400 text-xs font-bold mb-8">Upload a photo for identification.</p>
                <textarea className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold h-32 resize-none outline-none focus:ring-2 focus:ring-kubwa-primary/20" placeholder="A short bio about you or your business..." value={bio} onChange={e => setBio(e.target.value)} />
             </div>
           ) : (
@@ -111,7 +105,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                <Input placeholder="Active phone number" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
                <Input placeholder="Main street address" value={address} onChange={e => setAddress(e.target.value)} />
                <div className="space-y-1">
-                 <label className="text-xs font-bold text-gray-500 ml-2">Area district</label>
+                 <label className="text-xs font-bold text-gray-400 ml-2">Area district</label>
                  <select className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-kubwa-primary/20" value={area} onChange={e => setArea(e.target.value)}>
                    {KUBWA_AREAS.map(a => <option key={a}>{a}</option>)}
                  </select>

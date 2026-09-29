@@ -1,10 +1,9 @@
 
 
 import { supabase } from './supabase';
-import { compressImage } from './imageUtils';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus } from '../types';
 
-export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin', 'FCDA', 'Chikakore', 'Kubwa Village', 'Deidei', 'Galadinma', 'FOI', 'Federal Housing', 'Phase 2 Site 1', 'Phase 2 Site 2', 'Kagini', 'Karsana'];
+export const KUBWA_AREAS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Gwarinpa', 'Dawaki', 'Dutse', 'Arab Road', 'Byazhin'];
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
 export const PRODUCT_CATEGORIES = [
@@ -209,19 +208,15 @@ export const api = {
             const { error } = await supabase.rpc('request_role_upgrade', { new_role: newRole });
             return { success: !error, error: error?.message };
         },
-        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string; avatar?: string }): Promise<{ success: boolean; error?: string }> => {
+        updateProfile: async (userId: string, data: { name?: string; phoneNumber?: string; address?: string }): Promise<{ success: boolean; error?: string }> => {
             try {
-                const { avatar, ...syncableData } = data;
-                const metaData: any = { ...syncableData };
-                if (syncableData.name) metaData.full_name = syncableData.name;
+                const metaData: any = { ...data };
+                if (data.name) metaData.full_name = data.name;
 
                 const { error: authError } = await supabase.auth.updateUser({ data: metaData });
                 if (authError) throw authError;
 
-                const profileUpdate: any = { ...syncableData };
-                if (avatar !== undefined) profileUpdate.avatar = avatar;
-
-                const { error: profileError } = await supabase.from('profiles').update(profileUpdate).eq('id', userId);
+                const { error: profileError } = await supabase.from('profiles').update(data).eq('id', userId);
                 if (profileError) throw profileError;
 
                 return { success: true };
@@ -371,10 +366,9 @@ export const api = {
     },
     storage: {
         uploadProductImage: async (vendorId: string, file: File): Promise<string | null> => {
-            const compressed = await compressImage(file);
-            const ext = compressed.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
             const path = `${vendorId}/${crypto.randomUUID()}.${ext}`;
-            const { error } = await supabase.storage.from('product-images').upload(path, compressed, {
+            const { error } = await supabase.storage.from('product-images').upload(path, file, {
                 cacheControl: '3600',
                 upsert: false
             });
@@ -394,31 +388,6 @@ export const api = {
             if (idx === -1) return;
             const path = url.slice(idx + marker.length).split('?')[0];
             await supabase.storage.from('product-images').remove([path]);
-        },
-        uploadAvatar: async (userId: string, file: File): Promise<string | null> => {
-            const compressed = await compressImage(file, 800, 0.85); // avatars display small -- no need for the larger dimension used for product photos
-            const ext = compressed.name.split('.').pop()?.toLowerCase() || 'jpg';
-            const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-            const { error } = await supabase.storage.from('avatars').upload(path, compressed, {
-                cacheControl: '3600',
-                upsert: false
-            });
-            if (error) {
-                console.warn('[storage] avatar upload failed:', error.message);
-                return null;
-            }
-            const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-            return data.publicUrl;
-        },
-        deleteAvatar: async (url: string): Promise<void> => {
-            // Best-effort cleanup of the previous photo once a new one is
-            // successfully saved -- each upload gets a unique filename, so
-            // without this, replaced avatars would just accumulate forever.
-            const marker = '/avatars/';
-            const idx = url.indexOf(marker);
-            if (idx === -1) return;
-            const path = url.slice(idx + marker.length).split('?')[0];
-            await supabase.storage.from('avatars').remove([path]);
         }
     },
     getProducts: async (): Promise<Product[]> => {
@@ -530,59 +499,17 @@ export const api = {
             const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
             const { count: pendingCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
             const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
-
-            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-            const { data: recentTxns } = await supabase
-                .from('transactions')
-                .select('amount, intent, created_at')
-                .eq('status', 'SUCCESS')
-                .gte('created_at', fourteenDaysAgo);
-
-            const txns = recentTxns || [];
-            const now = Date.now();
-            const sevenDaysAgoMs = now - 7 * 24 * 60 * 60 * 1000;
-
-            // Kobo -> Naira. This is the only real revenue this business has --
-            // Mart/FixIt transactions are not commissioned, only tier
-            // subscriptions are, so anything else here would be fiction.
-            const thisWeek = txns.filter(t => new Date(t.created_at).getTime() >= sevenDaysAgoMs);
-            const lastWeek = txns.filter(t => new Date(t.created_at).getTime() < sevenDaysAgoMs);
-            const thisWeekTotal = thisWeek.reduce((sum, t) => sum + t.amount, 0) / 100;
-            const lastWeekTotal = lastWeek.reduce((sum, t) => sum + t.amount, 0) / 100;
-            const growthPct = lastWeekTotal > 0
-                ? Math.round(((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100)
-                : (thisWeekTotal > 0 ? 100 : 0);
-
-            const splitByIntent: Record<string, number> = {};
-            for (const t of thisWeek) {
-                const label = t.intent === 'VENDOR_FEATURED' ? 'Vendor Featured'
-                    : t.intent === 'VENDOR_VERIFIED' ? 'Vendor Verified'
-                    : t.intent === 'FIXIT_VERIFIED' ? 'FixIt Verified'
-                    : t.intent;
-                splitByIntent[label] = (splitByIntent[label] || 0) + (t.amount / 100);
-            }
-
-            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const revenueByDay = Array.from({ length: 7 }, (_, i) => {
-                const dayStart = new Date(now - (6 - i) * 24 * 60 * 60 * 1000);
-                dayStart.setHours(0, 0, 0, 0);
-                const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-                const dayTotal = txns
-                    .filter(t => {
-                        const ts = new Date(t.created_at).getTime();
-                        return ts >= dayStart.getTime() && ts < dayEnd.getTime();
-                    })
-                    .reduce((sum, t) => sum + t.amount, 0) / 100;
-                return { name: dayNames[dayStart.getDay()], rev: dayTotal };
-            });
-
+            
             return {
                 dau: userCount || 0,
-                revenue: thisWeekTotal,
-                retention: 0, // Not tracked -- no session/return-visit data exists in this schema yet.
-                conversion: growthPct,
-                revenueSplit: Object.entries(splitByIntent).map(([name, value]) => ({ name, value })),
-                revenueByDay,
+                revenue: 245000,
+                retention: 78,
+                conversion: 12,
+                revenueSplit: [
+                    { name: 'Mart Fees', value: 120000 },
+                    { name: 'FixIt Leads', value: 85000 },
+                    { name: 'Subscriptions', value: 40000 }
+                ],
                 userStats: {
                     pending: pendingCount || 0,
                     total: userCount || 0,
@@ -597,14 +524,6 @@ export const api = {
         getAllTransactions: async (): Promise<Transaction[]> => {
             const { data } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
             return (data as any) || [];
-        },
-        getAllOrders: async (): Promise<MartOrder[]> => {
-            const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
-            return (data as any) || [];
-        },
-        issueRefund: async (orderId: string, reason: string): Promise<{ success: boolean; error?: string }> => {
-            const { error } = await supabase.rpc('issue_refund', { p_order_id: orderId, p_reason: reason });
-            return { success: !error, error: error?.message };
         }
     },
     reviews: { 

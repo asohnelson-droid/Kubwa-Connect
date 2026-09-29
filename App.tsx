@@ -1,11 +1,9 @@
 
 
-import BrandMark from './components/BrandMark';
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { Home as HomeIcon, ShoppingBag, Wrench, Truck, User, Loader2, X } from 'lucide-react';
 import { AppSection, UserRole, CartItem, User as UserType } from './types';
 import SetupWizard from './components/SetupWizard';
-import LocationPrompt from './components/LocationPrompt';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
 import { useData } from './contexts/DataContext';
@@ -30,8 +28,7 @@ function App() {
   const hasInitializedRef = useRef(false);
 
   // Use DataContext for cart state
-  const { cart, setCart, addToCart, setBrowse } = useData();
-  const browseDefaultKeyRef = useRef<string | null>(null);
+  const { cart, setCart, addToCart } = useData();
   
   const [authIntent, setAuthIntent] = useState<{ section: AppSection; role: UserRole } | null>(null);
 
@@ -96,27 +93,6 @@ function App() {
       isRefreshingRef.current = false;
     }
   }, [navigateTo]);
-
-  /**
-   * DEFAULT BROWSING AREA
-   * When a member signs in or changes location, Mart/FixIt/Home start on
-   * their own city if it is live, otherwise on all of Nigeria. A manual
-   * choice in the location chip stays until the next sign-in or move.
-   */
-  useEffect(() => {
-    const key = user ? `${user.id}:${user.cityId ?? ''}` : 'guest';
-    if (browseDefaultKeyRef.current === key) return;
-    const firstRun = browseDefaultKeyRef.current === null;
-    browseDefaultKeyRef.current = key;
-    if (!user) {
-      if (!firstRun) setBrowse({ scope: 'NATIONAL', label: 'All Nigeria' });
-      return;
-    }
-    api.locations.getCities().then(cities => {
-      const city = user.cityId ? cities.find(c => c.id === user.cityId) : undefined;
-      setBrowse(city?.isLive ? { scope: 'CITY', cityId: city.id, label: city.name } : { scope: 'NATIONAL', label: 'All Nigeria' });
-    });
-  }, [user?.id, user?.cityId, setBrowse]);
 
   /**
    * APP LIFECYCLE
@@ -205,7 +181,13 @@ function App() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
          <div className="w-16 h-16 bg-kubwa-ink rounded-3xl animate-bounce flex items-center justify-center shadow-xl p-3.5">
-            <BrandMark className="w-full h-full" />
+            <svg viewBox="0 0 200 200" className="w-full h-full">
+              <g stroke="currentColor" strokeLinecap="round" fill="none">
+                <path d="M 55 30 L 55 170" stroke="#16A34A" strokeWidth="38"/>
+                <path d="M 55 100 L 155 30" stroke="#F59E0B" strokeWidth="38"/>
+                <path d="M 55 100 L 155 170" stroke="#2563EB" strokeWidth="38"/>
+              </g>
+            </svg>
          </div>
          <p className="mt-6 text-xs font-bold text-gray-500">Syncing app state...</p>
       </div>
@@ -232,10 +214,6 @@ function App() {
         />
       )}
       
-      {user && user.isSetupComplete && !user.lgaId && (
-        <LocationPrompt user={user} onSaved={() => refreshUser()} />
-      )}
-
       <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32">
          <Suspense fallback={
            <div className="h-full flex items-center justify-center">
