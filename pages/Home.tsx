@@ -1,14 +1,12 @@
 
-
-import BrandMark from '../components/BrandMark';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Wrench, Truck, Store, Bike, Search, MapPin, Bell, X, Star, Crown, Briefcase, Loader2, CheckCircle, ShieldCheck } from 'lucide-react';
 import { AppSection, UserRole, User as UserType, Announcement, Product } from '../types';
 import { Button, Sheet, SafeImage, SectionHeader } from '../components/ui';
 import { api } from '../services/data';
-import { BRAND } from '../config/brand';
 import { useData } from '../contexts/DataContext';
 import ScopeChip from '../components/ScopeChip';
+import HomeHero, { HeroSlideId } from '../components/HomeHero';
 
 interface HomeProps {
   setSection: (section: AppSection) => void;
@@ -23,20 +21,6 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
   const [visibleAnnouncement, setVisibleAnnouncement] = useState<Announcement | null>(null);
   const [featuredVendors, setFeaturedVendors] = useState<UserType[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
-  const [heroIndex, setHeroIndex] = useState(0);
-
-  const heroMessages = [
-    "Got something to sell? Sell am here.",
-    "Find trusted artisans near you, in minutes.",
-    "Order quality products from local vendors.",
-    "Send and track packages across your city."
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => setHeroIndex((prev) => (prev + 1) % heroMessages.length), 5000);
-    return () => clearInterval(interval);
-  }, []);
-
   useEffect(() => {
     api.admin.getAnnouncements().then(data => data.length && setVisibleAnnouncement(data[0]));
   }, []);
@@ -104,6 +88,13 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
     setUpgradeTarget({ role, title: opt.title, desc: opt.desc, icon: opt.icon });
   };
 
+  const handleHeroAction = (slide: HeroSlideId) => {
+    if (slide === 'sell') handleRoleAction('VENDOR');
+    else if (slide === 'mart') setSection(AppSection.MART);
+    else if (slide === 'fixit') setSection(AppSection.FIXIT);
+    else setSection(AppSection.RIDE);
+  };
+
   const handleConfirmUpgrade = async () => {
     if (!upgradeTarget) return;
     setRequestingUpgrade(true);
@@ -119,24 +110,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
 
   return (
     <div className="pb-24 md:pb-0">
-      {/* Dynamic Hero Section */}
-      <div className="bg-gradient-to-br from-kubwa-primary to-kubwa-primaryDark text-white rounded-b-[2.5rem] p-8 pt-16 relative overflow-hidden shadow-2xl min-h-[400px] md:rounded-[2.5rem] md:mt-8 md:p-14 md:min-h-0">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full -ml-24 -mb-24 blur-3xl" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8 md:hidden">
-             <div className="bg-white p-2 rounded-2xl shadow-xl transform -rotate-6">
-                <BrandMark className="w-[22px] h-[22px]" />
-             </div>
-             <span className="font-display text-lg font-bold tracking-tight">{BRAND.name}</span>
-          </div>
-
-          <div className="min-h-[4.5rem] mb-6 md:min-h-[7rem] md:mb-8 md:max-w-2xl">
-             <h1 key={heroIndex} className="font-display text-[1.75rem] leading-[1.15] font-bold animate-fade-in md:text-5xl md:leading-[1.1]">
-               {heroMessages[heroIndex]}
-             </h1>
-          </div>
-
+      <HomeHero onAction={handleHeroAction}>
           <div className="bg-white rounded-3xl p-3 shadow-2xl flex flex-col gap-3 md:flex-row md:items-center md:max-w-3xl">
              <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-2xl md:flex-1 md:py-3">
                 <Search className="text-gray-500" size={20} />
@@ -154,8 +128,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
                 <Button onClick={handleSearch} className="px-8 shadow-none h-12 shrink-0">Search</Button>
              </div>
           </div>
-        </div>
-      </div>
+      </HomeHero>
 
       {visibleAnnouncement && (
         <div className="mx-6 -mt-6 md:mx-0 md:mt-6 relative z-20 bg-kubwa-ink text-white rounded-3xl shadow-2xl p-4 flex justify-between items-center animate-slide-in-bottom">
