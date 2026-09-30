@@ -341,10 +341,9 @@ export const api = {
                 return null; 
             }
         },
+        // Profiles are private (own row only); this server function returns just the public shop identity.
         getFeaturedVendors: async (cityId?: number) => {
-            let q = supabase.from('profiles').select('*').eq('tier', 'FEATURED').eq('role', 'VENDOR').eq('status', 'APPROVED');
-            if (cityId) q = q.eq('cityId', cityId);
-            const { data } = await q;
+            const { data } = await supabase.rpc('get_featured_vendors', { p_city_id: cityId ?? null });
             return (data as any) || [];
         },
         getAddresses: async (userId: string): Promise<Address[]> => {
@@ -369,14 +368,15 @@ export const api = {
     riders: {
         // Riders are matched by city: a vendor only ever sees riders who work in their city.
         // The database enforces the same rule when a rider is assigned.
+        // The server uses the signed-in vendor's own city, so the cityId argument is only a guard.
         getAvailable: async (cityId?: number): Promise<{ id: string; name: string; phoneNumber?: string }[]> => {
             if (!cityId) return [];
-            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber"').eq('role', 'RIDER').eq('status', 'APPROVED').eq('available', true).eq('cityId', cityId);
+            const { data } = await supabase.rpc('get_city_riders', { p_only_available: true });
             return (data as any) || [];
         },
         getAllApproved: async (cityId?: number): Promise<{ id: string; name: string; phoneNumber?: string; available: boolean }[]> => {
             if (!cityId) return [];
-            const { data } = await supabase.from('profiles').select('id, name, "phoneNumber", available').eq('role', 'RIDER').eq('status', 'APPROVED').eq('cityId', cityId);
+            const { data } = await supabase.rpc('get_city_riders', { p_only_available: false });
             return (data as any) || [];
         },
         getMyAvailability: async (userId: string): Promise<boolean> => {
@@ -482,8 +482,9 @@ export const api = {
         return { items, hasMore };
     },
     getVendorPickupInfo: async (vendorId: string): Promise<{ storeName?: string; address?: string; location?: string; area?: string; lgaId?: number; stateId?: number; cityId?: number } | null> => {
-        const { data } = await supabase.from('profiles').select('storeName, address, location, area, "lgaId", "stateId", "cityId"').eq('id', vendorId).maybeSingle();
-        return data || null;
+        const { data } = await supabase.rpc('get_vendor_public_info', { p_vendor_id: vendorId });
+        const row = Array.isArray(data) ? data[0] : data;
+        return (row as any) || null;
     },
     getProviders: async (browse?: BrowseLocation, page = 0): Promise<{ items: ServiceProvider[]; hasMore: boolean }> => {
         let q = supabase
@@ -505,10 +506,21 @@ export const api = {
         return { items, hasMore: items.length === PAGE_SIZE };
     },
     getDeliveries: async (userId?: string): Promise<DeliveryRequest[]> => {
-        let query = supabase.from('deliveries').select('*, rider:profiles!deliveries_riderid_fkey(name, phoneNumber)');
+        let query = supabase.from('deliveries').select('*');
         if (userId) query = query.or(`userId.eq.${userId},riderId.eq.${userId}`);
         const { data } = await query;
-        return (data as any) || [];
+        const deliveries: DeliveryRequest[] = (data as any) || [];
+        // Rider contact comes from a server function limited to deliveries you're part of.
+        const withRider = deliveries.filter(d => d.riderId).map(d => d.id);
+        if (withRider.length) {
+            const { data: riders } = await supabase.rpc('get_delivery_riders', { p_delivery_ids: withRider });
+            const byDelivery = new Map(((riders as any[]) || []).map(r => [r.deliveryId, { name: r.name, phoneNumber: r.phoneNumber }]));
+            for (const d of deliveries) {
+                const rider = byDelivery.get(d.id);
+                if (rider) d.rider = rider;
+            }
+        }
+        return deliveries;
     },
     // The fee is set by the database from the city's zone prices; the client never sends one.
     requestDelivery: async (data: { userId: string; pickup: string; dropoff: string; itemType: string; phoneNumber: string; pickupLgaId: number; dropoffLgaId: number }): Promise<{ success: boolean; error?: string }> => {
