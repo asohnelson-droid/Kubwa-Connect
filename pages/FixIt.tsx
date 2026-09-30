@@ -9,6 +9,7 @@ import { ServiceProvider, User as UserType, Review, AppSection, ServiceOrder, Se
 import { Button, Card, Badge, Breadcrumbs, Input, BackButton, Sheet, SafeImage, SectionHeader } from '../components/ui';
 import AuthModal from '../components/AuthModal';
 import { useData } from '../contexts/DataContext';
+import SectionHero from '../components/SectionHero';
 
 interface FixItProps {
   user: UserType | null;
@@ -247,8 +248,10 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
         ]} />
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">FixIt Services</h2>
+      <SectionHero variant="fixit" />
+
+      <div className="flex justify-between items-center mb-6 md:justify-end md:mb-4">
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight md:sr-only">FixIt Services</h2>
         {myProfile && (
            <button 
              onClick={handleToggleStatus}

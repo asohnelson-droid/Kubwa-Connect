@@ -8,6 +8,7 @@ import { Product, CartItem, User, AppSection, Lga } from '../types';
 import ScopeChip from '../components/ScopeChip';
 import { Button, Badge, Card, Breadcrumbs, Sheet, Input, BackButton, SafeImage } from '../components/ui';
 import { useData } from '../contexts/DataContext';
+import SectionHero from '../components/SectionHero';
 
 interface MartProps {
   addToCart: (product: Product) => void;
@@ -259,8 +260,10 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
     <div className="pb-24 pt-4 px-4 md:px-0 md:pt-8 md:pb-0">
       {user && goBack && <BackButton onClick={goBack} />}
       
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Mart</h2>
+      <SectionHero variant="mart" />
+
+      <div className="flex justify-between items-center mb-6 md:justify-end md:mb-4">
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight md:sr-only">Mart</h2>
         <div className="flex items-center gap-2">
            {user?.role === 'VENDOR' && (
              <button 

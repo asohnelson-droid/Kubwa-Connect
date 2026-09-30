@@ -6,6 +6,7 @@ import { api } from '../services/data';
 import { supabase } from '../services/supabase';
 import { Button, Card, Input, Badge, Breadcrumbs, BackButton, SectionHeader } from '../components/ui';
 import { User, DeliveryRequest, Address, AppSection, DeliveryStatus, Lga } from '../types';
+import SectionHero from '../components/SectionHero';
 
 interface DeliveriesProps {
   user: User | null;
@@ -252,8 +253,10 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Ride</h2>
+      <SectionHero variant="ride" />
+
+      <div className="flex justify-between items-center mb-6 md:justify-end md:mb-4">
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight md:sr-only">Ride</h2>
         {!isRider && isElite && <Badge color="bg-kubwa-ink text-kubwa-amber border border-kubwa-amber/40">Elite Benefits</Badge>}
         {isRider && (
            <button 
