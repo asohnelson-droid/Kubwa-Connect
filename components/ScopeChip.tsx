@@ -1,3 +1,4 @@
+import { cn } from './cn';
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MapPin, ChevronDown, Check } from 'lucide-react';
@@ -51,7 +52,7 @@ const ScopeChip: React.FC<ScopeChipProps> = ({ user, tone = 'light', className =
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`rounded-2xl px-4 py-3 flex items-center gap-2 min-w-0 text-xs font-bold ${chipClass} ${className}`}
+        className={cn('rounded-2xl px-4 py-3 flex items-center gap-2 min-w-0 text-xs font-bold', chipClass, className)}
         aria-label={`Browsing ${browse.label}. Change location`}
       >
         <MapPin size={16} className="text-kubwa-primary shrink-0" />

@@ -1,5 +1,6 @@
+import { cn } from './cn';
 import React, { useState } from 'react';
-import { ArrowLeft, ImageOff, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ImageOff, ChevronRight, X } from 'lucide-react';
 
 export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' }> = ({
   children, variant = 'primary', className = '', ...props
@@ -15,27 +16,27 @@ export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
   };
 
   return (
-    <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
+    <button className={cn(baseStyle, variants[variant], className)} {...props}>
       {children}
     </button>
   );
 };
 
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ children, className = '', ...props }) => (
-  <div className={`bg-white rounded-[1.75rem] shadow-sm shadow-black/[0.03] border border-gray-100 p-6 ${className}`} {...props}>
+  <div className={cn('bg-white rounded-[1.75rem] shadow-sm shadow-black/[0.03] border border-gray-100 p-6', className)} {...props}>
     {children}
   </div>
 );
 
 export const Badge: React.FC<{ children: React.ReactNode; color?: string; className?: string }> = ({ children, color = 'bg-gray-100 text-gray-600', className = '' }) => (
-  <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-transparent flex items-center gap-1.5 w-fit ${color} ${className}`}>
+  <span className={cn('px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-transparent flex items-center gap-1.5 w-fit', color, className)}>
     {children}
   </span>
 );
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className = '', ...props }) => (
   <input
-    className={`w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-kubwa-primary/10 focus:border-kubwa-primary transition-all placeholder:text-gray-500 placeholder:font-medium font-semibold text-kubwa-ink ${className}`}
+    className={cn('w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-kubwa-primary/10 focus:border-kubwa-primary transition-all placeholder:text-gray-500 placeholder:font-medium font-semibold text-kubwa-ink', className)}
     {...props}
   />
 );
@@ -43,10 +44,13 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ c
 export const Sheet: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode; title?: string }> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center md:items-center md:p-6 animate-fade-in">
       <div className="absolute inset-0 bg-kubwa-ink/60 backdrop-blur-md" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] overflow-hidden flex flex-col max-h-[94vh] shadow-2xl animate-slide-in-bottom">
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full z-10" />
+      <div className="relative w-full max-w-md md:max-w-lg bg-white rounded-t-[2.5rem] md:rounded-[2rem] overflow-hidden flex flex-col max-h-[94vh] md:max-h-[88vh] shadow-2xl animate-slide-in-bottom md:animate-zoom-in">
+        <div className="md:hidden absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full z-10" />
+        <button type="button" onClick={onClose} aria-label="Close" className="hidden md:flex absolute top-5 right-5 z-10 w-9 h-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200">
+          <X size={18} />
+        </button>
         {title && (
           <div className="pt-10 px-8 pb-3">
             <h3 className="font-display text-xl font-bold text-kubwa-ink tracking-tight">{title}</h3>
@@ -101,7 +105,7 @@ export const SafeImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement> & { f
   const [errored, setErrored] = useState(false);
   if (!src || errored) {
     return (
-      <div className={`bg-gray-100 flex items-center justify-center text-gray-500 ${className}`}>
+      <div className={cn('bg-gray-100 flex items-center justify-center text-gray-500', className)}>
         {fallbackIcon || <ImageOff size={22} strokeWidth={1.5} />}
       </div>
     );
@@ -121,7 +125,7 @@ export const SectionHeader: React.FC<{
   action?: { label: string; onClick: () => void };
   className?: string;
 }> = ({ title, subtitle, icon, action, className = '' }) => (
-  <div className={`flex items-end justify-between gap-4 mb-5 ${className}`}>
+  <div className={cn('flex items-end justify-between gap-4 mb-5', className)}>
     <div className="flex items-center gap-2.5 min-w-0">
       {icon}
       <div className="min-w-0">
