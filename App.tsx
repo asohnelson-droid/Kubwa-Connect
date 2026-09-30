@@ -181,6 +181,12 @@ function App() {
     setShowOnboarding(false);
   };
 
+  // Each new page starts at the top (the page area is its own scroll container).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [currentSection]);
+
   const renderContent = () => {
     if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
         return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
@@ -197,6 +203,9 @@ function App() {
       case AppSection.PRIVACY:
       case AppSection.TERMS:
       case AppSection.CONTACT:
+      case AppSection.HOW_IT_WORKS:
+      case AppSection.SAFETY:
+      case AppSection.CITIES:
       case AppSection.FAQ: return <InfoPages section={currentSection} setSection={navigateTo} goBack={goBack} user={user} />;
       default: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
     }
@@ -239,7 +248,7 @@ function App() {
         <LocationPrompt user={user} onSaved={() => refreshUser()} />
       )}
 
-      <div className="h-screen overflow-y-auto no-scrollbar bg-white pb-32 md:h-auto md:flex-1 md:pb-0 md:bg-kubwa-surface">
+      <div ref={scrollRef} className="h-screen overflow-y-auto no-scrollbar bg-white pb-32 md:h-auto md:flex-1 md:pb-0 md:bg-kubwa-surface">
          <Suspense fallback={
            <div className="h-full flex items-center justify-center">
              <Loader2 className="animate-spin text-kubwa-primary" size={32} />

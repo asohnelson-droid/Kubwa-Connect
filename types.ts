@@ -91,7 +91,10 @@ export enum AppSection {
   PRIVACY = 'PRIVACY',
   TERMS = 'TERMS',
   CONTACT = 'CONTACT',
-  FAQ = 'FAQ'
+  FAQ = 'FAQ',
+  HOW_IT_WORKS = 'HOW_IT_WORKS',
+  SAFETY = 'SAFETY',
+  CITIES = 'CITIES'
 }
 
 export interface MartOrder {
