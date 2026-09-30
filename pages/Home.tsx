@@ -7,6 +7,7 @@ import { api } from '../services/data';
 import { useData } from '../contexts/DataContext';
 import ScopeChip from '../components/ScopeChip';
 import HomeHero, { HeroSlideId } from '../components/HomeHero';
+import SiteFooter from '../components/SiteFooter';
 
 interface HomeProps {
   setSection: (section: AppSection) => void;
@@ -241,6 +242,8 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
             ))}
          </div>
       </div>
+
+      <SiteFooter setSection={setSection} onPartner={handleRoleAction} />
 
       <Sheet isOpen={!!upgradeTarget} onClose={() => setUpgradeTarget(null)} title={upgradeSubmitted ? 'Request Submitted' : upgradeTarget?.title}>
         {upgradeTarget && (

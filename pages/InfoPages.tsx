@@ -1,8 +1,10 @@
 
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppSection, User } from '../types';
-import { ArrowLeft, Mail, MapPin, Phone, ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { ArrowLeft, Mail, MapPin, Phone, ChevronDown, ChevronUp, Globe, ShoppingBag, Wrench, Truck, Store, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import { api } from '../services/data';
+import { City, NgState } from '../types';
 import { BackButton } from '../components/ui';
 import { BRAND } from '../config/brand';
 import { LEGAL_LAST_UPDATED, LegalSection, privacySections, termsSections } from '../config/legal';
@@ -29,6 +31,81 @@ const LegalDocument: React.FC<{ title: string; intro: string; sections: LegalSec
     </div>
   </div>
 );
+
+const Steps: React.FC<{ icon: React.ElementType; title: string; tint: string; steps: string[] }> = ({ icon: Icon, title, tint, steps }) => (
+  <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <div className="flex items-center gap-3 mb-4">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tint}`}><Icon size={18} /></div>
+      <h3 className="font-bold text-kubwa-ink text-base">{title}</h3>
+    </div>
+    <ol className="space-y-3">
+      {steps.map((step, i) => (
+        <li key={i} className="flex gap-3 text-sm text-gray-700 font-medium leading-relaxed">
+          <span className="w-6 h-6 rounded-full bg-gray-100 text-kubwa-ink text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+          <span>{step}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+);
+
+const TipList: React.FC<{ title: string; tips: string[] }> = ({ title, tips }) => (
+  <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h3 className="font-bold text-kubwa-ink text-base mb-3">{title}</h3>
+    <ul className="space-y-2.5">
+      {tips.map((tip, i) => (
+        <li key={i} className="flex gap-3 text-sm text-gray-700 font-medium leading-relaxed">
+          <CheckCircle2 size={18} className="text-kubwa-mart shrink-0 mt-0.5" />
+          <span>{tip}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+);
+
+/** Live cities and the ones opening next, straight from the cities table. */
+const CitiesList: React.FC = () => {
+  const [cities, setCities] = useState<City[] | null>(null);
+  const [states, setStates] = useState<NgState[]>([]);
+  useEffect(() => {
+    api.locations.getCities().then(setCities).catch(() => setCities([]));
+    api.locations.getStates().then(setStates).catch(() => setStates([]));
+  }, []);
+  const stateName = (id: number) => states.find(s => s.id === id)?.name ?? '';
+  if (!cities) return <p className="text-sm text-gray-500 font-medium">Loading cities...</p>;
+  const live = cities.filter(c => c.isLive);
+  const soon = cities.filter(c => !c.isLive);
+  const Row: React.FC<{ c: City; isLive: boolean }> = ({ c, isLive }) => (
+    <li className="flex items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-gray-100">
+      <div className="flex items-center gap-3 min-w-0">
+        <MapPin size={18} className={isLive ? 'text-kubwa-mart shrink-0' : 'text-gray-400 shrink-0'} />
+        <div className="min-w-0">
+          <p className="font-bold text-sm text-kubwa-ink truncate">{c.name}</p>
+          {stateName(c.stateId) && <p className="text-xs text-gray-500 font-semibold">{stateName(c.stateId) === 'Federal Capital Territory' ? 'FCT' : `${stateName(c.stateId)} State`}</p>}
+        </div>
+      </div>
+      {isLive
+        ? <span className="px-3 py-1 rounded-full bg-kubwa-mart/10 text-kubwa-martText text-xs font-bold shrink-0">Live</span>
+        : <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center gap-1 shrink-0"><Clock size={12} /> Coming soon</span>}
+    </li>
+  );
+  return (
+    <div className="space-y-6">
+      {live.length > 0 && (
+        <div>
+          <h3 className="font-bold text-kubwa-ink text-base mb-3">Live now</h3>
+          <ul className="space-y-2">{live.map(c => <Row key={c.id} c={c} isLive />)}</ul>
+        </div>
+      )}
+      {soon.length > 0 && (
+        <div>
+          <h3 className="font-bold text-kubwa-ink text-base mb-3">Opening next</h3>
+          <ul className="grid gap-2 sm:grid-cols-2">{soon.map(c => <Row key={c.id} c={c} isLive={false} />)}</ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface InfoPagesProps {
   section: AppSection;
@@ -141,6 +218,76 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
                 </div>
               ))}
             </div>
+          </div>
+        );
+
+      case AppSection.HOW_IT_WORKS:
+        return (
+          <div className="space-y-4 animate-fade-in">
+            <h2 className="font-display text-2xl font-bold text-kubwa-primary">How {BRAND.name} works</h2>
+            <p className="text-sm text-gray-700 font-medium leading-relaxed">One app to shop from local sellers, hire artisans and send packages. Here is how each part works.</p>
+            <Steps icon={ShoppingBag} tint="bg-kubwa-mart/10 text-kubwa-mart" title="Shop on Mart" steps={[
+              'Choose your location, then browse products from verified vendors in your city or across Nigeria.',
+              'Add items to your cart and check out. Pay online securely with Paystack, or pay on delivery or at pickup where the vendor allows it.',
+              'Choose rider delivery if you and the vendor are in the same live city, or arrange pickup with the vendor.',
+            ]} />
+            <Steps icon={Wrench} tint="bg-kubwa-fixit/10 text-kubwa-fixitText" title="Hire on FixIt" steps={[
+              'Search for the service you need: plumbing, electrical, cleaning, repairs and more.',
+              'Compare artisans by their rates, reviews and Verified badge, then send a booking request.',
+              'Agree the price and scope with the artisan before work starts. You pay the artisan directly.',
+            ]} />
+            <Steps icon={Truck} tint="bg-kubwa-ride/10 text-kubwa-ride" title="Send with Ride" steps={[
+              'Enter the pickup and drop-off addresses and tell us what you are sending.',
+              'See the delivery fee upfront and send your request to riders nearby.',
+              'Track the delivery until it arrives, and pay the rider on delivery.',
+            ]} />
+            <Steps icon={Store} tint="bg-kubwa-primary/10 text-kubwa-primary" title="Sell, work or ride with us" steps={[
+              'Create an account and choose Vendor, Artisan or Rider.',
+              'Add your details and location. Our team reviews every application before it goes live.',
+              'Once approved, start listing products, taking bookings or accepting delivery jobs.',
+            ]} />
+          </div>
+        );
+
+      case AppSection.SAFETY:
+        return (
+          <div className="space-y-4 animate-fade-in">
+            <h2 className="font-display text-2xl font-bold text-kubwa-primary">Safety tips</h2>
+            <p className="text-sm text-gray-700 font-medium leading-relaxed">We review every vendor, artisan and rider before they go live, but a few simple habits keep every deal safe.</p>
+            <TipList title="When you buy" tips={[
+              'Pay through the app with Paystack where you can. Your card details go straight to Paystack and are never shared with the seller.',
+              'If you pay on delivery or at pickup, inspect the item before you hand over money.',
+              'Meet in busy public places for pickups, and bring someone along for high-value items.',
+              'Be wary of prices that look too good to be true, or sellers who push you to pay outside the app.',
+            ]} />
+            <TipList title="When you hire an artisan" tips={[
+              'Check reviews and look for the Verified badge before you book.',
+              'Agree the price, materials and timeline before any work starts.',
+              'Avoid paying the full amount upfront for large jobs. Agree staged payments as work is completed.',
+            ]} />
+            <TipList title="When you sell or deliver" tips={[
+              'Confirm the payment has landed before you release goods; a screenshot is not proof of payment.',
+              'Keep conversations and agreements in writing so there is a record.',
+              'Riders: confirm pickup and drop-off details with the customer before you set off.',
+            ]} />
+            <section className="bg-kubwa-ink text-white rounded-2xl p-5 flex gap-4 items-start">
+              <ShieldCheck size={22} className="text-kubwa-amber shrink-0 mt-0.5" />
+              <div className="text-sm font-medium leading-relaxed">
+                <p className="font-bold mb-1">We will never ask for your PIN, password or OTP.</p>
+                <p className="text-white/75">Report a suspicious listing, user or message to {BRAND.supportEmail} and we will look into it.</p>
+              </div>
+            </section>
+          </div>
+        );
+
+      case AppSection.CITIES:
+        return (
+          <div className="space-y-4 animate-fade-in">
+            <h2 className="font-display text-2xl font-bold text-kubwa-primary">Cities we serve</h2>
+            <p className="text-sm text-gray-700 font-medium leading-relaxed">
+              You can sign up and shop from anywhere in Nigeria. Rider delivery and local listings open city by city. Vendors, artisans and riders in upcoming cities can register now and go live the day their city opens.
+            </p>
+            <CitiesList />
           </div>
         );
 
