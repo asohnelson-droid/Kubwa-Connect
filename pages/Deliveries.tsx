@@ -225,7 +225,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
   }
 
   return (
-    <div className="pb-24 pt-4 px-4 relative">
+    <div className="pb-24 pt-4 px-4 relative md:max-w-3xl md:mx-auto md:px-0 md:pt-8 md:pb-0">
       {user && goBack ? (
         <BackButton onClick={goBack} />
       ) : (
@@ -253,7 +253,7 @@ const Deliveries: React.FC<DeliveriesProps> = ({ user, onRequireAuth, setSection
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Kubwa Ride</h2>
+        <h2 className="font-display text-2xl font-bold text-kubwa-ink tracking-tight">Ride</h2>
         {!isRider && isElite && <Badge color="bg-kubwa-ink text-kubwa-amber border border-kubwa-amber/40">Elite Benefits</Badge>}
         {isRider && (
            <button 

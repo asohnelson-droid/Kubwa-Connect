@@ -256,7 +256,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   };
 
   return (
-    <div className="pb-24 pt-4 px-4">
+    <div className="pb-24 pt-4 px-4 md:px-0 md:pt-8 md:pb-0">
       {user && goBack && <BackButton onClick={goBack} />}
       
       <div className="flex justify-between items-center mb-6">
@@ -278,7 +278,7 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         </div>
       </div>
 
-      <ScopeChip user={user} className="w-full mb-3" />
+      <ScopeChip user={user} className="w-full mb-3 lg:hidden" />
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
@@ -306,9 +306,9 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         })}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {contextLoading && products.length === 0 ? <div className="col-span-2 flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-primary"/></div> : 
-          filteredProducts.length === 0 ? <div className="col-span-2 text-center py-20 text-gray-500 font-semibold text-sm">No products found in {browse.label} yet. Try a wider area from the location button above.</div> :
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-5">
+        {contextLoading && products.length === 0 ? <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-primary"/></div> : 
+          filteredProducts.length === 0 ? <div className="col-span-full text-center py-20 text-gray-500 font-semibold text-sm">No products found in {browse.label} yet. Try a wider area from the location button above.</div> :
           filteredProducts.map(product => (
             <Card key={product.id} className="p-0 overflow-hidden cursor-pointer group border-none shadow-sm" onClick={() => setSelectedProduct(product)}>
               <div className="h-40 bg-gray-100 overflow-hidden relative">
@@ -439,11 +439,11 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
              <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8">{selectedProduct.description || 'Quality product from a verified vendor.'}</p>
              {isDemoProduct(selectedProduct) ? (
                <div className="bg-gray-50 rounded-2xl p-4 text-center">
-                 <p className="text-xs font-bold text-gray-500">Sample listing for browsing only — not available to order.</p>
+                 <p className="text-xs font-bold text-gray-500">Sample listing for browsing only. Not available to order.</p>
                </div>
              ) : isOutOfStock(selectedProduct) ? (
                <div className="bg-red-50 rounded-2xl p-4 text-center">
-                 <p className="text-xs font-bold text-red-500">Out of stock — check back later.</p>
+                 <p className="text-xs font-bold text-red-500">Out of stock. Check back later.</p>
                </div>
              ) : (
                <Button
@@ -544,10 +544,10 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
                          ) : pickupInfo ? (
                             <>
                                <p className="font-bold text-kubwa-ink">{pickupInfo.storeName || 'Vendor location'}</p>
-                               <p className="text-gray-500 font-medium mt-0.5">{pickupInfo.address || pickupInfo.location || 'Address not set by vendor yet — confirm with them directly.'}</p>
+                               <p className="text-gray-500 font-medium mt-0.5">{pickupInfo.address || pickupInfo.location || 'Address not set by vendor yet. Confirm with them directly.'}</p>
                             </>
                          ) : (
-                            <span className="text-gray-500 font-semibold">Pickup location unavailable — confirm with the vendor directly.</span>
+                            <span className="text-gray-500 font-semibold">Pickup location unavailable. Confirm with the vendor directly.</span>
                          )}
                       </div>
                     )}

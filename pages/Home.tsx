@@ -118,27 +118,27 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
   };
 
   return (
-    <div className="pb-24">
+    <div className="pb-24 md:pb-0">
       {/* Dynamic Hero Section */}
-      <div className="bg-gradient-to-br from-kubwa-primary to-kubwa-primaryDark text-white rounded-b-[2.5rem] p-8 pt-16 relative overflow-hidden shadow-2xl min-h-[400px]">
+      <div className="bg-gradient-to-br from-kubwa-primary to-kubwa-primaryDark text-white rounded-b-[2.5rem] p-8 pt-16 relative overflow-hidden shadow-2xl min-h-[400px] md:rounded-[2.5rem] md:mt-8 md:p-14 md:min-h-0">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full -ml-24 -mb-24 blur-3xl" />
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-8 md:hidden">
              <div className="bg-white p-2 rounded-2xl shadow-xl transform -rotate-6">
                 <BrandMark className="w-[22px] h-[22px]" />
              </div>
              <span className="font-display text-lg font-bold tracking-tight">{BRAND.name}</span>
           </div>
 
-          <div className="min-h-[4.5rem] mb-6">
-             <h1 key={heroIndex} className="font-display text-[1.75rem] leading-[1.15] font-bold animate-fade-in">
+          <div className="min-h-[4.5rem] mb-6 md:min-h-[7rem] md:mb-8 md:max-w-2xl">
+             <h1 key={heroIndex} className="font-display text-[1.75rem] leading-[1.15] font-bold animate-fade-in md:text-5xl md:leading-[1.1]">
                {heroMessages[heroIndex]}
              </h1>
           </div>
 
-          <div className="bg-white rounded-3xl p-3 shadow-2xl flex flex-col gap-3">
-             <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-2xl">
+          <div className="bg-white rounded-3xl p-3 shadow-2xl flex flex-col gap-3 md:flex-row md:items-center md:max-w-3xl">
+             <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-2xl md:flex-1 md:py-3">
                 <Search className="text-gray-500" size={20} />
                 <input
                   type="text"
@@ -150,7 +150,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
                 />
              </div>
              <div className="flex gap-2">
-                <ScopeChip user={user} tone="dark" className="flex-1" />
+                <ScopeChip user={user} tone="dark" className="flex-1 lg:hidden" />
                 <Button onClick={handleSearch} className="px-8 shadow-none h-12 shrink-0">Search</Button>
              </div>
           </div>
@@ -158,7 +158,7 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
       </div>
 
       {visibleAnnouncement && (
-        <div className="mx-6 -mt-6 relative z-20 bg-kubwa-ink text-white rounded-3xl shadow-2xl p-4 flex justify-between items-center animate-slide-in-bottom">
+        <div className="mx-6 -mt-6 md:mx-0 md:mt-6 relative z-20 bg-kubwa-ink text-white rounded-3xl shadow-2xl p-4 flex justify-between items-center animate-slide-in-bottom">
            <div className="flex items-center gap-4 min-w-0">
               <div className="bg-kubwa-fixit p-2.5 rounded-2xl shrink-0"><Bell size={18} className="text-white" /></div>
               <div className="min-w-0">
@@ -172,14 +172,14 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
 
       {/* Featured Merchants Carousel */}
       {featuredVendors.length > 0 && (
-        <div className="mt-10 px-6">
+        <div className="mt-10 px-6 md:px-0">
            <SectionHeader
               title="Featured Merchants"
               subtitle="Top-rated shops and services this week"
               icon={<Crown className="text-kubwa-amber fill-kubwa-amber" size={18} />}
            />
 
-           <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2 -mx-6 px-6">
+           <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2 -mx-6 px-6 md:mx-0 md:px-0">
               {featuredVendors.map((vendor) => (
                 <div key={vendor.id} className="flex flex-col items-center shrink-0 w-24 group cursor-pointer" onClick={() => setSection(AppSection.MART)}>
                   <div className="relative mb-3">
@@ -199,8 +199,13 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
         </div>
       )}
 
+      <div className="md:grid md:grid-cols-2 md:gap-8 lg:gap-10 md:items-start">
       {/* Main Categories Grid */}
-      <div className="px-6 mt-10 grid grid-cols-3 gap-4">
+      <div className="px-6 mt-10 md:px-0">
+      <div className="hidden md:block">
+        <SectionHeader title="Explore" subtitle="Shop, hire and send across your city" />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
          {[
            { section: AppSection.MART, icon: ShoppingBag, label: 'Mart', bg: 'bg-kubwa-mart/10', text: 'text-kubwa-martText', border: 'border-kubwa-mart/15' },
            { section: AppSection.FIXIT, icon: Wrench, label: 'FixIt', bg: 'bg-kubwa-fixit/10', text: 'text-kubwa-fixitText', border: 'border-kubwa-fixit/15' },
@@ -216,9 +221,10 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
            </button>
          ))}
       </div>
+      </div>
 
       {/* Role CTA Section */}
-      <div className="px-6 mt-10">
+      <div className="px-6 mt-10 md:px-0">
          <SectionHeader title="Start Earning" subtitle="Turn your skills or shop into income" />
          <div className="grid grid-cols-3 gap-3">
             {(['VENDOR', 'PROVIDER', 'RIDER'] as const).map(role => {
@@ -240,18 +246,20 @@ const Home: React.FC<HomeProps> = ({ setSection, user, setAuthIntent, refreshUse
          </div>
       </div>
 
+      </div>
+
       {/* Trending Products */}
-      <div className="px-6 mt-10">
+      <div className="px-6 mt-10 md:px-0">
          <SectionHeader
             title="Mart Deals"
             subtitle="Fresh listings from local vendors today"
             action={{ label: 'View all', onClick: () => setSection(AppSection.MART) }}
          />
 
-         <div className="grid grid-cols-2 gap-4">
+         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
             {recentProducts.map(product => (
                <div key={product.id} onClick={() => setSection(AppSection.MART)} className="cursor-pointer group">
-                  <div className="h-40 rounded-2xl overflow-hidden mb-3">
+                  <div className="h-40 rounded-2xl overflow-hidden mb-3 md:h-52">
                      <SafeImage src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={product.name} />
                   </div>
                   <h4 className="text-xs font-bold text-kubwa-ink px-1 truncate">{product.name}</h4>

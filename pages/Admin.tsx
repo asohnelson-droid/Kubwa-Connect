@@ -240,7 +240,7 @@ const Admin: React.FC<{currentUser?: User | null}> = ({ currentUser }) => {
   };
 
   return (
-    <div className="pb-32 pt-8 px-6 max-w-5xl mx-auto animate-fade-in">
+    <div className="pb-32 pt-8 px-6 max-w-5xl mx-auto animate-fade-in md:max-w-none md:px-0 md:pb-0">
       <div className="mb-10 flex justify-between items-end">
          <div>
             <div className="flex items-center gap-2 mb-2">

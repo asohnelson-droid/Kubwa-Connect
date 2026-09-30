@@ -5,6 +5,30 @@ import { AppSection, User } from '../types';
 import { ArrowLeft, Mail, MapPin, Phone, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { BackButton } from '../components/ui';
 import { BRAND } from '../config/brand';
+import { LEGAL_LAST_UPDATED, LegalSection, privacySections, termsSections } from '../config/legal';
+import { PaymentService } from '../services/payments';
+
+const LegalDocument: React.FC<{ title: string; intro: string; sections: LegalSection[] }> = ({ title, intro, sections }) => (
+  <div className="space-y-4 animate-fade-in">
+    <h2 className="font-display text-2xl font-bold text-kubwa-primary">{title}</h2>
+    <p className="text-xs font-bold text-gray-500">Last updated: {LEGAL_LAST_UPDATED}</p>
+    <p className="text-sm text-gray-700 font-medium leading-relaxed">{intro}</p>
+    <div className="space-y-6 pt-2">
+      {sections.map((section, i) => (
+        <section key={section.heading} className="text-sm text-gray-700 font-medium leading-relaxed">
+          <h3 className="font-bold text-kubwa-ink text-base mb-2">{i + 1}. {section.heading}</h3>
+          {section.paragraphs?.map((para, j) => <p key={j} className="mb-2">{para}</p>)}
+          {section.bullets && (
+            <ul className="list-disc pl-5 space-y-1.5 mb-2">
+              {section.bullets.map((b, j) => <li key={j}>{b}</li>)}
+            </ul>
+          )}
+          {section.after?.map((para, j) => <p key={j} className="mb-2">{para}</p>)}
+        </section>
+      ))}
+    </div>
+  </div>
+);
 
 interface InfoPagesProps {
   section: AppSection;
@@ -87,11 +111,14 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
 
       case AppSection.FAQ:
         const faqs = [
-          { q: "How do I become a vendor?", a: "Simply sign up, select 'Vendor' as your role during registration, and upgrade to a Pro plan to start listing unlimited products." },
-          { q: "Is payment secure?", a: "Yes, we use Flutterwave and Paystack, two of the most secure payment gateways in Africa, to process all transactions." },
-          { q: "How does delivery work?", a: "When you book a ride or order an item, a nearby rider accepts your request and brings it directly to your saved address." },
-          { q: "Can I cancel a service booking?", a: "Yes, you can cancel a booking up to 1 hour before the scheduled time for a full refund." },
-          { q: "What is the Basic plan?", a: "The Basic plan is free and allows vendors to list up to 3 products. Regular users don't need a subscription." }
+          { q: "How do I start selling?", a: `Sign up, choose Vendor, and complete your shop details. We review every new vendor before your shop goes live. The free plan lets you list up to 4 products; Vendor Featured (₦${PaymentService.getPrice('VENDOR_FEATURED').toLocaleString()} for 30 days) gives unlimited listings and a Featured badge.` },
+          { q: "Is paying online safe?", a: "Yes. Online payments are handled by Paystack, and your card or bank details go straight to them; we never see or store them. You can also choose to pay on delivery or at pickup." },
+          { q: "How does delivery work?", a: "Rider delivery is available when you and the vendor are in the same live city. You see the rider fee before ordering and pay it to the rider on delivery. If you're in a different city, you can pick up from the vendor or arrange delivery with them." },
+          { q: "Which cities are live?", a: `We're opening city by city, starting with Abuja. You can sign up from anywhere in Nigeria and browse listings from every live city. Vendors, artisans and riders elsewhere can register now and go live when their city opens.` },
+          { q: "Can I cancel an order?", a: `Yes, before the vendor dispatches it. Contact the vendor or email ${BRAND.supportEmail} with your order details.` },
+          { q: "What if my order is wrong or doesn't arrive?", a: `Contact the vendor first. If it isn't resolved, email ${BRAND.supportEmail} within 7 days. For orders paid online, approved refunds go back to your original payment method through Paystack. See the Terms of Service for details.` },
+          { q: "How do I pay an artisan?", a: "Artisan bookings on FixIt are paid directly to the artisan, not through the app. Agree the price and scope with them before work starts." },
+          { q: "How do I delete my account or get a copy of my data?", a: `Email ${BRAND.privacyEmail} from the email address on your account. We reply within 30 days. See the Privacy Policy for your full rights.` }
         ];
         return (
           <div className="space-y-4 animate-fade-in">
@@ -119,42 +146,23 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
 
       case AppSection.PRIVACY:
         return (
-          <div className="space-y-4 animate-fade-in">
-            <h2 className="font-display text-2xl font-bold text-kubwa-primary">Privacy Policy</h2>
-            <div className="prose prose-sm text-gray-600 text-sm font-medium leading-relaxed">
-              <p className="font-bold text-kubwa-ink">Last updated: October 2023</p>
-              <p>At {BRAND.name}, we prioritize your privacy. This policy outlines how we collect, use, and protect your personal information.</p>
-              
-              <h4 className="font-bold text-kubwa-ink mt-4">1. Information we collect</h4>
-              <p>We collect information you provide directly to us, such as when you create an account, make a purchase, or contact support. This includes your name, email, phone number, and location data for deliveries.</p>
-
-              <h4 className="font-bold text-kubwa-ink mt-4">2. How we use your information</h4>
-              <p>We use your data to facilitate orders, improve our app, and communicate with you. Your location data is shared with riders only during an active delivery.</p>
-
-              <h4 className="font-bold text-kubwa-ink mt-4">3. Data security</h4>
-              <p>We implement industry-standard security measures to protect your data. Payment information is processed securely by third-party providers (Paystack/Flutterwave) and is not stored on our servers.</p>
-            </div>
-          </div>
+          <LegalDocument
+            title="Privacy Policy"
+            intro={`This policy explains how ${BRAND.name} collects, uses and protects your personal data, and the rights you have under the Nigeria Data Protection Act 2023.`}
+            sections={privacySections()}
+          />
         );
 
       case AppSection.TERMS:
         return (
-          <div className="space-y-4 animate-fade-in">
-            <h2 className="font-display text-2xl font-bold text-kubwa-primary">Terms of Service</h2>
-            <div className="prose prose-sm text-gray-600 text-sm font-medium leading-relaxed">
-              <p className="font-bold text-kubwa-ink">Last updated: October 2023</p>
-              <p>By using {BRAND.name}, you agree to these terms. Please read them carefully.</p>
-              
-              <h4 className="font-bold text-kubwa-ink mt-4">1. Acceptable use</h4>
-              <p>You agree not to use the app for any illegal purposes. Vendors must ensure all listed products comply with local laws.</p>
-
-              <h4 className="font-bold text-kubwa-ink mt-4">2. User accounts</h4>
-              <p>You are responsible for maintaining the confidentiality of your account password. Any activity under your account is your responsibility.</p>
-
-              <h4 className="font-bold text-kubwa-ink mt-4">3. Limitation of liability</h4>
-              <p>{BRAND.name} acts as a platform connecting users. We are not liable for the quality of services provided by independent artisans or vendors, though we strive to vet all providers.</p>
-            </div>
-          </div>
+          <LegalDocument
+            title="Terms of Service"
+            intro={`Please read these terms before using ${BRAND.name}. They explain how the marketplace works and what we and you are each responsible for.`}
+            sections={termsSections({
+              vendorFeatured: PaymentService.getPrice('VENDOR_FEATURED'),
+              fixitVerified: PaymentService.getPrice('FIXIT_VERIFIED'),
+            })}
+          />
         );
 
       default:
@@ -163,7 +171,7 @@ const InfoPages: React.FC<InfoPagesProps> = ({ section, setSection, goBack, user
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 min-h-screen bg-kubwa-surface">
+    <div className="pb-24 pt-4 px-4 min-h-screen bg-kubwa-surface md:max-w-3xl md:mx-auto md:px-0 md:pt-8 md:pb-0 md:min-h-0">
       {user && goBack ? (
         <BackButton onClick={goBack} />
       ) : (

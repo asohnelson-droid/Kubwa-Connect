@@ -6,6 +6,7 @@ import { api } from '../services/data';
 import { supabase } from '../services/supabase';
 import { Button, Card, Badge, BackButton, Sheet, Input, SafeImage, SectionHeader } from '../components/ui';
 import AuthModal from '../components/AuthModal';
+import HelpLinks from '../components/HelpLinks';
 import LocationPicker, { LocationValue } from '../components/LocationPicker';
 import { BRAND } from '../config/brand';
 import VendorDashboard from '../components/VendorDashboard';
@@ -237,7 +238,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center animate-fade-in pb-32">
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center animate-fade-in pb-32 md:min-h-[75vh] md:pb-8">
         <div className="w-28 h-28 bg-kubwa-primary/10 rounded-[2.5rem] flex items-center justify-center mb-10 relative">
           <div className="absolute inset-0 bg-kubwa-primary/5 rounded-[2.5rem] animate-ping scale-110 opacity-50"></div>
           <UserIcon size={52} className="text-kubwa-primary relative z-10" />
@@ -270,6 +271,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
           >
             <ShieldAlert size={14} /> Admin staff portal
           </button>
+
+          <HelpLinks setSection={setSection} className="mt-10" />
         </div>
 
         {isAuthModalOpen && (
@@ -281,6 +284,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
                clearAuthIntent();
             }}
             onSuccess={handleAuthSuccess}
+            onOpenLegal={(section) => { setIsAuthModalOpen(false); setSection(section); }}
           />
         )}
       </div>
@@ -292,7 +296,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
   const isApproved = user.status === 'APPROVED';
 
   return (
-    <div className="pb-32 pt-8 px-6 max-w-2xl mx-auto animate-fade-in">
+    <div className="pb-32 pt-8 px-6 max-w-2xl mx-auto animate-fade-in md:max-w-4xl md:px-0 md:pb-0">
       {goBack && <BackButton onClick={goBack} />}
       
       {/* Profile Header */}
@@ -525,6 +529,8 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
         </div>
       )}
 
+      <HelpLinks setSection={setSection} className="mt-10 mb-4" />
+
       <Sheet isOpen={!!reviewingBooking} onClose={() => setReviewingBooking(null)} title="Rate Your Experience">
         {reviewingBooking && (
           <div className="pb-6 space-y-5">
@@ -601,7 +607,7 @@ const Account: React.FC<AccountProps> = ({ user, setUser, setSection, refreshUse
               {emailChangeRequested ? (
                 <div className="bg-green-50 text-green-700 rounded-2xl p-4 text-xs font-semibold flex items-center gap-2">
                   <CheckCircle size={16} className="shrink-0" />
-                  Check your new inbox for a confirmation link — the change won't take effect until you click it.
+                  Check your new inbox for a confirmation link. The change won't take effect until you click it.
                 </div>
               ) : (
                 <>
