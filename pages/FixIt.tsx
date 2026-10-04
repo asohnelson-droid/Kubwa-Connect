@@ -212,10 +212,13 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
   };
 
   const handleUpdateBookingStatus = async (orderId: string, status: ServiceOrderStatus) => {
+    if (status === 'CANCELLED' && !window.confirm("Decline this booking? The customer will be told you can't take it.")) return;
     setBookingActionLoading(orderId);
     const success = await api.serviceOrders.updateStatus(orderId, status);
     if (success) {
       setMyBookings(prev => prev.map(b => b.id === orderId ? { ...b, status } : b));
+    } else {
+      alert("Couldn't update this booking. Please refresh and try again.");
     }
     setBookingActionLoading(null);
   };
@@ -310,6 +313,16 @@ const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshU
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-kubwa-mart">₦{booking.amount.toLocaleString()}</span>
                     <div className="flex gap-2">
+                      {(booking.status === 'PENDING' || booking.status === 'ACCEPTED') && (
+                        <button
+                          type="button"
+                          className="h-10 text-xs px-4 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                          disabled={bookingActionLoading === booking.id}
+                          onClick={() => handleUpdateBookingStatus(booking.id, 'CANCELLED')}
+                        >
+                          Decline
+                        </button>
+                      )}
                       {booking.status === 'PENDING' && (
                         <Button className="h-10 text-xs px-4" disabled={bookingActionLoading === booking.id} onClick={() => handleUpdateBookingStatus(booking.id, 'ACCEPTED')}>
                           {bookingActionLoading === booking.id ? <Loader2 size={14} className="animate-spin" /> : 'Accept'}
