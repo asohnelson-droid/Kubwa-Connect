@@ -1,6 +1,7 @@
 
 import { PaymentIntent, User } from '../types';
 import { supabase } from './supabase';
+import { TIER_PRICES } from '../config/pricing';
 
 declare global {
   interface Window {
@@ -21,11 +22,6 @@ export interface PaymentResult {
   error?: string;
 }
 
-const TIER_PRICES: Record<PaymentIntent, number> = {
-  VENDOR_VERIFIED: 2000,
-  VENDOR_FEATURED: 3000,
-  FIXIT_VERIFIED: 2000,
-};
 
 export const PaymentService = {
   getPrice(intent: PaymentIntent): number {
