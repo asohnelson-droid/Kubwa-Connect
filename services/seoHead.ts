@@ -1,5 +1,5 @@
 import { AppSection } from '../types';
-import { canonicalUrl, routeForSection } from '../config/seo';
+import { canonicalUrl, routeForSection, type RouteMeta } from '../config/seo';
 
 function setMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
@@ -23,11 +23,15 @@ function setCanonical(href: string) {
 
 /** Keeps the tab title, description, canonical link and share tags in step with the page on screen. */
 export function applyHeadForSection(section: AppSection) {
-  const r = routeForSection(section);
+  applyHeadForRoute(routeForSection(section));
+}
+
+/** `hide` keeps a page out of search results (used for area pages with no listings yet). */
+export function applyHeadForRoute(r: RouteMeta, hide = false) {
   const url = canonicalUrl(r);
   document.title = r.title;
   setMeta('name', 'description', r.description);
-  setMeta('name', 'robots', r.index ? 'index, follow' : 'noindex, nofollow');
+  setMeta('name', 'robots', r.index && !hide ? 'index, follow' : 'noindex, follow');
   setCanonical(url);
   setMeta('property', 'og:title', r.title);
   setMeta('property', 'og:description', r.description);
