@@ -10,6 +10,8 @@ import DesktopNav from './components/DesktopNav';
 import { api } from './services/data';
 import { supabase } from './services/supabase';
 import { useData } from './contexts/DataContext';
+import { routeForPath, routeForSection } from './config/seo';
+import { applyHeadForSection } from './services/seoHead';
 
 // Lazy Load Pages for Performance Optimization
 const Home = React.lazy(() => import('./pages/Home'));
@@ -22,7 +24,9 @@ const InfoPages = React.lazy(() => import('./pages/InfoPages'));
 const Onboarding = React.lazy(() => import('./pages/Onboarding'));
 
 function App() {
-  const [currentSection, setCurrentSection] = useState<AppSection>(AppSection.HOME);
+  // The page comes from the web address, so /mart, /fixit, /faq and the rest can be
+  // opened directly, shared and found by search engines.
+  const [currentSection, setCurrentSection] = useState<AppSection>(() => routeForPath(window.location.pathname).section);
   const [history, setHistory] = useState<AppSection[]>([]); // Navigation History Stack
   const [user, setUser] = useState<UserType | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -40,13 +44,16 @@ function App() {
    * NAVIGATION LOGIC
    * Manages history stack to allow standardized "Back" functionality
    */
+  const currentSectionRef = useRef(currentSection);
+  currentSectionRef.current = currentSection;
+
   const navigateTo = useCallback((section: AppSection) => {
-    setCurrentSection(prevSection => {
-      if (section === prevSection) return prevSection;
-      setHistory(prevHistory => [...prevHistory, prevSection]);
-      window.history.pushState({ appSection: section }, '');
-      return section;
-    });
+    const prevSection = currentSectionRef.current;
+    if (section === prevSection) return;
+    setHistory(prevHistory => [...prevHistory, prevSection]);
+    window.history.pushState({ appSection: section }, '', routeForSection(section).path);
+    currentSectionRef.current = section;
+    setCurrentSection(section);
   }, []);
 
   const goBack = useCallback(() => {
@@ -58,24 +65,26 @@ function App() {
   // (which now also just calls window.history.back() above) -- both funnel
   // through this one listener, so behavior is identical either way.
   useEffect(() => {
-    window.history.replaceState({ appSection: AppSection.HOME }, '');
+    // Tidy the address to the page's canonical path, keeping any ?query or #hash
+    // (sign-in links from Supabase arrive with tokens in the hash).
+    const initial = routeForPath(window.location.pathname);
+    window.history.replaceState({ appSection: initial.section }, '', initial.path + window.location.search + window.location.hash);
 
-    const handlePopState = () => {
-      setHistory(prevHistory => {
-        if (prevHistory.length === 0) {
-          setCurrentSection(AppSection.HOME);
-          return prevHistory;
-        }
-        const newHistory = [...prevHistory];
-        const prev = newHistory.pop();
-        if (prev !== undefined) setCurrentSection(prev);
-        return newHistory;
-      });
+    const handlePopState = (event: PopStateEvent) => {
+      const section = (event.state?.appSection as AppSection | undefined) ?? routeForPath(window.location.pathname).section;
+      setHistory(prevHistory => prevHistory.slice(0, -1));
+      currentSectionRef.current = section;
+      setCurrentSection(section);
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Title, description and share tags follow the page on screen.
+  useEffect(() => {
+    applyHeadForSection(currentSection);
+  }, [currentSection]);
 
   /**
    * STABLE USER REFRESH
@@ -158,7 +167,7 @@ function App() {
           setUser(null);
           setCurrentSection(AppSection.HOME);
           setHistory([]);
-          window.history.replaceState({ appSection: AppSection.HOME }, '');
+          window.history.replaceState({ appSection: AppSection.HOME }, '', '/');
         }
       }
     });
