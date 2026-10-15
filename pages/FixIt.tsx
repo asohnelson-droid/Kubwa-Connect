@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Star, Loader2, Power, X, Briefcase, MapPin, Shield, Wrench, Plus, Minus, ChevronRight, CheckCircle, Clock, Calendar, ShieldCheck } from 'lucide-react';
 import { api, FIXIT_SERVICES } from '../services/data';
 import ScopeChip from '../components/ScopeChip';
+import { peekFixitCategoryIntent, clearFixitCategoryIntent } from '../services/navIntent';
 import { PaymentService } from '../services/payments';
 import { ServiceProvider, User as UserType, Review, AppSection, ServiceOrder, ServiceOrderStatus } from '../types';
 import { Button, Card, Badge, Breadcrumbs, Input, BackButton, Sheet, SafeImage, SectionHeader } from '../components/ui';
@@ -21,7 +22,8 @@ interface FixItProps {
 
 const FixIt: React.FC<FixItProps> = ({ user, onRequireAuth, setSection, refreshUser, goBack }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState(() => peekFixitCategoryIntent() ?? 'All');
+  useEffect(() => { clearFixitCategoryIntent(); }, []);
   
   // Use DataContext for providers
   const { services: providers, loading: contextLoading, fetchServices, browse, hasMoreServices, loadMoreServices } = useData();

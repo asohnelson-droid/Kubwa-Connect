@@ -9,6 +9,7 @@ import ScopeChip from '../components/ScopeChip';
 import { Button, Badge, Card, Breadcrumbs, Sheet, Input, BackButton, SafeImage } from '../components/ui';
 import { useData } from '../contexts/DataContext';
 import SectionHero from '../components/SectionHero';
+import { peekMartCategoryIntent, clearMartCategoryIntent } from '../services/navIntent';
 
 interface MartProps {
   addToCart: (product: Product) => void;
@@ -25,7 +26,8 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const isDemoProduct = (product: Product) => product.vendorId?.startsWith('demo_');
   const isOutOfStock = (product: Product) => !isDemoProduct(product) && product.stock <= 0;
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedParentCategory, setSelectedParentCategory] = useState('All'); 
+  const [selectedParentCategory, setSelectedParentCategory] = useState(() => peekMartCategoryIntent() ?? 'All');
+  useEffect(() => { clearMartCategoryIntent(); }, []);
   
   // Use DataContext for products
   const { products, loading: contextLoading, fetchProducts, hasMoreProducts, loadMoreProducts, browse } = useData();
