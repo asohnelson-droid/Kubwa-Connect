@@ -1,0 +1,13 @@
+{
+  "name": "Sell Am Here",
+  "short_name": "Sell Am Here",
+  "description": "Buy, sell and get it done near you.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#161A2B",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
