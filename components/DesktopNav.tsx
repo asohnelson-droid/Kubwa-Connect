@@ -6,6 +6,14 @@ import { SafeImage } from './ui';
 import { cn } from './cn';
 import { BRAND } from '../config/brand';
 import { AppSection, User } from '../types';
+import { routeForSection } from '../config/seo';
+
+/** Plain clicks stay in the app; ctrl/cmd/middle clicks open a new tab as normal. */
+const inApp = (go: () => void) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  go();
+};
 
 interface DesktopNavProps {
   user: User | null;
@@ -29,19 +37,19 @@ const DesktopNav: React.FC<DesktopNavProps> = ({ user, currentSection, navigateT
   return (
     <header className="hidden md:block shrink-0 bg-white/95 backdrop-blur-xl border-b border-gray-100 z-40">
       <div className="max-w-6xl mx-auto px-6 lg:px-8 h-16 flex items-center gap-4 lg:gap-8">
-        <button type="button" onClick={() => navigateTo(AppSection.HOME)} className="flex items-center gap-2.5 shrink-0" aria-label={`${BRAND.name} home`}>
+        <a href="/" onClick={inApp(() => navigateTo(AppSection.HOME))} className="flex items-center gap-2.5 shrink-0" aria-label={`${BRAND.name} home`}>
           <span className="w-9 h-9 rounded-xl bg-kubwa-ink p-1.5 flex items-center justify-center"><BrandMark className="w-full h-full" /></span>
           <span className="font-display text-lg font-bold text-kubwa-ink tracking-tight">{BRAND.name}</span>
-        </button>
+        </a>
 
         <nav aria-label="Main" className="flex items-center gap-1">
           {links.map(link => {
             const active = currentSection === link.id;
             return (
-              <button
+              <a
                 key={link.id}
-                type="button"
-                onClick={() => navigateTo(link.id)}
+                href={routeForSection(link.id).path}
+                onClick={inApp(() => navigateTo(link.id))}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'flex items-center gap-2 px-3 lg:px-4 py-2 rounded-xl text-sm font-bold transition-colors',
@@ -49,7 +57,7 @@ const DesktopNav: React.FC<DesktopNavProps> = ({ user, currentSection, navigateT
                 )}
               >
                 <link.icon size={16} strokeWidth={active ? 2.5 : 2} /> {link.label}
-              </button>
+              </a>
             );
           })}
         </nav>

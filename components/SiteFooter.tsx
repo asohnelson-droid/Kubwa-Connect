@@ -3,6 +3,7 @@ import { Mail, MapPin, ShieldCheck } from 'lucide-react';
 import BrandMark from './BrandMark';
 import { BRAND } from '../config/brand';
 import { AppSection } from '../types';
+import { routeForSection } from '../config/seo';
 
 type PartnerRole = 'VENDOR' | 'PROVIDER' | 'RIDER';
 
@@ -12,7 +13,7 @@ interface SiteFooterProps {
   onPartner: (role: PartnerRole) => void;
 }
 
-interface FooterLink { label: string; onClick: () => void }
+interface FooterLink { label: string; onClick: () => void; href?: string }
 
 const Column: React.FC<{ title: string; links: FooterLink[] }> = ({ title, links }) => (
   <nav aria-label={title}>
@@ -20,13 +21,27 @@ const Column: React.FC<{ title: string; links: FooterLink[] }> = ({ title, links
     <ul className="space-y-2.5">
       {links.map(link => (
         <li key={link.label}>
-          <button
-            type="button"
-            onClick={link.onClick}
-            className="text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4 text-left"
-          >
-            {link.label}
-          </button>
+          {link.href ? (
+            <a
+              href={link.href}
+              onClick={e => {
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                link.onClick();
+              }}
+              className="text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4"
+            >
+              {link.label}
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={link.onClick}
+              className="text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4 text-left"
+            >
+              {link.label}
+            </button>
+          )}
         </li>
       ))}
     </ul>
@@ -35,16 +50,16 @@ const Column: React.FC<{ title: string; links: FooterLink[] }> = ({ title, links
 
 /** Site footer: brand, service links, partner sign-ups, help and legal. */
 const SiteFooter: React.FC<SiteFooterProps> = ({ setSection, onPartner }) => {
-  const go = (section: AppSection) => () => setSection(section);
+  const page = (label: string, section: AppSection): FooterLink => ({ label, onClick: () => setSection(section), href: routeForSection(section).path });
 
   const columns: { title: string; links: FooterLink[] }[] = [
     {
       title: 'Services',
       links: [
-        { label: 'Mart', onClick: go(AppSection.MART) },
-        { label: 'FixIt', onClick: go(AppSection.FIXIT) },
-        { label: 'Ride', onClick: go(AppSection.RIDE) },
-        { label: 'Cities we serve', onClick: go(AppSection.CITIES) },
+        page('Mart', AppSection.MART),
+        page('FixIt', AppSection.FIXIT),
+        page('Ride', AppSection.RIDE),
+        page('Cities we serve', AppSection.CITIES),
       ],
     },
     {
@@ -58,18 +73,18 @@ const SiteFooter: React.FC<SiteFooterProps> = ({ setSection, onPartner }) => {
     {
       title: 'Help',
       links: [
-        { label: 'How it works', onClick: go(AppSection.HOW_IT_WORKS) },
-        { label: 'Safety tips', onClick: go(AppSection.SAFETY) },
-        { label: 'FAQ', onClick: go(AppSection.FAQ) },
-        { label: 'Contact us', onClick: go(AppSection.CONTACT) },
+        page('How it works', AppSection.HOW_IT_WORKS),
+        page('Safety tips', AppSection.SAFETY),
+        page('FAQ', AppSection.FAQ),
+        page('Contact us', AppSection.CONTACT),
       ],
     },
     {
       title: 'Company',
       links: [
-        { label: 'About us', onClick: go(AppSection.ABOUT) },
-        { label: 'Terms of Service', onClick: go(AppSection.TERMS) },
-        { label: 'Privacy Policy', onClick: go(AppSection.PRIVACY) },
+        page('About us', AppSection.ABOUT),
+        page('Terms of Service', AppSection.TERMS),
+        page('Privacy Policy', AppSection.PRIVACY),
       ],
     },
   ];
