@@ -1,6 +1,7 @@
 import { AppSection } from '../types';
 import { BRAND } from './brand';
 import { FAQ_ITEMS } from './faq';
+import { landingForPath, type LandingPage } from './landing';
 
 /**
  * Search engine setup: one web address per page, with its own title and
@@ -133,15 +134,24 @@ export function routeForSection(section: AppSection): RouteMeta {
   return BY_SECTION.get(section) ?? ROUTES[0];
 }
 
+export function landingRoute(lp: LandingPage): RouteMeta {
+  return {
+    section: AppSection.LANDING, path: lp.path, title: lp.title, description: lp.description,
+    index: true, h1: lp.h1, intro: lp.intro, priority: lp.priority,
+  };
+}
+
 /** Unknown paths fall back to the home page. */
 export function routeForPath(pathname: string): RouteMeta {
   const clean = pathname.replace(/\/+$/, '').toLowerCase() || '/';
+  const landing = landingForPath(clean);
+  if (landing) return landingRoute(landing);
   return BY_PATH.get(clean) ?? ROUTES[0];
 }
 
 export function isKnownPath(pathname: string): boolean {
   const clean = pathname.replace(/\/+$/, '').toLowerCase() || '/';
-  return BY_PATH.has(clean);
+  return BY_PATH.has(clean) || !!landingForPath(clean);
 }
 
 export const canonicalUrl = (r: RouteMeta) => (r.path === '/' ? `${SITE_URL}/` : `${SITE_URL}${r.path}`);
@@ -184,7 +194,19 @@ export function faqJsonLd() {
   };
 }
 
+export function breadcrumbJsonLd(r: RouteMeta) {
+  const crumbs: { name: string; url: string }[] = [{ name: BRAND.name, url: `${SITE_URL}/` }];
+  if (r.path !== '/abuja') crumbs.push({ name: 'Abuja', url: `${SITE_URL}/abuja` });
+  crumbs.push({ name: r.h1, url: canonicalUrl(r) });
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: c.url })),
+  };
+}
+
 export function jsonLdFor(r: RouteMeta): object[] {
+  if (r.section === AppSection.LANDING) return [breadcrumbJsonLd(r)];
   if (r.section === AppSection.HOME) return [organizationJsonLd(), websiteJsonLd()];
   if (r.section === AppSection.FAQ) return [faqJsonLd()];
   return [];
