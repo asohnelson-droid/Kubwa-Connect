@@ -8,7 +8,7 @@ import { routeForSection } from '../config/seo';
 type PartnerRole = 'VENDOR' | 'PROVIDER' | 'RIDER';
 
 interface SiteFooterProps {
-  setSection: (section: AppSection) => void;
+  setSection: (section: AppSection, path?: string) => void;
   /** Starts the vendor, artisan or rider sign-up. */
   onPartner: (role: PartnerRole) => void;
 }
@@ -60,6 +60,7 @@ const SiteFooter: React.FC<SiteFooterProps> = ({ setSection, onPartner }) => {
         page('FixIt', AppSection.FIXIT),
         page('Ride', AppSection.RIDE),
         page('Cities we serve', AppSection.CITIES),
+        { label: 'Services in Abuja', onClick: () => setSection(AppSection.LANDING, '/abuja'), href: '/abuja' },
       ],
     },
     {
