@@ -94,7 +94,8 @@ export enum AppSection {
   FAQ = 'FAQ',
   HOW_IT_WORKS = 'HOW_IT_WORKS',
   SAFETY = 'SAFETY',
-  CITIES = 'CITIES'
+  CITIES = 'CITIES',
+  LANDING = 'LANDING'
 }
 
 export interface MartOrder {
@@ -121,7 +122,7 @@ export interface Address { id: string; userId: string; title: string; details: s
 export interface Announcement { id: string; title: string; message: string; type: 'INFO' | 'ALERT' | 'PROMO'; isActive: boolean; created_at: string; }
 export interface AnalyticsData { dau: number; revenue: number; retention: number; conversion: number; revenueSplit: any; revenueByDay?: { name: string; rev: number }[]; userStats?: any; }
 export interface SystemSettings { allowSignups: boolean; maintenanceMode: boolean; allowAdminPromotions: boolean; supportEmail: string; supportPhone: string; minVersion: string; }
-export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; stateId?: number; lgaId?: number; cityId?: number; cityName?: string; lgaName?: string; }
+export interface ServiceProvider { id: string; userId: string; name: string; category: string; rate: number; rating: number; reviews: number; image: string; available: boolean; isVerified: boolean; bio?: string; skills?: string[]; location?: string; area?: string; stateId?: number; lgaId?: number; cityId?: number; cityName?: string; lgaName?: string; }
 export interface Review { id: string; userId: string; targetId: string; rating: number; comment: string; created_at: string; }
 export interface DeliveryRequest { id: string; userId: string; riderId?: string; pickup: string; dropoff: string; itemType: string; status: DeliveryStatus; price: number; created_at: string; phoneNumber?: string; rider?: { name: string; phoneNumber?: string }; pickupLgaId?: number; dropoffLgaId?: number; cityId?: number; }
 export interface ServiceOrder { id: string; userId: string; serviceId: string; amount: number; status: ServiceOrderStatus; created_at: string; providers?: { userId: string; name: string; image: string; category: string }; }

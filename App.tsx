@@ -11,7 +11,7 @@ import { api } from './services/data';
 import { supabase } from './services/supabase';
 import { useData } from './contexts/DataContext';
 import { routeForPath, routeForSection } from './config/seo';
-import { applyHeadForSection } from './services/seoHead';
+import { applyHeadForRoute } from './services/seoHead';
 
 // Lazy Load Pages for Performance Optimization
 const Home = React.lazy(() => import('./pages/Home'));
@@ -21,12 +21,14 @@ const Deliveries = React.lazy(() => import('./pages/Deliveries'));
 const Admin = React.lazy(() => import('./pages/Admin'));
 const Account = React.lazy(() => import('./pages/Account'));
 const InfoPages = React.lazy(() => import('./pages/InfoPages'));
+const Landing = React.lazy(() => import('./pages/Landing'));
 const Onboarding = React.lazy(() => import('./pages/Onboarding'));
 
 function App() {
   // The page comes from the web address, so /mart, /fixit, /faq and the rest can be
   // opened directly, shared and found by search engines.
   const [currentSection, setCurrentSection] = useState<AppSection>(() => routeForPath(window.location.pathname).section);
+  const [currentPath, setCurrentPath] = useState<string>(() => routeForPath(window.location.pathname).path);
   const [history, setHistory] = useState<AppSection[]>([]); // Navigation History Stack
   const [user, setUser] = useState<UserType | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -46,14 +48,20 @@ function App() {
    */
   const currentSectionRef = useRef(currentSection);
   currentSectionRef.current = currentSection;
+  const currentPathRef = useRef(currentPath);
+  currentPathRef.current = currentPath;
 
-  const navigateTo = useCallback((section: AppSection) => {
+  /** Go to a page. `path` is only needed for pages that share a section, like the area and service pages. */
+  const navigateTo = useCallback((section: AppSection, path?: string) => {
+    const target = path ?? routeForSection(section).path;
     const prevSection = currentSectionRef.current;
-    if (section === prevSection) return;
+    if (section === prevSection && target === currentPathRef.current) return;
     setHistory(prevHistory => [...prevHistory, prevSection]);
-    window.history.pushState({ appSection: section }, '', routeForSection(section).path);
+    window.history.pushState({ appSection: section, path: target }, '', target);
     currentSectionRef.current = section;
+    currentPathRef.current = target;
     setCurrentSection(section);
+    setCurrentPath(target);
   }, []);
 
   const goBack = useCallback(() => {
@@ -68,13 +76,16 @@ function App() {
     // Tidy the address to the page's canonical path, keeping any ?query or #hash
     // (sign-in links from Supabase arrive with tokens in the hash).
     const initial = routeForPath(window.location.pathname);
-    window.history.replaceState({ appSection: initial.section }, '', initial.path + window.location.search + window.location.hash);
+    window.history.replaceState({ appSection: initial.section, path: initial.path }, '', initial.path + window.location.search + window.location.hash);
 
     const handlePopState = (event: PopStateEvent) => {
-      const section = (event.state?.appSection as AppSection | undefined) ?? routeForPath(window.location.pathname).section;
+      const path = (event.state?.path as string | undefined) ?? routeForPath(window.location.pathname).path;
+      const section = (event.state?.appSection as AppSection | undefined) ?? routeForPath(path).section;
       setHistory(prevHistory => prevHistory.slice(0, -1));
       currentSectionRef.current = section;
+      currentPathRef.current = path;
       setCurrentSection(section);
+      setCurrentPath(path);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -83,8 +94,8 @@ function App() {
 
   // Title, description and share tags follow the page on screen.
   useEffect(() => {
-    applyHeadForSection(currentSection);
-  }, [currentSection]);
+    applyHeadForRoute(currentSection === AppSection.LANDING ? routeForPath(currentPath) : routeForSection(currentSection));
+  }, [currentSection, currentPath]);
 
   /**
    * STABLE USER REFRESH
@@ -166,6 +177,7 @@ function App() {
         if (mounted) {
           setUser(null);
           setCurrentSection(AppSection.HOME);
+          setCurrentPath('/');
           setHistory([]);
           window.history.replaceState({ appSection: AppSection.HOME }, '', '/');
         }
@@ -194,7 +206,7 @@ function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
-  }, [currentSection]);
+  }, [currentSection, currentPath]);
 
   const renderContent = () => {
     if (currentSection === AppSection.ADMIN && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
@@ -216,6 +228,7 @@ function App() {
       case AppSection.SAFETY:
       case AppSection.CITIES:
       case AppSection.FAQ: return <InfoPages section={currentSection} setSection={navigateTo} goBack={goBack} user={user} />;
+      case AppSection.LANDING: return <Landing path={currentPath} navigateTo={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
       default: return <Home setSection={navigateTo} user={user} setAuthIntent={setAuthIntent} refreshUser={refreshUser} />;
     }
   };
