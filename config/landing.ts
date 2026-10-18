@@ -36,8 +36,10 @@ export interface AreaDef {
 }
 
 export interface MartCategoryDef {
-  /** The product category stored on each listing. */
-  id: string;
+  /** The product categories (config/categories.ts ids) this page shows. */
+  ids: string[];
+  /** What Mart opens on from this page: a category group or a single category. */
+  opens: string;
   slug: string;
   label: string;
   summary: string;
@@ -137,10 +139,17 @@ export const AREAS: AreaDef[] = [
 ];
 
 export const MART_CATEGORIES: MartCategoryDef[] = [
-  { id: 'Food', slug: 'food-and-groceries', label: 'Food and groceries', summary: 'Foodstuff, provisions, drinks, snacks and home-cooked meals from sellers near you.', examples: ['Rice, beans and garri', 'Fresh produce', 'Drinks and snacks', 'Home-cooked meals and pastries'] },
-  { id: 'Fashion', slug: 'fashion', label: 'Fashion and style', summary: 'Clothes, shoes, bags, fabrics and accessories from local sellers and designers.', examples: ['Ready-to-wear clothes', 'Ankara and lace fabrics', 'Shoes and bags', 'Jewellery and accessories'] },
-  { id: 'Electronics', slug: 'phones-and-gadgets', label: 'Phones and gadgets', summary: 'Phones, laptops, accessories and home electronics from verified sellers.', examples: ['Phones and tablets', 'Laptops and accessories', 'Chargers, earpieces and power banks', 'Speakers and home electronics'] },
-  { id: 'Home', slug: 'home-and-living', label: 'Home and living', summary: 'Furniture, kitchenware, decor and household items for your home.', examples: ['Furniture', 'Kitchenware', 'Bedding and decor', 'Household essentials'] },
+  { ids: ['Food', 'Drinks'], opens: 'food', slug: 'food-and-groceries', label: 'Food and groceries', summary: 'Foodstuff, provisions, drinks, snacks and home-cooked meals from sellers near you.', examples: ['Rice, beans and garri', 'Fresh produce', 'Drinks and snacks', 'Home-cooked meals and pastries'] },
+  { ids: ['FashionWomen', 'FashionMen', 'FashionKids', 'ShoesBags', 'Jewellery', 'Fabrics', 'Fashion'], opens: 'fashion', slug: 'fashion', label: 'Fashion and style', summary: 'Clothes, shoes, bags, fabrics, watches and accessories from local sellers and designers.', examples: ['Ready-to-wear clothes', 'Ankara and lace fabrics', 'Shoes and bags', 'Watches and jewellery'] },
+  { ids: ['FashionWomen'], opens: 'FashionWomen', slug: 'womens-fashion', label: "Women's fashion", summary: 'Dresses, tops, skirts, native wear and ready-to-wear outfits from local sellers and designers.', examples: ['Dresses and gowns', 'Native and Ankara styles', 'Tops, skirts and trousers', 'Nightwear and loungewear'] },
+  { ids: ['FashionMen'], opens: 'FashionMen', slug: 'mens-fashion', label: "Men's fashion", summary: 'Shirts, trousers, native wear, kaftans and suits from local sellers and tailors.', examples: ['Shirts and polos', 'Native wear and kaftans', 'Trousers and jeans', 'Suits and blazers'] },
+  { ids: ['FashionKids'], opens: 'FashionKids', slug: 'childrens-fashion', label: "Children's fashion", summary: 'Clothes and shoes for babies, children and teenagers, including school wear and party outfits.', examples: ['Baby clothes', 'School uniforms and wear', 'Party and native outfits', 'Children\u2019s shoes'] },
+  { ids: ['Beauty', 'Fragrances', 'Hair'], opens: 'beauty', slug: 'beauty-and-cosmetics', label: 'Beauty and cosmetics', summary: 'Makeup, skincare, perfumes, hair and wigs from verified local sellers.', examples: ['Makeup and skincare', 'Shea butter and natural products', 'Perfumes and body sprays', 'Wigs, braids and hair products'] },
+  { ids: ['Health'], opens: 'Health', slug: 'health-and-wellness', label: 'Health and wellness', summary: 'Wellness products, supplements, personal care and fitness essentials from verified sellers.', examples: ['Vitamins and supplements', 'Personal care', 'First aid supplies', 'Fitness and wellness products'] },
+  { ids: ['Electronics', 'Computers'], opens: 'electronics', slug: 'phones-and-gadgets', label: 'Phones and gadgets', summary: 'Phones, laptops, accessories and gadgets from verified sellers.', examples: ['Phones and tablets', 'Laptops and accessories', 'Chargers, earpieces and power banks', 'Smart watches and gadgets'] },
+  { ids: ['Home', 'Kitchen', 'Appliances'], opens: 'home', slug: 'home-and-living', label: 'Home and living', summary: 'Furniture, kitchenware, appliances, decor and household items for your home.', examples: ['Furniture', 'Kitchenware', 'Appliances, TVs and speakers', 'Bedding and decor'] },
+  { ids: ['Solar'], opens: 'Solar', slug: 'solar-and-power', label: 'Solar and power', summary: 'Solar panels, inverters, batteries and generators to keep your power on.', examples: ['Solar panels', 'Inverters and batteries', 'Generators', 'Stabilisers and power accessories'] },
+  { ids: ['Agriculture', 'AgroInputs'], opens: 'agric', slug: 'agriculture', label: 'Farm produce and agriculture', summary: 'Farm produce, livestock, seeds, feed and farm equipment from local farmers.', examples: ['Farm produce', 'Livestock and poultry', 'Seeds, fertiliser and feed', 'Farm tools and equipment'] },
 ];
 
 export const JOIN_PAGES: JoinDef[] = [
