@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ShoppingCart, Plus, Star, Loader2, X, Heart, Shield, Phone, ArrowRight, Info, Crown, ArrowUpCircle, ShieldCheck, TrendingUp, CheckCircle, MapPin } from 'lucide-react';
-import { api, PRODUCT_CATEGORIES, getParentCategory } from '../services/data';
+import { api, getParentCategory } from '../services/data';
+import { CATEGORY_GROUPS, groupOfCategory, isGroupId } from '../config/categories';
 import { PaymentService } from '../services/payments';
 import { Product, CartItem, User, AppSection, Lga } from '../types';
 import ScopeChip from '../components/ScopeChip';
@@ -26,7 +27,16 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const isDemoProduct = (product: Product) => product.vendorId?.startsWith('demo_');
   const isOutOfStock = (product: Product) => !isDemoProduct(product) && product.stock <= 0;
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedParentCategory, setSelectedParentCategory] = useState(() => peekMartCategoryIntent() ?? 'All');
+  // A landing page can open Mart on a group ("fashion") or a single category ("FashionWomen").
+  const [selectedParentCategory, setSelectedParentCategory] = useState(() => {
+    const intent = peekMartCategoryIntent();
+    if (!intent) return 'All';
+    return isGroupId(intent) ? intent : groupOfCategory(intent);
+  });
+  const [selectedSubCategory, setSelectedSubCategory] = useState(() => {
+    const intent = peekMartCategoryIntent();
+    return intent && !isGroupId(intent) ? intent : 'All';
+  });
   useEffect(() => { clearMartCategoryIntent(); }, []);
   
   // Use DataContext for products
@@ -119,11 +129,13 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const parent = getParentCategory(p.category);
-      const matchesCategory = selectedParentCategory === 'All' || parent === selectedParentCategory;
+      const matchesCategory = selectedSubCategory !== 'All'
+        ? p.category === selectedSubCategory
+        : selectedParentCategory === 'All' || parent === selectedParentCategory;
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesCategory && matchesSearch && p.status === 'APPROVED';
     });
-  }, [products, selectedParentCategory, searchTerm]);
+  }, [products, selectedParentCategory, selectedSubCategory, searchTerm]);
 
   /**
    * STRICT PRODUCT LIMIT CHECK
@@ -296,20 +308,36 @@ const Mart: React.FC<MartProps> = ({ addToCart, cart, setCart, user, onRequireAu
         />
       </div>
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-8">
-        {['All', ...PRODUCT_CATEGORIES.map(c => c.label)].map(cat => {
-          const catId = cat === 'All' ? 'All' : PRODUCT_CATEGORIES.find(c => c.label === cat)?.id || 'All';
-          return (
-            <button 
-              key={cat} 
-              onClick={() => setSelectedParentCategory(catId)} 
-              className={`px-5 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${selectedParentCategory === catId ? 'bg-kubwa-ink text-white border-kubwa-ink shadow-lg shadow-kubwa-ink/10' : 'bg-white border-gray-100 text-gray-500'}`}
-            >
-              {cat}
-            </button>
-          );
-        })}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3" role="tablist" aria-label="Product categories">
+        {[{ id: 'All', label: 'All' }, ...CATEGORY_GROUPS.map(g => ({ id: g.id, label: g.label }))].map(g => (
+          <button
+            key={g.id}
+            type="button"
+            role="tab"
+            aria-selected={selectedParentCategory === g.id}
+            onClick={() => { setSelectedParentCategory(g.id); setSelectedSubCategory('All'); }}
+            className={`px-5 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${selectedParentCategory === g.id ? 'bg-kubwa-ink text-white border-kubwa-ink shadow-lg shadow-kubwa-ink/10' : 'bg-white border-gray-100 text-gray-500'}`}
+          >
+            {g.label}
+          </button>
+        ))}
       </div>
+      {selectedParentCategory !== 'All' && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar mb-8" aria-label="Narrow down">
+          {[{ id: 'All', label: `All ${CATEGORY_GROUPS.find(g => g.id === selectedParentCategory)?.label.toLowerCase() ?? ''}` },
+            ...(CATEGORY_GROUPS.find(g => g.id === selectedParentCategory)?.categories ?? [])].map(c => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setSelectedSubCategory(c.id)}
+              className={`px-4 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${selectedSubCategory === c.id ? 'bg-kubwa-primary/10 text-kubwa-primary border-kubwa-primary/30' : 'bg-white border-gray-100 text-gray-500'}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {selectedParentCategory === 'All' && <div className="mb-5" />}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-5">
         {contextLoading && products.length === 0 ? <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-kubwa-primary"/></div> : 

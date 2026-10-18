@@ -84,7 +84,7 @@ const Landing: React.FC<LandingProps> = ({ path, navigateTo, user, setAuthIntent
         .catch(() => setProviders([]));
     } else if (page.martCategory) {
       api.getProducts(browse, 0)
-        .then(({ items }) => setProducts(items.filter(p => p.category === page.martCategory!.id)))
+        .then(({ items }) => setProducts(items.filter(p => page.martCategory!.ids.includes(p.category))))
         .catch(() => setProducts([]));
     }
   }, [page?.path, cityId]);
@@ -185,7 +185,7 @@ const Landing: React.FC<LandingProps> = ({ path, navigateTo, user, setAuthIntent
             </button>
           )}
           {page.martCategory && (
-            <button type="button" onClick={() => openMart(page.martCategory!.id)} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-kubwa-primary text-white text-sm font-bold hover:brightness-110">
+            <button type="button" onClick={() => openMart(page.martCategory!.opens)} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-kubwa-primary text-white text-sm font-bold hover:brightness-110">
               <ShoppingBag size={16} /> Shop {page.martCategory.label.toLowerCase()} <ArrowRight size={16} />
             </button>
           )}
