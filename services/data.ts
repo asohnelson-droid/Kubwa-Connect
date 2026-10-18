@@ -1,6 +1,7 @@
 
 
 import { supabase } from './supabase';
+import { ALL_CATEGORIES, groupOfCategory } from '../config/categories';
 import { compressImage } from './imageUtils';
 import { User, UserRole, Product, ServiceProvider, ApprovalStatus, MonetisationTier, PaymentIntent, Transaction, Address, Review, DeliveryRequest, MartOrder, OrderStatus, AnalyticsData, DeliveryStatus, ServiceOrder, ServiceOrderStatus, NgState, Lga, City, CityReadiness, BrowseLocation } from '../types';
 
@@ -17,16 +18,11 @@ export const AREA_SUGGESTIONS: Record<string, string[]> = {
 export const PAGE_SIZE = 40;
 export const FIXIT_SERVICES = ['Electrical Repairs', 'Plumbing', 'Generator Repairs', 'Phone & Laptop Repairs', 'Cleaning Services', 'Painting', 'AC Repairs', 'Carpentry', 'Installations', 'Home Tutoring', 'Beauty & Makeup'];
 
-export const PRODUCT_CATEGORIES = [
-    { id: 'Food', label: 'Food & Groceries' },
-    { id: 'Fashion', label: 'Fashion & Style' },
-    { id: 'Electronics', label: 'Tech & Gadgets' },
-    { id: 'Home', label: 'Home & Living' },
-];
+/** Every product category, in display order. The full grouped list lives in config/categories.ts. */
+export const PRODUCT_CATEGORIES = ALL_CATEGORIES;
 
-export const getParentCategory = (category: string) => {
-    return category; 
-};
+/** The Mart filter group a product belongs to. */
+export const getParentCategory = (category: string) => groupOfCategory(category);
 
 /**
  * MAPS SUPABASE AUTH METADATA TO APP USER TYPE
@@ -66,6 +62,7 @@ const mapUserMetadata = (sessionUser: any): User => {
         bio: meta.bio,
         phoneNumber: meta.phoneNumber,
         storeName: meta.storeName,
+        businessCategory: meta.businessCategory,
         address: meta.address
     };
 };
@@ -82,7 +79,7 @@ const mapUserMetadata = (sessionUser: any): User => {
 const overlayProfileData = async (appUser: User): Promise<User> => {
     const { data: profile } = await supabase
         .from('profiles')
-        .select('avatar, "productLimit", tier, "verificationStatus", "paymentStatus", status, "isFeatured", "stateId", "lgaId", "cityId", area, address, "phoneNumber", "storeName"')
+        .select('avatar, "productLimit", tier, "verificationStatus", "paymentStatus", status, "isFeatured", "stateId", "lgaId", "cityId", area, address, "phoneNumber", "storeName", "businessCategory"')
         .eq('id', appUser.id)
         .maybeSingle();
 
@@ -101,6 +98,7 @@ const overlayProfileData = async (appUser: User): Promise<User> => {
         if (profile.address) appUser.address = profile.address;
         if (profile.phoneNumber) appUser.phoneNumber = profile.phoneNumber;
         if (profile.storeName) appUser.storeName = profile.storeName;
+        if (profile.businessCategory) appUser.businessCategory = profile.businessCategory;
     }
 
     return appUser;
