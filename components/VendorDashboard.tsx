@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Product, MartOrder, ApprovalStatus } from '../types';
-import { api, PRODUCT_CATEGORIES } from '../services/data';
+import { api } from '../services/data';
+import { CATEGORY_GROUPS, categoryLabel, isKnownCategory } from '../config/categories';
 import { PaymentService } from '../services/payments';
 import { supabase } from '../services/supabase';
 import { Card, Button, Input, Badge, Sheet, SafeImage, SectionHeader } from './ui';
@@ -184,7 +185,8 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
   const MAX_PRODUCT_IMAGES = 4;
 
   const openAddProduct = () => {
-    setEditingProduct({ category: 'Food' });
+    // New products start in the vendor's main category (chosen at sign-up).
+    setEditingProduct({ category: isKnownCategory(user.businessCategory) ? user.businessCategory : 'Food' });
     setImageEntries([]);
     setPendingImageDeletions([]);
     setIsSheetOpen(true);
@@ -424,7 +426,14 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user, refreshUser }) 
                   value={editingProduct?.category}
                   onChange={e => setEditingProduct(prev => ({...prev || {}, category: e.target.value}))}
                 >
-                   {PRODUCT_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                   {editingProduct?.category && !isKnownCategory(editingProduct.category) && (
+                     <option value={editingProduct.category}>{categoryLabel(editingProduct.category)} (please choose a newer category)</option>
+                   )}
+                   {CATEGORY_GROUPS.map(g => (
+                     <optgroup key={g.id} label={g.label}>
+                       {g.categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                     </optgroup>
+                   ))}
                 </select>
              </div>
              <textarea 

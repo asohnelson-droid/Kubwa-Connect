@@ -5,6 +5,7 @@ import { Button, Input, Card } from './ui';
 import { api } from '../services/data';
 import LocationPicker, { LocationValue } from './LocationPicker';
 import { User as UserType } from '../types';
+import { CATEGORY_GROUPS } from '../config/categories';
 
 interface SetupWizardProps {
   user: UserType;
@@ -18,6 +19,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
+  const [businessCategory, setBusinessCategory] = useState(user.businessCategory || '');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [location, setLocation] = useState<LocationValue>({ stateId: user.stateId, lgaId: user.lgaId, area: user.area || '' });
@@ -41,6 +43,10 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
   const handleFinish = async () => {
     if (loading) return;
     setFormError('');
+    if (isVendor && !businessCategory) {
+      setFormError('Please choose what you mainly sell.');
+      return;
+    }
     if (!location.lgaId) {
       setFormError('Please choose your state and local government area.');
       return;
@@ -65,6 +71,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
         lgaId: location.lgaId,
         area: location.area.trim() || undefined,
         storeName: isVendor ? storeName.trim() : undefined,
+        businessCategory: isVendor ? businessCategory : undefined,
       });
       if (updatedUser) {
         onComplete(updatedUser);
@@ -112,6 +119,25 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ user, onComplete }) => {
                  <Search size={14} className="shrink-0 mt-0.5" /> Enter your contact details so clients can reach you.
                </div>
                {isVendor && <Input placeholder="Business name" value={storeName} onChange={e => setStoreName(e.target.value)} />}
+               {isVendor && (
+                 <div className="space-y-1">
+                   <label htmlFor="business-category" className="text-xs font-bold text-gray-500 ml-2">What do you mainly sell?</label>
+                   <select
+                     id="business-category"
+                     className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-kubwa-primary/20"
+                     value={businessCategory}
+                     onChange={e => setBusinessCategory(e.target.value)}
+                   >
+                     <option value="">Choose a category</option>
+                     {CATEGORY_GROUPS.map(g => (
+                       <optgroup key={g.id} label={g.label}>
+                         {g.categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                       </optgroup>
+                     ))}
+                   </select>
+                   <p className="text-[11px] text-gray-500 font-semibold ml-2">You can still list products in any category.</p>
+                 </div>
+               )}
                <Input placeholder="Active phone number" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
                <LocationPicker value={location} onChange={setLocation} role={user.role} />
                <Input placeholder="House number and street" value={address} onChange={e => setAddress(e.target.value)} />
