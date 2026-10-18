@@ -35,6 +35,8 @@ export interface User {
   isSetupComplete?: boolean;
   phoneNumber?: string;
   storeName?: string;
+  /** A vendor's main product category (config/categories.ts id). */
+  businessCategory?: string;
   address?: string;
 
   // Location (server-derived: stateId and cityId always follow lgaId)
